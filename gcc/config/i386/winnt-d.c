@@ -60,6 +60,17 @@ winnt_d_register_module (void *module_decl, tree minfo)
   // There is no _d_dso_registry for windows targets
 }
 
+/* Implement TARGET_D_SYSTEM_LINKAGE for Windows targets.  */
+
+LINKAGE
+winnt_d_system_linkage ()
+{
+  if (DEFAULT_ABI == MS_ABI)
+    return LINKAGE_WINDOWS;
+  else
+    return LINKAGE_C;
+}
+
 #undef TARGET_D_OS_VERSIONS
 #define TARGET_D_OS_VERSIONS winnt_d_os_builtins
 
@@ -68,5 +79,8 @@ winnt_d_register_module (void *module_decl, tree minfo)
 
 #undef TARGET_D_REGISTER_MODULE
 #define TARGET_D_REGISTER_MODULE winnt_d_register_module
+
+#undef TARGET_D_SYSTEM_LINKAGE
+#define TARGET_D_SYSTEM_LINKAGE winnt_d_system_linkage
 
 struct gcc_targetdm targetdm = TARGETDM_INITIALIZER;

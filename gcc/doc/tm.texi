@@ -10757,6 +10757,11 @@ The @code{emit_minfo_section} places a reference to @code{minfo} into the sectio
 @code{_d_dso_registry}. The default implementation uses this mechanism.
 @end deftypefn
 
+@deftypefn {D Target Hook} LINKAGE TARGET_D_SYSTEM_LINKAGE (void)
+Return information about the system ABI used. This information is used
+to implement the @code{version(System)} statement.
+@end deftypefn
+
 @node Named Address Spaces
 @section Adding support for named address spaces
 @cindex named address spaces

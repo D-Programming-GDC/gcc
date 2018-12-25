@@ -23,6 +23,12 @@
 #define DEFHOOK_UNDOC DEFHOOK
 #define HOOKSTRUCT(FRAGMENT) FRAGMENT
 
+enum LINKAGE
+{
+    LINKAGE_C,
+    LINKAGE_WINDOWS
+};
+
 #include "d-target.def"
 
 /* Each target can provide their own.  */
@@ -39,5 +45,8 @@ extern void register_minfo_section ();
 
 /* Default implementation to register minfo section with runtime.  */
 extern void d_register_module_default (void *module_decl, tree minfo);
+
+/* Default implementation to determine extern(System) linkage.  */
+LINKAGE d_system_linkage_default ();
 
 #endif /* GCC_D_TARGET_H  */

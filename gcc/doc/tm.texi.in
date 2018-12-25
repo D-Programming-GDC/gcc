@@ -7342,6 +7342,8 @@ floating-point support; they are not included in this mechanism.
 
 @hook TARGET_D_REGISTER_MODULE
 
+@hook TARGET_D_SYSTEM_LINKAGE
+
 @node Named Address Spaces
 @section Adding support for named address spaces
 @cindex named address spaces

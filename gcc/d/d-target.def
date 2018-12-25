@@ -69,5 +69,13 @@ The @code{emit_minfo_section} places a reference to @code{minfo} into the sectio
  void, (void *module_decl, tree minfo),
  d_register_module_default)
 
+/* Return information about system ABI. */
+DEFHOOK
+(d_system_linkage,
+ "Return information about the system ABI used. This information is used\n\
+to implement the @code{version(System)} statement.",
+ LINKAGE, (void),
+ d_system_linkage_default)
+
 /* Close the 'struct gcc_targetdm' definition.  */
 HOOK_VECTOR_END (C90_EMPTY_HACK)
