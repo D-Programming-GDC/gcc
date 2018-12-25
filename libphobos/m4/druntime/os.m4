@@ -183,3 +183,20 @@ AC_DEFUN([DRUNTIME_OS_MINFO_BRACKETING],
   AM_CONDITIONAL([DRUNTIME_OS_MINFO_BRACKETING], [test "$DCFG_MINFO_BRACKETING" = "true"])
   AC_LANG_POP([C])
 ])
+
+# DRUNTIME_OS_SHARED_SUPPORT
+# --------------------------
+# Override LT_INIT shared lib values for OS where we do not support
+# building shared druntime libs.
+AC_DEFUN([DRUNTIME_OS_SHARED_SUPPORT],
+[
+  AC_REQUIRE([DRUNTIME_OS_DETECT])
+
+  case "$druntime_cv_target_os" in
+    mingw*)
+      AC_MSG_NOTICE([Shared phobos libraries are not supported for windows targets. Disabled.])
+      enable_shared=no
+      enable_static=yes
+      ;;
+  esac
+])
