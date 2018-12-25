@@ -10747,6 +10747,16 @@ would return the @code{sizeof(CRITICAL_SECTION)}, while other platforms that
 implement pthreads would return @code{sizeof(pthread_mutex_t)}.
 @end deftypefn
 
+@deftypefn {D Target Hook} void TARGET_D_REGISTER_MODULE (void *@var{module_decl}, tree @var{minfo})
+Generates code to register the Moduleinfo @var{minfo} belonging to module
+@var{module_decl} with the D runtime. This usually involves two steps: Storing
+a reference to @var{minfo} and calling the @code{_d_dso_registry} function in the
+runtime. Currently, the only available implemention uses a named minfo section.
+The @code{emit_minfo_section} places a reference to @code{minfo} into the section,
+@code{register_minfo_section} generates constructors to call
+@code{_d_dso_registry}. The default implementation uses this mechanism.
+@end deftypefn
+
 @node Named Address Spaces
 @section Adding support for named address spaces
 @cindex named address spaces

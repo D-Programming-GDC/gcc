@@ -56,5 +56,18 @@ implement pthreads would return @code{sizeof(pthread_mutex_t)}.",
  unsigned, (void),
  hook_uint_void_0)
 
+/* Generate code to register module with druntime. */
+DEFHOOK
+(d_register_module,
+ "Generates code to register the Moduleinfo @var{minfo} belonging to module\n\
+@var{module_decl} with the D runtime. This usually involves two steps: Storing\n\
+a reference to @var{minfo} and calling the @code{_d_dso_registry} function in the\n\
+runtime. Currently, the only available implemention uses a named minfo section.\n\
+The @code{emit_minfo_section} places a reference to @code{minfo} into the section,\n\
+@code{register_minfo_section} generates constructors to call\n\
+@code{_d_dso_registry}. The default implementation uses this mechanism.",
+ void, (void *module_decl, tree minfo),
+ d_register_module_default)
+
 /* Close the 'struct gcc_targetdm' definition.  */
 HOOK_VECTOR_END (C90_EMPTY_HACK)

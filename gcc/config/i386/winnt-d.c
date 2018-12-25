@@ -51,10 +51,22 @@ winnt_d_critsec_size (void)
     return 24;
 }
 
+/* Implement TARGET_D_REGISTER_MODULE for Windows targets.  */
+
+void
+winnt_d_register_module (void *module_decl, tree minfo)
+{
+  emit_minfo_section (module_decl, minfo);
+  // There is no _d_dso_registry for windows targets
+}
+
 #undef TARGET_D_OS_VERSIONS
 #define TARGET_D_OS_VERSIONS winnt_d_os_builtins
 
 #undef TARGET_D_CRITSEC_SIZE
 #define TARGET_D_CRITSEC_SIZE winnt_d_critsec_size
+
+#undef TARGET_D_REGISTER_MODULE
+#define TARGET_D_REGISTER_MODULE winnt_d_register_module
 
 struct gcc_targetdm targetdm = TARGETDM_INITIALIZER;
