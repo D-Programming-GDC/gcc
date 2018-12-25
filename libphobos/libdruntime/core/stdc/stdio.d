@@ -1146,97 +1146,30 @@ void setbuf(FILE* stream, char* buf);
 ///
 int  setvbuf(FILE* stream, char* buf, int mode, size_t size);
 
-version (MinGW)
-{
-    // Prefer the MinGW versions over the MSVC ones, as the latter don't handle
-    // reals at all.
-    ///
-    int __mingw_fprintf(FILE* stream, scope const char* format, ...);
-    ///
-    alias __mingw_fprintf fprintf;
-
-    ///
-    int __mingw_fscanf(FILE* stream, scope const char* format, ...);
-    ///
-    alias __mingw_fscanf fscanf;
-
-    ///
-    int __mingw_sprintf(scope char* s, scope const char* format, ...);
-    ///
-    alias __mingw_sprintf sprintf;
-
-    ///
-    int __mingw_sscanf(scope const char* s, scope const char* format, ...);
-    ///
-    alias __mingw_sscanf sscanf;
-
-    ///
-    int __mingw_vfprintf(FILE* stream, scope const char* format, va_list arg);
-    ///
-    alias __mingw_vfprintf vfprintf;
-
-    ///
-    int __mingw_vfscanf(FILE* stream, scope const char* format, va_list arg);
-    ///
-    alias __mingw_vfscanf vfscanf;
-
-    ///
-    int __mingw_vsprintf(scope char* s, scope const char* format, va_list arg);
-    ///
-    alias __mingw_vsprintf vsprintf;
-
-    ///
-    int __mingw_vsscanf(scope const char* s, scope const char* format, va_list arg);
-    ///
-    alias __mingw_vsscanf vsscanf;
-
-    ///
-    int __mingw_vprintf(scope const char* format, va_list arg);
-    ///
-    alias __mingw_vprintf vprintf;
-
-    ///
-    int __mingw_vscanf(scope const char* format, va_list arg);
-    ///
-    alias __mingw_vscanf vscanf;
-
-    ///
-    int __mingw_printf(scope const char* format, ...);
-    ///
-    alias __mingw_printf printf;
-
-    ///
-    int __mingw_scanf(scope const char* format, ...);
-    ///
-    alias __mingw_scanf scanf;
-}
-else
-{
-    ///
-    int fprintf(FILE* stream, scope const char* format, ...);
-    ///
-    int fscanf(FILE* stream, scope const char* format, ...);
-    ///
-    int sprintf(scope char* s, scope const char* format, ...);
-    ///
-    int sscanf(scope const char* s, scope const char* format, ...);
-    ///
-    int vfprintf(FILE* stream, scope const char* format, va_list arg);
-    ///
-    int vfscanf(FILE* stream, scope const char* format, va_list arg);
-    ///
-    int vsprintf(scope char* s, scope const char* format, va_list arg);
-    ///
-    int vsscanf(scope const char* s, scope const char* format, va_list arg);
-    ///
-    int vprintf(scope const char* format, va_list arg);
-    ///
-    int vscanf(scope const char* format, va_list arg);
-    ///
-    int printf(scope const char* format, ...);
-    ///
-    int scanf(scope const char* format, ...);
-}
+///
+int fprintf(FILE* stream, scope const char* format, ...);
+///
+int fscanf(FILE* stream, scope const char* format, ...);
+///
+int sprintf(scope char* s, scope const char* format, ...);
+///
+int sscanf(scope const char* s, scope const char* format, ...);
+///
+int vfprintf(FILE* stream, scope const char* format, va_list arg);
+///
+int vfscanf(FILE* stream, scope const char* format, va_list arg);
+///
+int vsprintf(scope char* s, scope const char* format, va_list arg);
+///
+int vsscanf(scope const char* s, scope const char* format, va_list arg);
+///
+int vprintf(scope const char* format, va_list arg);
+///
+int vscanf(scope const char* format, va_list arg);
+///
+int printf(scope const char* format, ...);
+///
+int scanf(scope const char* format, ...);
 
 // No unsafe pointer manipulation.
 @trusted
@@ -1291,35 +1224,7 @@ size_t fwrite(scope const void* ptr, size_t size, size_t nmemb, FILE* stream);
     c_long ftell(FILE* stream);
 }
 
-version (MinGW)
-{
-  // No unsafe pointer manipulation.
-  extern (D) @trusted
-  {
-    ///
-    void rewind()(FILE* stream)   { fseek(stream,0L,SEEK_SET); stream._flag = stream._flag & ~_IOERR; }
-    ///
-    pure void clearerr()(FILE* stream) { stream._flag = stream._flag & ~(_IOERR|_IOEOF); }
-    ///
-    pure int  feof()(FILE* stream)     { return stream._flag&_IOEOF; }
-    ///
-    pure int  ferror()(FILE* stream)   { return stream._flag&_IOERR; }
-  }
-  ///
-    int   __mingw_snprintf(scope char* s, size_t n, scope const char* fmt, ...);
-    ///
-    alias __mingw_snprintf _snprintf;
-    ///
-    alias __mingw_snprintf snprintf;
-
-    ///
-    int   __mingw_vsnprintf(scope char* s, size_t n, scope const char* format, va_list arg);
-    ///
-    alias __mingw_vsnprintf _vsnprintf;
-    ///
-    alias __mingw_vsnprintf vsnprintf;
-}
-else version (CRuntime_DigitalMars)
+version (CRuntime_DigitalMars)
 {
   // No unsafe pointer manipulation.
   extern (D) @trusted

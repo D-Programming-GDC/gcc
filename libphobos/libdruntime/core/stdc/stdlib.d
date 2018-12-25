@@ -128,13 +128,6 @@ version (CRuntime_Microsoft)
         return strtod(nptr, endptr);
     }
 }
-else version (MinGW)
-{
-    ///
-    real __mingw_strtold(scope inout(char)* nptr, scope inout(char)** endptr);
-    ///
-    alias __mingw_strtold strtold;
-}
 else
 {
     /// Added to Bionic since Lollipop.

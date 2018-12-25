@@ -29,17 +29,7 @@ public import core.sys.windows.threadaux;
 //  not access tls_array[tls_index] as needed for thread local _tlsstart and _tlsend
 extern (C)
 {
-        version (MinGW)
-        {
-            extern __gshared void* _tls_start;
-            extern __gshared void* _tls_end;
-            extern __gshared void* __xl_a;
-
-            alias _tls_start _tlsstart;
-            alias _tls_end   _tlsend;
-            alias __xl_a     _tls_callbacks_a;
-        }
-        else version (Win32)
+        version (Win32)
     {
         version (CRuntime_DigitalMars)
         {
@@ -329,6 +319,8 @@ bool dll_fixTLS( HINSTANCE hInstance, void* tlsstart, void* tlsend, void* tls_ca
 {
     version (Win64)
         return true;                // fixed
+    else version (GNU)
+        return true;                // Using emutls
     else version (Win32)
     {
     /* If the OS has allocated a TLS slot for us, we don't have to do anything

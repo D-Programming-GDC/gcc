@@ -165,7 +165,7 @@ struct thread_aux
     {
         version (Win32)
         {
-            version (GNU_InlineAsm)
+            version (GNU)
             {
                 void** teb;
                 asm pure nothrow @nogc { "movl %%fs:0x18, %0;" : "=r" teb; }
@@ -183,7 +183,7 @@ struct thread_aux
         }
         else version (Win64)
         {
-            version (GNU_InlineAsm)
+            version (GNU)
             {
                 void** teb;
                 asm pure nothrow @nogc { "movq %%gs:0x30, %0;" : "=r" teb; }

@@ -3679,7 +3679,11 @@ real log2(real x) @safe pure nothrow @nogc
  */
 real logb(real x) @trusted nothrow @nogc
 {
-    version (Win64_DMD_InlineAsm)
+    version (GNU)
+    {
+        return core.stdc.math.logbl(x);
+    }
+    else version (Win64_DMD_InlineAsm)
     {
         asm pure nothrow @nogc
         {
@@ -3958,7 +3962,24 @@ real hypot(real x, real y) @safe pure nothrow @nogc
  */
 real ceil(real x) @trusted pure nothrow @nogc
 {
-    version (Win64_DMD_InlineAsm)
+    static real genericCeil(real x) @trusted pure nothrow @nogc
+    {
+        // Special cases.
+        if (isNaN(x) || isInfinity(x))
+            return x;
+
+        real y = floorImpl(x);
+        if (y < x)
+            y += 1.0;
+
+        return y;
+    }
+
+    version(GNU)
+    {
+        return genericCeil(x);
+    }
+    else version (Win64_DMD_InlineAsm)
     {
         asm pure nothrow @nogc
         {
@@ -3997,15 +4018,7 @@ real ceil(real x) @trusted pure nothrow @nogc
     }
     else
     {
-        // Special cases.
-        if (isNaN(x) || isInfinity(x))
-            return x;
-
-        real y = floorImpl(x);
-        if (y < x)
-            y += 1.0;
-
-        return y;
+        return genericCeil(x);
     }
 }
 
@@ -4086,7 +4099,20 @@ float ceil(float x) @trusted pure nothrow @nogc
  */
 real floor(real x) @trusted pure nothrow @nogc
 {
-    version (Win64_DMD_InlineAsm)
+    static real genericFloor(real x) @trusted pure nothrow @nogc
+    {
+        // Special cases.
+        if (isNaN(x) || isInfinity(x) || x == 0.0)
+            return x;
+
+        return floorImpl(x);
+    }
+
+    version (GNU)
+    {
+        return genericFloor(x);
+    }
+    else version (Win64_DMD_InlineAsm)
     {
         asm pure nothrow @nogc
         {
@@ -4125,11 +4151,7 @@ real floor(real x) @trusted pure nothrow @nogc
     }
     else
     {
-        // Special cases.
-        if (isNaN(x) || isInfinity(x) || x == 0.0)
-            return x;
-
-        return floorImpl(x);
+        return genericFloor(x);
     }
 }
 
@@ -4586,7 +4608,11 @@ version (Posix)
  */
 real trunc(real x) @trusted nothrow @nogc
 {
-    version (Win64_DMD_InlineAsm)
+    version (GNU)
+    {
+        return core.stdc.math.truncl(x);
+    }
+    else version (Win64_DMD_InlineAsm)
     {
         asm pure nothrow @nogc
         {
