@@ -44,9 +44,17 @@ struct SectionGroup
     version (Win64)
     @property immutable(FuncTable)[] ehTables() const nothrow @nogc
     {
-        auto pbeg = cast(immutable(FuncTable)*)&_deh_beg;
-        auto pend = cast(immutable(FuncTable)*)&_deh_end;
-        return pbeg[0 .. pend - pbeg];
+        version (GNU)
+        {
+            // GCC exception handling does not use this function
+            return [];
+        }
+        else
+        {
+            auto pbeg = cast(immutable(FuncTable)*)&_deh_beg;
+            auto pend = cast(immutable(FuncTable)*)&_deh_end;
+            return pbeg[0 .. pend - pbeg];
+        }
     }
 
     @property inout(void[])[] gcRanges() inout nothrow @nogc
@@ -73,32 +81,40 @@ void initSections() nothrow @nogc
     import rt.sections;
     conservative = !scanDataSegPrecisely();
 
-    if (conservative)
+    version (GNU)
     {
         _sections._gcRanges = (cast(void[]*) malloc((void[]).sizeof))[0..1];
         _sections._gcRanges[0] = dataSection;
     }
     else
     {
-        size_t count = &_DP_end - &_DP_beg;
-        auto ranges = cast(void[]*) malloc(count * (void[]).sizeof);
-        size_t r = 0;
-        void* prev = null;
-        for (size_t i = 0; i < count; i++)
+        if (conservative)
         {
-            auto off = (&_DP_beg)[i];
-            if (off == 0) // skip zero entries added by incremental linking
-                continue; // assumes there is no D-pointer at the very beginning of .data
-            void* addr = dataSection.ptr + off;
-            debug(PRINTF) printf("  scan %p\n", addr);
-            // combine consecutive pointers into single range
-            if (prev + (void*).sizeof == addr)
-                ranges[r-1] = ranges[r-1].ptr[0 .. ranges[r-1].length + (void*).sizeof];
-            else
-                ranges[r++] = (cast(void**)addr)[0..1];
-            prev = addr;
+            _sections._gcRanges = (cast(void[]*) malloc((void[]).sizeof))[0..1];
+            _sections._gcRanges[0] = dataSection;
         }
-        _sections._gcRanges = ranges[0..r];
+        else
+        {
+            size_t count = &_DP_end - &_DP_beg;
+            auto ranges = cast(void[]*) malloc(count * (void[]).sizeof);
+            size_t r = 0;
+            void* prev = null;
+            for (size_t i = 0; i < count; i++)
+            {
+                auto off = (&_DP_beg)[i];
+                if (off == 0) // skip zero entries added by incremental linking
+                    continue; // assumes there is no D-pointer at the very beginning of .data
+                void* addr = dataSection.ptr + off;
+                debug(PRINTF) printf("  scan %p\n", addr);
+                // combine consecutive pointers into single range
+                if (prev + (void*).sizeof == addr)
+                    ranges[r-1] = ranges[r-1].ptr[0 .. ranges[r-1].length + (void*).sizeof];
+                else
+                    ranges[r++] = (cast(void**)addr)[0..1];
+                prev = addr;
+            }
+            _sections._gcRanges = ranges[0..r];
+        }
     }
 }
 
@@ -129,6 +145,7 @@ void[] initTLSRanges() nothrow @nogc
             sub EAX, [_tls_used+0]; // start
             mov pend, EAX;
         }
+        return pbeg[0 .. pend - pbeg];
     }
     else version (D_InlineAsm_X86_64)
     {
@@ -144,35 +161,55 @@ void[] initTLSRanges() nothrow @nogc
             sub RAX, [_tls_used+0]; // start
             mov pend, RAX;
         }
+        return pbeg[0 .. pend - pbeg];
+    }
+    else version (GNU_EMUTLS)
+    {
+        return [];
     }
     else
         static assert(false, "Architecture not supported.");
-
-    return pbeg[0 .. pend - pbeg];
 }
 
 void finiTLSRanges(void[] rng) nothrow @nogc
 {
 }
 
+version (GNU_EMUTLS)
+{
+    extern(C) void emutls_iterate_range (void* mem, size_t size, scope void* user) nothrow
+    {
+        alias GCDelegate = scope void delegate(void* pbeg, void* pend) nothrow;
+        auto dg = *cast(GCDelegate*)user;
+        dg(mem, mem + size);
+    }
+}
+
 void scanTLSRanges(void[] rng, scope void delegate(void* pbeg, void* pend) nothrow dg) nothrow
 {
-    if (conservative)
+    version (GNU_EMUTLS)
     {
-        dg(rng.ptr, rng.ptr + rng.length);
+        __emutls_iterate_memory(&emutls_iterate_range, &dg);
     }
     else
     {
-        for (auto p = &_TP_beg; p < &_TP_end; )
+        if (conservative)
         {
-            uint beg = *p++;
-            uint end = beg + cast(uint)((void*).sizeof);
-            while (p < &_TP_end && *p == end)
+            dg(rng.ptr, rng.ptr + rng.length);
+        }
+        else
+        {
+            for (auto p = &_TP_beg; p < &_TP_end; )
             {
-                end += (void*).sizeof;
-                p++;
+                uint beg = *p++;
+                uint end = beg + cast(uint)((void*).sizeof);
+                while (p < &_TP_end && *p == end)
+                {
+                    end += (void*).sizeof;
+                    p++;
+                }
+                dg(rng.ptr + beg, rng.ptr + end);
             }
-            dg(rng.ptr + beg, rng.ptr + end);
         }
     }
 }
@@ -182,8 +219,18 @@ __gshared SectionGroup _sections;
 
 extern(C)
 {
-    extern __gshared void* _minfo_beg;
-    extern __gshared void* _minfo_end;
+    version (GNU)
+    {
+        alias emutls_iterate_callback = extern(C) void function(void* mem, size_t size, void* user) nothrow;
+        void __emutls_iterate_memory (emutls_iterate_callback cb, void* user) nothrow;
+        extern __gshared void* __start_minfo;
+        extern __gshared void* __stop_minfo;
+    }
+    else
+    {
+        extern __gshared void* _minfo_beg;
+        extern __gshared void* _minfo_end;
+    }
 }
 
 immutable(ModuleInfo*)[] getModuleInfos() nothrow @nogc
@@ -194,7 +241,12 @@ out (result)
 }
 body
 {
-    auto m = (cast(immutable(ModuleInfo*)*)&_minfo_beg)[1 .. &_minfo_end - &_minfo_beg];
+    // The binutils __start symbol address is a valid ModuleInfo entry,
+    // whereas the _beg address is an extra variable, not ModuleInfo.
+    version (GNU)
+        auto m = (cast(immutable(ModuleInfo*)*)&__start_minfo)[0 .. &__stop_minfo - &__start_minfo];
+    else
+        auto m = (cast(immutable(ModuleInfo*)*)&_minfo_beg)[1 .. &_minfo_end - &_minfo_beg];
     /* Because of alignment inserted by the linker, various null pointers
      * are there. We need to filter them out.
      */
