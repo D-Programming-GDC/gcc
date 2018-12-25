@@ -127,8 +127,21 @@ struct _Unwind_Exception
 {
     _Unwind_Exception_Class exception_class;
     _Unwind_Exception_Cleanup_Fn exception_cleanup;
-    _Unwind_Word private_1;
-    _Unwind_Word private_2;
+
+    version (GNU_SjLj_Exceptions)
+    {
+        _Unwind_Word private_1;
+        _Unwind_Word private_2;
+    }
+    else version (GNU_SEH_Exceptions)
+    {
+        _Unwind_Word private_[6];
+    }
+    else
+    {
+        _Unwind_Word private_1;
+        _Unwind_Word private_2;
+    }
 }
 
 // The ACTIONS argument to the personality routine is a bitwise OR of one
@@ -270,5 +283,5 @@ version (GNU_SEH_Exceptions)
     }
 
     extern(C) EXCEPTION_DISPOSITION _GCC_specific_handler(void*, void*, void*,
-                                                          _Unwind_Personality_Fn);
+                                                          void*, _Unwind_Personality_Fn);
 }
