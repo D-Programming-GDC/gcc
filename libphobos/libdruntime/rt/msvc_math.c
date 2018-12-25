@@ -10,16 +10,16 @@
 * Authors:   Martin Kinkelin
 */
 
-#if defined _M_IX86
+#if defined _M_IX86 || (defined __MINGW32__ && defined __i386__)
 
 // Forward-declare double-precision version and implement single-precision
 // wrapper.
 #define ALT_IMPL(baseName) \
     double baseName(double x); \
-    float _msvc_ ## baseName ## f(float x) { return (float)baseName(x); }
+    float ## baseName ## f(float x) { return (float)baseName(x); }
 #define ALT_IMPL2(baseName) \
     double baseName(double x, double y); \
-    float _msvc_ ## baseName ## f(float x, float y) { return (float)baseName(x, y); }
+    float ## baseName ## f(float x, float y) { return (float)baseName(x, y); }
 
 ALT_IMPL(acos);
 ALT_IMPL(asin);
@@ -41,7 +41,7 @@ ALT_IMPL(floor);
 ALT_IMPL2(fmod);
 
 double modf(double value, double *iptr);
-float _msvc_modff(float value, float *iptr)
+float modff(float value, float *iptr)
 {
     double di;
     float result = (float)modf(value, &di);
