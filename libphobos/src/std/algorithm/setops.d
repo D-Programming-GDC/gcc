@@ -130,6 +130,7 @@ if (!allSatisfy!(isForwardRange, R1, R2) ||
                           "have at least one finite forward range");
 }
 
+/+
 ///
 @safe unittest
 {
@@ -354,6 +355,7 @@ pure nothrow @safe @nogc unittest
     int[1] a = [1];
     foreach (t; cartesianProduct(a[], a[])) {}
 }
++/
 
 /// ditto
 auto cartesianProduct(RR...)(RR ranges)
@@ -422,6 +424,7 @@ if (ranges.length >= 2 &&
     return Result(ranges);
 }
 
+/+
 @safe unittest
 {
     // Issue 10693: cartesian product of empty ranges should be empty.
@@ -552,7 +555,7 @@ pure @safe nothrow @nogc unittest
     import std.algorithm.iteration : map;
     auto seq = [1, 2].map!(x => x);
     foreach (pair; cartesianProduct(seq, seq)) {}
-}
+}+/
 
 // largestPartialIntersection
 /**

@@ -363,7 +363,7 @@ if (isBidirectionalRange!(Unqual!Range))
     }
 }
 
-
+/+
 ///
 pure @safe nothrow @nogc unittest
 {
@@ -479,7 +479,7 @@ pure @safe nothrow @nogc unittest
     int[] data = src[];
     foreach_reverse (x; data) {}
     foreach (x; data.retro) {}
-}
+}+/
 
 
 /**
@@ -686,7 +686,7 @@ body
         return Result(r, n);
     }
 }
-
+/+
 ///
 pure @safe nothrow unittest
 {
@@ -868,7 +868,7 @@ pure @safe nothrow unittest
     auto s = stride(LL, 3);
     assert(equal(s, [1L, 4L, 7L]));
 }
-
++/
 /**
 Spans multiple ranges in sequence. The function $(D chain) takes any
 number of ranges and returns a $(D Chain!(R1, R2,...)) object. The
@@ -1205,7 +1205,7 @@ if (Ranges.length > 0 &&
         return Result(rs);
     }
 }
-
+/+
 ///
 pure @safe nothrow unittest
 {
@@ -1348,7 +1348,7 @@ pure @safe nothrow @nogc unittest
     immutable(Foo)[] b;
     assert(chain(a, b).empty);
 }
-
++/
 /**
 Choose one of two ranges at runtime depending on a Boolean condition.
 
@@ -1532,7 +1532,7 @@ if (isInputRange!(Unqual!R1) && isInputRange!(Unqual!R2) &&
     }
     return Result(condition, r1, r2);
 }
-
+/+
 ///
 @system unittest
 {
@@ -1562,7 +1562,7 @@ if (isInputRange!(Unqual!R1) && isInputRange!(Unqual!R2) &&
 
     result = chooseRange(false);
     assert(result.equal([ 6, 7, 8, 9 ]));
-}
+}+/
 
 /**
 Choose one of multiple ranges at runtime.
@@ -1588,7 +1588,7 @@ if (Ranges.length >= 2
     else
         return choose(index == 0, rs[0], chooseAmong(index - 1, rs[1 .. $]));
 }
-
+/+
 ///
 @system unittest
 {
@@ -1662,7 +1662,7 @@ if (Ranges.length >= 2
     assert(c[0] == 42);
 }
 
-
++/
 /**
 $(D roundRobin(r1, r2, r3)) yields $(D r1.front), then $(D r2.front),
 then $(D r3.front), after which it pops off one element from each and
@@ -1769,7 +1769,7 @@ if (Rs.length > 1 && allSatisfy!(isInputRange, staticMap!(Unqual, Rs)))
 
     return Result(rs, 0);
 }
-
+/+
 ///
 @safe unittest
 {
@@ -1804,7 +1804,7 @@ if (Rs.length > 1 && allSatisfy!(isInputRange, staticMap!(Unqual, Rs)))
     }
 
     assert(interleave([1, 2, 3], 0).equal([1, 0, 2, 0, 3]));
-}
+}+/
 
 /**
 Iterates a random-access range starting from a given point and
@@ -1835,7 +1835,7 @@ if (isRandomAccessRange!(Unqual!R) && hasLength!(Unqual!R) && hasSlicing!(Unqual
 {
     return .radial(r, (r.length - !r.empty) / 2);
 }
-
+/+
 ///
 @safe unittest
 {
@@ -1904,7 +1904,7 @@ if (isRandomAccessRange!(Unqual!R) && hasLength!(Unqual!R) && hasSlicing!(Unqual
     auto LL = iota(1L, 6L);
     auto r = radial(LL);
     assert(equal(r, [3L, 4L, 2L, 5L, 1L]));
-}
+}+/
 
 /**
 Lazily takes only up to `n` elements of a range. This is
@@ -2143,7 +2143,7 @@ if (isInputRange!(Unqual!R) &&
 {
     alias Take = R;
 }
-
+/+
 ///
 pure @safe nothrow unittest
 {
@@ -2293,7 +2293,7 @@ pure @safe nothrow @nogc unittest //13151
 
     auto r = take(repeat(1, 4), 3);
     assert(r.take(2).equal(repeat(1, 2)));
-}
+}+/
 
 
 /**
@@ -2385,7 +2385,7 @@ if (isInputRange!R)
         return Result(range, n);
     }
 }
-
+/+
 ///
 pure @safe nothrow unittest
 {
@@ -2497,7 +2497,7 @@ pure @safe nothrow unittest
     assert(equal(t, [1, 2, 3, 4, 5]));
     assert(equal(t, te));
 }
-
++/
 /**
 Returns a range with at most one element; for example, $(D
 takeOne([42, 43, 44])) returns a range consisting of the integer $(D
@@ -2572,7 +2572,7 @@ if (isInputRange!R)
         return Result(source, source.empty);
     }
 }
-
+/+
 ///
 pure @safe nothrow unittest
 {
@@ -2623,7 +2623,7 @@ pure @safe unittest
     assert(sum == 3);
     assert(iotaPart.front == 3);
 }
-
++/
 /++
     Returns an empty range which is statically known to be empty and is
     guaranteed to have $(D length) and be random access regardless of $(D R)'s
@@ -2634,7 +2634,7 @@ if (isInputRange!R)
 {
     return typeof(takeOne(R.init)).init;
 }
-
+/+
 ///
 pure @safe nothrow @nogc unittest
 {
@@ -2648,7 +2648,7 @@ pure @safe nothrow @nogc unittest
     enum ctfe = takeNone!(int[])();
     static assert(ctfe.length == 0);
     static assert(ctfe.empty);
-}
+}+/
 
 
 /++
@@ -2680,7 +2680,7 @@ if (isInputRange!R)
     assert(retval.empty);
     return retval;
 }
-
+/+
 ///
 pure @safe nothrow unittest
 {
@@ -2812,7 +2812,7 @@ pure @safe nothrow unittest
     //@@@BUG@@@ 8339 and 5941 force this to be takeExactly
     //static assert(is(typeof(filtered) == typeof(takeNone(filtered))), typeof(filtered).stringof);
 }
-
++/
 /++
  + Return a _range advanced to within $(D _n) elements of the end of
  + $(D _range).
@@ -6177,7 +6177,7 @@ FrontTransversal!(RangeOfRanges, opt) frontTransversal(
 {
     return typeof(return)(rr);
 }
-
+/+
 ///
 @safe unittest
 {
@@ -6279,7 +6279,7 @@ FrontTransversal!(RangeOfRanges, opt) frontTransversal(
     auto ft2 = frontTransversal!(TransverseOptions.enforceNotJagged)(arr);
     assert(ft2.empty);
 }
-
++/
 /**
     Given a range of ranges, iterate transversally through the
     `n`th element of each of the enclosed ranges.
@@ -6509,7 +6509,7 @@ Transversal!(RangeOfRanges, opt) transversal
 {
     return typeof(return)(rr, n);
 }
-
+/+
 ///
 @safe unittest
 {
@@ -6579,7 +6579,7 @@ Transversal!(RangeOfRanges, opt) transversal
     auto mat1 = transversal!(TransverseOptions.assumeNotJagged)(mat, 1)[1 .. 3];
     assert(mat1[0] == 6);
     assert(mat1[1] == 10);
-}
+}+/
 
 struct Transposed(RangeOfRanges)
 if (isForwardRange!RangeOfRanges &&
@@ -6643,7 +6643,7 @@ if (isForwardRange!RangeOfRanges &&
 private:
     RangeOfRanges _input;
 }
-
+/+
 @safe unittest
 {
     // Boundary case: transpose of empty range should be empty
@@ -6661,7 +6661,7 @@ private:
         [1, 3, 4, 6],
         [2, 5]
     ]));
-}
+}+/
 
 /**
 Given a range of ranges, returns a range of ranges where the $(I i)'th subrange
@@ -6674,7 +6674,7 @@ if (isForwardRange!RangeOfRanges &&
 {
     return Transposed!RangeOfRanges(rr);
 }
-
+/+
 ///
 @safe unittest
 {
@@ -6719,7 +6719,7 @@ if (isForwardRange!RangeOfRanges &&
 
     auto t1 = transposed(t0[].chunks(1).array());
     assert(equal!"a.equal(b)"(t1, [[123]]));
-}
+}+/
 
 /**
 This struct takes two ranges, $(D source) and $(D indices), and creates a view
@@ -6936,7 +6936,7 @@ Indexed!(Source, Indices) indexed(Source, Indices)(Source source, Indices indice
 {
     return typeof(return)(source, indices);
 }
-
+/+
 ///
 @safe unittest
 {
@@ -6978,7 +6978,7 @@ Indexed!(Source, Indices) indexed(Source, Indices)(Source source, Indices indice
         static assert(propagatesRangeType!(DummyType, typeof(r)));
         static assert(propagatesLength!(DummyType, typeof(r)));
     }
-}
+}+/
 
 /**
 This range iterates over fixed-sized chunks of size $(D chunkSize) of a
@@ -7257,7 +7257,7 @@ if (isInputRange!Source)
 {
     return typeof(return)(source, chunkSize);
 }
-
+/+
 ///
 @safe unittest
 {
@@ -7396,7 +7396,7 @@ if (isInputRange!Source)
     assert(equal!`equal(a, b)`(oddsByPairs[3 .. $].take(2), [[13, 15], [17, 19]]));
 }
 
-
++/
 
 /**
 This range splits a $(D source) range into $(D chunkCount) chunks of
@@ -7543,7 +7543,7 @@ if (isForwardRange!Source && hasLength!Source)
 {
     return typeof(return)(source, chunkCount);
 }
-
+/+
 ///
 @safe unittest
 {
@@ -7589,7 +7589,7 @@ if (isForwardRange!Source && hasLength!Source)
     chunks = [1, 2, 3].evenChunks(5);
     assert(equal(chunks, [[1], [2], [3], [], []]));
 }
-
++/
 /*
 A fixed-sized sliding window iteration
 of size `windowSize` over a `source` range by a custom `stepSize`.
@@ -7989,7 +7989,7 @@ public:
         }
     }
 }
-
+/+
 //
 @safe pure nothrow unittest
 {
@@ -8564,7 +8564,7 @@ public:
     assert(infDollar.slide(2)[1 .. $].front.equal([1, 2]));
     assert(infDollar.slide(4)[0 .. $].front.equal([0, 1, 2, 3]));
     assert(infDollar.slide(4)[2 .. $].front.equal([2, 3, 4, 5]));
-}
+}+/
 
 private struct OnlyResult(T, size_t arity)
 {
@@ -8777,7 +8777,7 @@ if (!is(CommonType!Values == void) || Values.length == 0)
 {
     return OnlyResult!(CommonType!Values, Values.length)(values);
 }
-
+/+
 ///
 @safe unittest
 {
@@ -8971,7 +8971,7 @@ if (!is(CommonType!Values == void) || Values.length == 0)
     static struct Test { int* a; }
     immutable(Test) test;
     cast(void) only(test, test); // Works with mutable indirection
-}
+}+/
 
 /**
 Iterate over `range` with an attached index variable.
