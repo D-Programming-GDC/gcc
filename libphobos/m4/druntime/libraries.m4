@@ -37,7 +37,7 @@ AC_DEFUN([DRUNTIME_LIBRARIES_THREAD],
 
 
 # DRUNTIME_LIBRARIES_DLOPEN
-# -----------------------
+# -------------------------
 # Autodetect and add dl library to LIBS if necessary.
 AC_DEFUN([DRUNTIME_LIBRARIES_DLOPEN],
 [
