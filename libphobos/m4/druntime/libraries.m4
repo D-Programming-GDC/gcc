@@ -133,6 +133,37 @@ AC_DEFUN([DRUNTIME_LIBRARIES_ATOMIC],
   AC_SUBST(LIBATOMIC)
 ])
 
+# DRUNTIME_LIBRARIES_MSVC
+# -----------------------
+# Detect MSVCRT version. Complain if older than minimum 0x1200.
+AC_DEFUN([DRUNTIME_LIBRARIES_MSVC],
+[
+  AC_REQUIRE([DRUNTIME_OS_DETECT])
+  AC_REQUIRE([AC_PROG_GREP])
+  AC_LANG_PUSH([C])
+
+  DCFG_MSVC_VERSION=0
+  case "$druntime_cv_target_os" in
+    mingw*)
+      AC_MSG_CHECKING([MSVC version targeted by MinGW])
+      AC_PREPROC_IFELSE([AC_LANG_SOURCE([
+        #include <_mingw.h>
+        __MSVCRT_VERSION__
+      ])], [
+        DCFG_MSVC_VERSION=$($GREP -o '0x[[[:alnum:]]]*' conftest.i)
+        AC_MSG_RESULT($DCFG_MSVC_VERSION)
+        AS_IF([[[[ $DCFG_MSVC_VERSION -lt 0x1200 ]]]], [
+          AC_MSG_ERROR([The oldest supported MSVC version is 0x1200. Use --with-default-msvcrt when building mingw-w64.])
+        ])
+      ], [
+        AC_MSG_ERROR([Could not find value of __MSVCRT_VERSION__])
+      ])
+      ;;
+  esac
+  AC_SUBST(DCFG_MSVC_VERSION)
+  AC_LANG_POP([C])
+])
+
 # DRUNTIME_LIBRARIES_BACKTRACE
 # ---------------------------
 # Allow specifying whether to use libbacktrace for backtrace support.

@@ -46,3 +46,9 @@ enum GNU_Have_LibAtomic = @DCFG_HAVE_LIBATOMIC@;
 
 // Do we have qsort_r function
 enum Have_Qsort_R = @DCFG_HAVE_QSORT_R@;
+
+// For MinGW targets, the MSVC version druntime is compiled against
+version (CRuntime_Microsoft)
+{
+    enum MSVC_VERSION = @DCFG_MSVC_VERSION@;
+}
