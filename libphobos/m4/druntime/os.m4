@@ -200,3 +200,20 @@ AC_DEFUN([DRUNTIME_OS_SHARED_SUPPORT],
       ;;
   esac
 ])
+
+# DRUNTIME_OS_EXTRA_GDCFLAGS
+# --------------------------
+# Add OS specific flags to GDCFLAGS and GDCFLAGSX.
+AC_DEFUN([DRUNTIME_OS_EXTRA_GDCFLAGS],
+[
+  AC_REQUIRE([DRUNTIME_OS_DETECT])
+  AC_MSG_CHECKING([for extra flags to pass to unit test build])
+  OS_EXTRA_GDCFLAGSX=""
+  case "$druntime_cv_target_os" in
+    mingw*)
+      OS_EXTRA_GDCFLAGSX="-Wa,-mbig-obj"
+      ;;
+  esac
+  AC_MSG_RESULT([$OS_EXTRA_GDCFLAGSX])
+  GDCFLAGSX="$GDCFLAGSX $OS_EXTRA_GDCFLAGSX"
+])

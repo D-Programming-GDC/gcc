@@ -169,11 +169,12 @@ AC_SUBST(libtool_VERSION)
 if test -z "$GDCFLAGS"; then
     GDCFLAGS="-Wall $WERROR_FLAG -g -frelease -O2"
 fi
-AC_SUBST(GDCFLAGS)
 
 if test -z "$GDCFLAGSX"; then
     GDCFLAGSX="-Wall $WERROR_FLAG -g -fno-release -funittest"
 fi
+DRUNTIME_OS_EXTRA_GDCFLAGS
+AC_SUBST(GDCFLAGS)
 AC_SUBST(GDCFLAGSX)
 
 # Sanity check for the cross-compilation case:
