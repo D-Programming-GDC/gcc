@@ -119,7 +119,7 @@ unittest_static_SOURCES = ../testsuite/test_runner.d $(DRUNTIME_CSOURCES) \
     $(DRUNTIME_SSOURCES)
 unittest_static_LIBTOOLFLAGS =
 unittest_static_LDFLAGS = -Wc,-nophoboslib
-unittest_static_LDADD = $(DRUNTIME_TEST_OBJECTS) $(LIBATOMIC) $(LIBBACKTRACE)
+unittest_static_LDADD = $(DRUNTIME_TEST_OBJECTS) $(LIBATOMIC) $(LIBBACKTRACE) $(DRUNTIME_TEST_LIBS)
 EXTRA_unittest_static_DEPENDENCIES = $(DRUNTIME_TEST_OBJECTS)
 
 # For unittest with dynamic library
@@ -128,7 +128,7 @@ libgdruntime_t_la_LIBTOOLFLAGS =
 # Automake by default does not generate shared libs for non-installed
 # libraries. Use -rpath to force shared lib generation.
 libgdruntime_t_la_LDFLAGS = -Wc,-nophoboslib -rpath /foo -shared
-libgdruntime_t_la_LIBADD = $(DRUNTIME_TEST_LOBJECTS) $(LIBATOMIC) $(LIBBACKTRACE)
+libgdruntime_t_la_LIBADD = $(DRUNTIME_TEST_LOBJECTS) $(LIBATOMIC) $(LIBBACKTRACE) $(DRUNTIME_TEST_LIBS)
 EXTRA_libgdruntime_t_la_DEPENDENCIES = $(DRUNTIME_TEST_LOBJECTS)
 
 # For unittest

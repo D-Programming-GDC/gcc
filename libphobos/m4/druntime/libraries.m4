@@ -258,3 +258,21 @@ AC_DEFUN([DRUNTIME_LIBRARIES_SOCKET],
       ;;
   esac
 ])
+
+# DRUNTIME_LIBRARIES_TEST
+# -----------------------
+# Detect additional libraries needed for the unit tests.
+# Libraries are added to DRUNTIME_TEST_LIBS and substituted.
+AC_DEFUN([DRUNTIME_LIBRARIES_TEST],
+[
+  AC_REQUIRE([DRUNTIME_OS_DETECT])
+  DRUNTIME_TEST_LIBS=""
+  AC_MSG_CHECKING([for extra libraries for unit test build])
+  case "$druntime_cv_target_os" in
+    mingw*)
+      DRUNTIME_TEST_LIBS="-lcomctl32 -lshlwapi -lvfw32"
+      ;;
+  esac
+  AC_MSG_RESULT([$DRUNTIME_TEST_LIBS])
+  AC_SUBST(DRUNTIME_TEST_LIBS)
+])
