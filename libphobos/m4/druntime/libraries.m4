@@ -9,23 +9,30 @@
 # Add thread library to LIBS if necessary.
 AC_DEFUN([DRUNTIME_LIBRARIES_THREAD],
 [
-  enable_thread_lib=yes
-  AC_ARG_ENABLE(thread-lib,
-    AC_HELP_STRING([--enable-thread-lib=<arg>],
-                   [specify linker option for the system thread library (default: autodetect)]))
+  AC_REQUIRE([DRUNTIME_OS_DETECT])
+  case "$druntime_cv_target_os" in
+    mingw*)
+      ;;
+    *)
+      enable_thread_lib=yes
+      AC_ARG_ENABLE(thread-lib,
+        AC_HELP_STRING([--enable-thread-lib=<arg>],
+                       [specify linker option for the system thread library (default: autodetect)]))
 
-  AS_IF([test "x$enable_thread_lib" = "xyes"], [
-    AC_SEARCH_LIBS([pthread_create], [pthread])
-  ], [
-    AS_IF([test "x$enable_thread_lib" = "xno"], [
-      AC_MSG_CHECKING([for thread library])
-      AC_MSG_RESULT([disabled])
-    ], [
-      AC_CHECK_LIB([$enable_thread_lib], [pthread_create], [], [
-        AC_MSG_ERROR([Thread library not found])
+      AS_IF([test "x$enable_thread_lib" = "xyes"], [
+        AC_SEARCH_LIBS([pthread_create], [pthread])
+      ], [
+        AS_IF([test "x$enable_thread_lib" = "xno"], [
+          AC_MSG_CHECKING([for thread library])
+          AC_MSG_RESULT([disabled])
+        ], [
+          AC_CHECK_LIB([$enable_thread_lib], [pthread_create], [], [
+            AC_MSG_ERROR([Thread library not found])
+          ])
+        ])
       ])
-    ])
-  ])
+      ;;
+  esac
 ])
 
 
