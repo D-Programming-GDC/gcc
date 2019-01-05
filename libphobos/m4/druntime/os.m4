@@ -217,3 +217,38 @@ AC_DEFUN([DRUNTIME_OS_EXTRA_GDCFLAGS],
   AC_MSG_RESULT([$OS_EXTRA_GDCFLAGSX])
   GDCFLAGSX="$GDCFLAGSX $OS_EXTRA_GDCFLAGSX"
 ])
+
+# DRUNTIME_OS_TLS
+# ---------------
+# Check whether OS supports TLS. If it uses emutls, check if
+# emutls supports GC hooks.
+AC_DEFUN([DRUNTIME_OS_TLS],
+[
+  AC_LANG_PUSH(D)
+    AC_MSG_CHECKING([If gdc compiler uses emutls])
+    OS_EMUTLS=no
+    AC_COMPILE_IFELSE([AC_LANG_SOURCE([
+      version (GNU_EMUTLS)
+          static assert(false);
+      ])],[
+        OS_EMUTLS=no
+        AC_MSG_RESULT([no])
+      ], [
+        OS_EMUTLS=yes
+        AC_MSG_RESULT([yes])
+      ])
+  AC_LANG_POP(D)
+
+  AS_IF([[ test "x$OS_EMUTLS" == "xyes"]], [
+    AC_LANG_PUSH(C)
+    AC_MSG_CHECKING([If emutls supports GC hooks])
+    AC_LINK_IFELSE([AC_LANG_PROGRAM(
+        [void __emutls_iterate_memory (void *cb, void* user);], [[return 0;]])],[
+        AC_MSG_RESULT([yes])
+      ], [
+        AC_MSG_RESULT([no])
+        AC_MSG_ERROR([emutls without GC hooks is not supported!])
+    ])
+    AC_LANG_POP(C)
+  ])
+])

@@ -136,6 +136,7 @@ WITH_LOCAL_DRUNTIME([
   AC_SEARCH_LIBS([cosf], [m])
   AC_SEARCH_LIBS([clock_gettime], [rt])
   DRUNTIME_ENABLE_ATOMIC_BUILTINS
+  DRUNTIME_OS_TLS
   AC_LANG_POP([D])
 ], [-nophoboslib])
 
