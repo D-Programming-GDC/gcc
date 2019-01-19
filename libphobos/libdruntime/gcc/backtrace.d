@@ -45,7 +45,19 @@ else
 // Max size per line of the traceback.
 private enum MAX_BUFSIZE = 1536;
 
-static if (BACKTRACE_SUPPORTED && !BACKTRACE_USES_MALLOC)
+/* If BACKTRACE_USES_MALLOC is true, it's not safe to use libbacktrace
+ * in signals handlers. For targets without signal handlers, we don't
+ * care about the BACKTRACE_USES_MALLOC value. */
+version (Windows)
+{
+    enum HAS_SIGNAL_HANDLERS = false;
+}
+else
+{
+    enum HAS_SIGNAL_HANDLERS = true;
+}
+
+static if (BACKTRACE_SUPPORTED && (!HAS_SIGNAL_HANDLERS || !BACKTRACE_USES_MALLOC))
 {
     import core.stdc.stdint, core.stdc.string, core.stdc.stdio;
     private enum MAXFRAMES = 128;
