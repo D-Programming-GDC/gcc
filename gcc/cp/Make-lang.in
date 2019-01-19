@@ -175,7 +175,7 @@ CPP_SELFTEST_FLAGS = -xc++ $(SELFTEST_FLAGS)
 
 # Run the C++ selftests
 s-selftest-c++: $(CPP_SELFTEST_DEPS)
-	$(GCC_FOR_TARGET) $(CPP_SELFTEST_FLAGS)
+#	$(GCC_FOR_TARGET) $(CPP_SELFTEST_FLAGS)
 	$(STAMP) $@
 
 # Convenience method for running C++ selftests under gdb:
