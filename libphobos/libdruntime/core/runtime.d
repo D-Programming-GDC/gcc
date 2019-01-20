@@ -473,7 +473,12 @@ extern (C) bool runModuleUnitTests()
     else version (CRuntime_UClibc)
         import core.sys.linux.execinfo;
 
-    static if ( __traits( compiles, new LibBacktrace(0) ) )
+    version (Posix)
+        enum isPosix = true;
+    else
+        enum isPosix = false;
+
+    static if ( isPosix && __traits( compiles, new LibBacktrace(0) ) )
     {
         import core.sys.posix.signal; // segv handler
 
