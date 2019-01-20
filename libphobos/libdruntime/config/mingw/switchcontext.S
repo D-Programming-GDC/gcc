@@ -27,18 +27,51 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #if defined(__x86_64__)
 
     .text
+    .globl CSYM(fiber_trampoline)
+    .def CSYM(fiber_trampoline); .scl 2; .type 32; .endef
+    .align 16
+CSYM(fiber_trampoline):
+    .cfi_startproc
+    subq $32, %RSP;   // Shadow space (Win64 calling convention)
+    call fiber_entryPoint;
+    xorq %RCX, %RCX;  // This should never be reached, as
+    jmp *%RCX;        // fiber_entryPoint must never return.
+    .cfi_endproc
+
+    .text
     .globl CSYM(fiber_switchContext)
-    .type CSYM(fiber_switchContext), @function
+    .def CSYM(fiber_switchContext); .scl 2; .type 32; .endef
     .align 16
 CSYM(fiber_switchContext):
     .cfi_startproc
+    // save current stack state
+    // NOTE: When changing the layout of registers on the stack,
+    //       make sure that the XMM registers are still aligned.
+    //       On function entry, the stack is guaranteed to not
+    //       be aligned to 16 bytes because of the return address
+    //       on the stack.
     pushq %RBP;
     movq %RSP, %RBP;
-    pushq %RBX;
     pushq %R12;
     pushq %R13;
     pushq %R14;
     pushq %R15;
+    pushq %RDI;
+    pushq %RSI;
+    // 7 registers = 56 bytes; stack is now aligned to 16 bytes
+    subq $160, %RSP;
+    movdqa %XMM6, 144(%rsp);
+    movdqa %XMM7, 128(%rsp);
+    movdqa %XMM8, 112(%rsp);
+    movdqa %XMM9, 96(%rsp);
+    movdqa %XMM10, 80(%rsp);
+    movdqa %XMM11, 64(%rsp);
+    movdqa %XMM12, 48(%rsp);
+    movdqa %XMM13, 32(%rsp);
+    movdqa %XMM14, 16(%rsp);
+    movdqa %XMM15, (%rsp);
+    pushq %RBX;
+    xorq  %RAX,%RAX;
     pushq %GS:0;
     pushq %GS:8;
     pushq %GS:16;
@@ -52,24 +85,36 @@ CSYM(fiber_switchContext):
     popq %GS:16;
     popq %GS:8;
     popq %GS:0;
+    popq %RBX;
+    movdqa (%rsp), %XMM15;
+    movdqa 16(%rsp), %XMM14;
+    movdqa 32(%rsp), %XMM13;
+    movdqa 48(%rsp), %XMM12;
+    movdqa 64(%rsp), %XMM11;
+    movdqa 80(%rsp), %XMM10;
+    movdqa 96(%rsp), %XMM9;
+    movdqa 112(%rsp), %XMM8;
+    movdqa 128(%rsp), %XMM7;
+    movdqa 144(%rsp), %XMM6;
+    add $160, %RSP;
+    popq %RSI;
+    popq %RDI;
     popq %R15;
     popq %R14;
     popq %R13;
     popq %R12;
-    popq %RBX;
     popq %RBP;
 
     // 'return' to complete switch
     popq %RCX;
     jmp *%RCX;
     .cfi_endproc
-    .size CSYM(fiber_switchContext),.-CSYM(fiber_switchContext)
 
 #elif defined(_X86_)
 
     .text
     .globl CSYM(fiber_switchContext)
-    .type CSYM(fiber_switchContext), @function
+    .def CSYM(fiber_switchContext); .scl 2; .type 32; .endef
     .align 16
 CSYM(fiber_switchContext):
     .cfi_startproc
@@ -104,6 +149,5 @@ CSYM(fiber_switchContext):
     // 'return' to complete switch
     ret;
     .cfi_endproc
-    .size CSYM(fiber_switchContext),.-CSYM(fiber_switchContext)
 
 #endif
