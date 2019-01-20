@@ -3224,7 +3224,7 @@ private void* getStackBottom() nothrow @nogc
                  mov RAX, GS:[RAX];
                  ret;
             }
-        else version (GNU_InlineAsm)
+        else version (GNU)
         {
             void *bottom;
 
@@ -3513,7 +3513,10 @@ private
     version (D_InlineAsm_X86)
     {
         version (Windows)
+        {
             version = AsmX86_Windows;
+            version = X86_Windows;
+        }
         else version (Posix)
             version = AsmX86_Posix;
 
@@ -3525,6 +3528,7 @@ private
         version (Windows)
         {
             version = AsmX86_64_Windows;
+            version = X86_64_Windows;
             version = AlignFiberStackTo16Byte;
         }
         else version (Posix)
@@ -3537,10 +3541,13 @@ private
     {
         version = AsmExternal;
 
-        version (MinGW)
+        version (Windows)
         {
-            version = GNU_AsmX86_Windows;
-            version = AlignFiberStackTo16Byte;
+            version (GNU)
+            {
+                version = X86_Windows;
+                version = AlignFiberStackTo16Byte;
+            }
         }
         else version (Posix)
         {
@@ -3560,8 +3567,11 @@ private
             version = AsmExternal;
             version = AlignFiberStackTo16Byte;
 
-            version (MinGW)
-                version = GNU_AsmX86_64_Windows;
+            version (Windows)
+            {
+                version (GNU)
+                    version = X86_64_Windows;
+            }
             else version (Posix)
                 version = AsmX86_64_Posix;
         }
@@ -3692,6 +3702,8 @@ private
   {
       extern (C) void fiber_switchContext( void** oldp, void* newp ) nothrow @nogc;
       version (AArch64)
+          extern (C) void fiber_trampoline() nothrow;
+      else version (MinGW)
           extern (C) void fiber_trampoline() nothrow;
   }
   else
@@ -4704,7 +4716,7 @@ private:
             }
         }
 
-        version (AsmX86_Windows)
+        version (X86_Windows)
         {
             version (StackGrowsDown) {} else static assert( false );
 
@@ -4740,7 +4752,10 @@ private:
             enum sehChainEnd = cast(EXCEPTION_REGISTRATION*) 0xFFFFFFFF;
 
             __gshared static fp_t finalHandler = null;
-            if ( finalHandler is null )
+            // This requires native TLS, which GCC does not
+            // support on Windows
+            version (GNU) {}
+            else if ( finalHandler is null )
             {
                 static EXCEPTION_REGISTRATION* fs0() nothrow
                 {
@@ -4779,7 +4794,7 @@ private:
             push( cast(size_t) m_ctxt.bstack - m_size );            // FS:[8]
             push( 0x00000000 );                                     // EAX
         }
-        else version (AsmX86_64_Windows)
+        else version (X86_64_Windows)
         {
             // Using this trampoline instead of the raw fiber_entryPoint
             // ensures that during context switches, source and destination
@@ -4787,7 +4802,10 @@ private:
             // to be shifted by 8 bytes for the first call, as fiber_entryPoint
             // is an actual function expecting a stack which is not aligned
             // to 16 bytes.
-            static void trampoline()
+            version (GNU)
+            {
+            }
+            else static void fiber_trampoline()
             {
                 asm pure nothrow @nogc
                 {
@@ -4799,7 +4817,7 @@ private:
                 }
             }
 
-            push( cast(size_t) &trampoline );                       // RIP
+            push( cast(size_t) &fiber_trampoline );                 // RIP
             push( 0x00000000_00000000 );                            // RBP
             push( 0x00000000_00000000 );                            // R12
             push( 0x00000000_00000000 );                            // R13
@@ -4983,46 +5001,6 @@ private:
              * Position the stack pointer above the lr register
              */
             pstack += int.sizeof * 1;
-        }
-        else version (GNU_AsmX86_Windows)
-        {
-            version (StackGrowsDown) {} else static assert( false );
-
-            // Currently, MinGW doesn't utilize SEH exceptions.
-            // See DMD AsmX86_Windows If this code ever becomes fails and SEH is used.
-
-            push( 0x00000000 );                                     // Return address of fiber_entryPoint call
-            push( cast(size_t) &fiber_entryPoint );                 // EIP
-            push( 0x00000000 );                                     // EBP
-            push( 0x00000000 );                                     // EDI
-            push( 0x00000000 );                                     // ESI
-            push( 0x00000000 );                                     // EBX
-            push( 0xFFFFFFFF );                                     // FS:[0] - Current SEH frame
-            push( cast(size_t) m_ctxt.bstack );                     // FS:[4] - Top of stack
-            push( cast(size_t) m_ctxt.bstack - m_size );            // FS:[8] - Bottom of stack
-            push( 0x00000000 );                                     // EAX
-        }
-        else version (GNU_AsmX86_64_Windows)
-        {
-            push( 0x00000000_00000000 );                            // Return address of fiber_entryPoint call
-            push( cast(size_t) &fiber_entryPoint );                 // RIP
-            push( 0x00000000_00000000 );                            // RBP
-            push( 0x00000000_00000000 );                            // RBX
-            push( 0x00000000_00000000 );                            // R12
-            push( 0x00000000_00000000 );                            // R13
-            push( 0x00000000_00000000 );                            // R14
-            push( 0x00000000_00000000 );                            // R15
-            push( 0xFFFFFFFF_FFFFFFFF );                            // GS:[0] - Current SEH frame
-            version (StackGrowsDown)
-            {
-                push( cast(size_t) m_ctxt.bstack );                 // GS:[8]  - Top of stack
-                push( cast(size_t) m_ctxt.bstack - m_size );        // GS:[16] - Bottom of stack
-            }
-            else
-            {
-                push( cast(size_t) m_ctxt.bstack );                 // GS:[8]  - Top of stack
-                push( cast(size_t) m_ctxt.bstack + m_size );        // GS:[16] - Bottom of stack
-            }
         }
         else static if ( __traits( compiles, ucontext_t ) )
         {
