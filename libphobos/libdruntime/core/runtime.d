@@ -469,76 +469,79 @@ extern (C) bool runModuleUnitTests()
     else version (Solaris)
         import core.sys.solaris.execinfo;
 
-    static if ( __traits( compiles, new LibBacktrace(0) ) )
+    version (Posix)
     {
-        import core.sys.posix.signal; // segv handler
-
-        static extern (C) void unittestSegvHandler( int signum, siginfo_t* info, void* ptr )
+        static if ( __traits( compiles, new LibBacktrace(0) ) )
         {
-            import core.stdc.stdio;
-            fprintf(stderr, "Segmentation fault while running unittests:\n");
-            fprintf(stderr, "----------------\n");
+            import core.sys.posix.signal; // segv handler
 
-            enum alignment = LibBacktrace.MaxAlignment;
-            enum classSize = __traits(classInstanceSize, LibBacktrace);
+            static extern (C) void unittestSegvHandler( int signum, siginfo_t* info, void* ptr )
+            {
+                import core.stdc.stdio;
+                fprintf(stderr, "Segmentation fault while running unittests:\n");
+                fprintf(stderr, "----------------\n");
 
-            void[classSize + alignment] bt_store = void;
-            void* alignedAddress = cast(byte*)((cast(size_t)(bt_store.ptr + alignment - 1))
-                & ~(alignment - 1));
+                enum alignment = LibBacktrace.MaxAlignment;
+                enum classSize = __traits(classInstanceSize, LibBacktrace);
 
-            (alignedAddress[0 .. classSize]) = typeid(LibBacktrace).initializer[];
-            auto bt = cast(LibBacktrace)(alignedAddress);
-            // First frame is LibBacktrace ctor. Second is signal handler, but include that for now
-            bt.__ctor(1);
+                void[classSize + alignment] bt_store = void;
+                void* alignedAddress = cast(byte*)((cast(size_t)(bt_store.ptr + alignment - 1))
+                    & ~(alignment - 1));
 
-            foreach (size_t i, const(char[]) msg; bt)
-                fprintf(stderr, "%s\n", msg.ptr ? msg.ptr : "???");
+                (alignedAddress[0 .. classSize]) = typeid(LibBacktrace).initializer[];
+                auto bt = cast(LibBacktrace)(alignedAddress);
+                // First frame is LibBacktrace ctor. Second is signal handler, but include that for now
+                bt.__ctor(1);
+
+                foreach (size_t i, const(char[]) msg; bt)
+                    fprintf(stderr, "%s\n", msg.ptr ? msg.ptr : "???");
+            }
+
+            sigaction_t action = void;
+            sigaction_t oldseg = void;
+            sigaction_t oldbus = void;
+
+            (cast(byte*) &action)[0 .. action.sizeof] = 0;
+            sigfillset( &action.sa_mask ); // block other signals
+            action.sa_flags = SA_SIGINFO | SA_RESETHAND;
+            action.sa_sigaction = &unittestSegvHandler;
+            sigaction( SIGSEGV, &action, &oldseg );
+            sigaction( SIGBUS, &action, &oldbus );
+            scope( exit )
+            {
+                sigaction( SIGSEGV, &oldseg, null );
+                sigaction( SIGBUS, &oldbus, null );
+            }
         }
-
-        sigaction_t action = void;
-        sigaction_t oldseg = void;
-        sigaction_t oldbus = void;
-
-        (cast(byte*) &action)[0 .. action.sizeof] = 0;
-        sigfillset( &action.sa_mask ); // block other signals
-        action.sa_flags = SA_SIGINFO | SA_RESETHAND;
-        action.sa_sigaction = &unittestSegvHandler;
-        sigaction( SIGSEGV, &action, &oldseg );
-        sigaction( SIGBUS, &action, &oldbus );
-        scope( exit )
+        else static if ( __traits( compiles, backtrace ) )
         {
-            sigaction( SIGSEGV, &oldseg, null );
-            sigaction( SIGBUS, &oldbus, null );
-        }
-    }
-    else static if ( __traits( compiles, backtrace ) )
-    {
-        import core.sys.posix.signal; // segv handler
+            import core.sys.posix.signal; // segv handler
 
-        static extern (C) void unittestSegvHandler( int signum, siginfo_t* info, void* ptr ) nothrow
-        {
-            static enum MAXFRAMES = 128;
-            void*[MAXFRAMES]  callstack;
-            int               numframes;
+            static extern (C) void unittestSegvHandler( int signum, siginfo_t* info, void* ptr ) nothrow
+            {
+                static enum MAXFRAMES = 128;
+                void*[MAXFRAMES]  callstack;
+                int               numframes;
 
-            numframes = backtrace( callstack.ptr, MAXFRAMES );
-            backtrace_symbols_fd( callstack.ptr, numframes, 2 );
-        }
+                numframes = backtrace( callstack.ptr, MAXFRAMES );
+                backtrace_symbols_fd( callstack.ptr, numframes, 2 );
+            }
 
-        sigaction_t action = void;
-        sigaction_t oldseg = void;
-        sigaction_t oldbus = void;
+            sigaction_t action = void;
+            sigaction_t oldseg = void;
+            sigaction_t oldbus = void;
 
-        (cast(byte*) &action)[0 .. action.sizeof] = 0;
-        sigfillset( &action.sa_mask ); // block other signals
-        action.sa_flags = SA_SIGINFO | SA_RESETHAND;
-        action.sa_sigaction = &unittestSegvHandler;
-        sigaction( SIGSEGV, &action, &oldseg );
-        sigaction( SIGBUS, &action, &oldbus );
-        scope( exit )
-        {
-            sigaction( SIGSEGV, &oldseg, null );
-            sigaction( SIGBUS, &oldbus, null );
+            (cast(byte*) &action)[0 .. action.sizeof] = 0;
+            sigfillset( &action.sa_mask ); // block other signals
+            action.sa_flags = SA_SIGINFO | SA_RESETHAND;
+            action.sa_sigaction = &unittestSegvHandler;
+            sigaction( SIGSEGV, &action, &oldseg );
+            sigaction( SIGBUS, &action, &oldbus );
+            scope( exit )
+            {
+                sigaction( SIGSEGV, &oldseg, null );
+                sigaction( SIGBUS, &oldbus, null );
+            }
         }
     }
 
