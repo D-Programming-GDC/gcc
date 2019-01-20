@@ -9,6 +9,7 @@
 * Source:    $(DRUNTIMESRC rt/_msvc_math.c)
 * Authors:   Martin Kinkelin
 */
+// This file has been ported for GDC. Original source in druntime is rt/msvc_math.c
 
 #if defined _M_IX86 || (defined __MINGW32__ && defined __i386__)
 

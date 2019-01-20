@@ -184,7 +184,7 @@ AC_CHECK_HEADER(stdio.h,:,
 
 AC_CONFIG_FILES(Makefile)
 
-AC_CONFIG_FILES(libdruntime/gcc/config.d libdruntime/gcc/libbacktrace.d)
+AC_CONFIG_FILES(libdruntime/gcc/config/package.d libdruntime/gcc/libbacktrace.d)
 AC_CONFIG_FILES(src/libgphobos.spec)
 AC_CONFIG_FILES([testsuite/testsuite_flags],[chmod +x testsuite/testsuite_flags])
 

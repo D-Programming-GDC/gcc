@@ -159,7 +159,7 @@ install-data-local:
 	done
 
 
-DRUNTIME_DSOURCES_GENERATED = gcc/config.d gcc/libbacktrace.d
+DRUNTIME_DSOURCES_GENERATED = gcc/config/package.d gcc/libbacktrace.d
 # Source file definitions. Boring stuff, auto-generated with
 # https://gist.github.com/jpf91/8ad1dbc9902d6ad876313f134c6527d1
 # Can't use wildcards here:
@@ -393,6 +393,6 @@ DRUNTIME_DSOURCES_WINDOWS = core/sys/windows/accctrl.d \
 	core/sys/windows/winver.d core/sys/windows/wtsapi32.d \
 	core/sys/windows/wtypes.d
 
-DRUNTIME_CSOURCES_WINDOWS = rt/msvc.c rt/msvc_math.c
+DRUNTIME_CSOURCES_WINDOWS = gcc/config/msvc.c gcc/config/msvc_math.c
 
 DRUNTIME_DISOURCES = __entrypoint.di __main.di

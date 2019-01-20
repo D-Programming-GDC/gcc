@@ -9,6 +9,7 @@
 * Source:    $(DRUNTIMESRC rt/_msvc.c)
 * Authors:   Rainer Schuetze
 */
+// This file has been ported for GDC. Original source in druntime is rt/msvc.c
 
 #include <stddef.h>
 #include <stdarg.h>
