@@ -196,7 +196,7 @@ SPEC_PHOBOS_DEPS="$LIBS"
 AC_SUBST(SPEC_PHOBOS_DEPS)
 
 # Libdruntime / phobos soname version
-libtool_VERSION=76:3:0
+libtool_VERSION=83:0:0
 AC_SUBST(libtool_VERSION)
 
 # Set default flags (after DRUNTIME_WERROR!)

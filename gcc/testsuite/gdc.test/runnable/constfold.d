@@ -355,7 +355,7 @@ int foo9() {
 static assert(foo9()==2);
 
 /************************************/
-// Bugzilla 6077
+// https://issues.dlang.org/show_bug.cgi?id=6077
 
 void test6077() {
     static string scat(string s1, string s2)
@@ -425,7 +425,7 @@ int test4()
 static assert(test4() == 24666);
 
 /************************************/
-// 8400
+// https://issues.dlang.org/show_bug.cgi?id=8400
 
 void test8400()
 {
@@ -435,7 +435,7 @@ void test8400()
 }
 
 /************************************/
-// 8939
+// https://issues.dlang.org/show_bug.cgi?id=8939
 
 void foo8939(T)(ref T) { } // same for `auto ref`
 void bar8939(ref const int) { }
@@ -487,7 +487,7 @@ class C8939regression
 }
 
 /************************************/
-// 9058
+// https://issues.dlang.org/show_bug.cgi?id=9058
 
 template TypeTuple9058(TL...) { alias TypeTuple9058 = TL; }
 template EnumMembers9058(T)
@@ -505,7 +505,7 @@ void test9058()
 }
 
 /************************************/
-// 11159
+// https://issues.dlang.org/show_bug.cgi?id=11159
 
 void test11159()
 {
@@ -520,7 +520,7 @@ void test11159()
 }
 
 /************************************/
-// 12306
+// https://issues.dlang.org/show_bug.cgi?id=12306
 
 void test12306()
 {
@@ -541,7 +541,7 @@ void test12306()
 }
 
 /************************************/
-// 13977
+// https://issues.dlang.org/show_bug.cgi?id=13977
 
 void test13977()
 {
@@ -565,12 +565,13 @@ void test13977()
     Object.init && check();
     assert(x == 0);
 
-    (check(2), false) && check();
+    check(2);
+    false && check();
     assert(x == 2); x = 0;
 }
 
 /************************************/
-// 13978
+// https://issues.dlang.org/show_bug.cgi?id=13978
 
 void test13978()
 {
@@ -594,7 +595,8 @@ void test13978()
     Object.init || check();
     assert(x == 1); x = 0;
 
-    (check(2), true) || check();
+    check(2);
+    true || check();
     assert(x == 2); x = 0;
 }
 
@@ -615,7 +617,7 @@ void test3697or()
 }
 
 /************************************/
-// 14459
+// https://issues.dlang.org/show_bug.cgi?id=14459
 
 void test14459()
 {

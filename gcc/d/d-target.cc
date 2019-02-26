@@ -41,17 +41,6 @@ along with GCC; see the file COPYING3.  If not see
 /* Implements the Target interface defined by the front end.
    Used for retrieving target-specific information.  */
 
-/* Type size information used by frontend.  */
-int Target::ptrsize;
-int Target::c_longsize;
-int Target::realsize;
-int Target::realpad;
-int Target::realalignsize;
-bool Target::reverseCppOverloads;
-bool Target::cppExceptions;
-int Target::classinfosize;
-unsigned long long Target::maxStaticDataSize;
-
 /* Floating-point constants for for .max, .min, and other properties.  */
 template <typename T> real_t Target::FPTypeProperties<T>::max;
 template <typename T> real_t Target::FPTypeProperties<T>::min_normal;
@@ -162,10 +151,12 @@ Target::_init (void)
 
   /* Set-up target C ABI.  */
   Target::c_longsize = int_size_in_bytes (long_integer_type_node);
+  Target::c_long_doublesize = int_size_in_bytes (long_double_type_node);
 
   /* Set-up target C++ ABI.  */
   Target::reverseCppOverloads = false;
   Target::cppExceptions = true;
+  Target::twoDtorInVtable = true;
 
   /* Initialize all compile-time properties for floating-point types.
      Should ensure that our real_t type is able to represent real_value.  */
@@ -297,18 +288,10 @@ Target::isVectorOpSupported (Type *type, TOK op, Type *)
       /* Logical operators must have a result type of bool.  */
       return false;
 
-    case TOKue:
-    case TOKlg:
-    case TOKule:
-    case TOKul:
-    case TOKuge:
-    case TOKug:
     case TOKle:
     case TOKlt:
     case TOKge:
     case TOKgt:
-    case TOKleg:
-    case TOKunord:
     case TOKequal:
     case TOKnotequal:
     case TOKidentity:
@@ -400,4 +383,50 @@ LINK
 Target::systemLinkage (void)
 {
   return LINKc;
+}
+
+/* Determine return style of function, whether in registers or through a
+   hidden pointer to the caller's stack.  */
+
+bool
+Target::isReturnOnStack (TypeFunction *, bool)
+{
+  /* Need the back-end type to determine this, but this is called from the
+     frontend before semantic processing is finished.  An accurate value
+     is not currently needed anyway.  */
+  return true;
+}
+
+/* Return the result of a __traits(getTargetInfo) query or NULL if it is
+   not information that's known at compile-time.  */
+
+Expression *
+Target::getTargetInfo (const char *name, const Loc& loc)
+{
+  const char *result = NULL;
+
+  switch (strlen (name))
+    {
+    case 8:
+      if (strcmp (name, "floatAbi") == 0)
+	result = targetdm.d_float_abi_type ();
+      break;
+
+    case 12:
+      if (strcmp (name, "objectFormat") == 0)
+	result = targetdm.d_object_format ();
+      break;
+
+    case 17:
+      /* The driver only ever optionally links to libstdc++.  */
+      if (strcmp (name, "cppRuntimeLibrary") == 0)
+	result = "libstdc++";
+      break;
+    }
+
+  if (result != NULL)
+    return StringExp::create (loc, CONST_CAST (char *, result),
+			      strlen (result));
+
+  return NULL;
 }

@@ -10,8 +10,10 @@
 
 #pragma once
 
-#include "root/dsystem.h"
-#include "globals.h"
+#include <stdarg.h>
+#include <stddef.h>
+
+struct Loc;
 
 bool isConsoleColorSupported();
 
@@ -27,6 +29,7 @@ D_ATTRIBUTE_FORMAT(2, 3) void warningSupplemental(const Loc& loc, const char *fo
 D_ATTRIBUTE_FORMAT(2, 3) void deprecation(const Loc& loc, const char *format, ...);
 D_ATTRIBUTE_FORMAT(2, 3) void deprecationSupplemental(const Loc& loc, const char *format, ...);
 D_ATTRIBUTE_FORMAT(2, 3) void error(const Loc& loc, const char *format, ...);
+D_ATTRIBUTE_FORMAT(4, 5) void error(const char *filename, unsigned linnum, unsigned charnum, const char *format, ...);
 D_ATTRIBUTE_FORMAT(2, 3) void errorSupplemental(const Loc& loc, const char *format, ...);
 D_ATTRIBUTE_FORMAT(2, 0) void verror(const Loc& loc, const char *format, va_list ap, const char *p1 = NULL, const char *p2 = NULL, const char *header = "Error: ");
 D_ATTRIBUTE_FORMAT(2, 0) void verrorSupplemental(const Loc& loc, const char *format, va_list ap);

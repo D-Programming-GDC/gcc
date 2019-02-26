@@ -1335,6 +1335,7 @@ int main() {}])],
 fi
 
 ACX_PROG_GNAT
+ACX_PROG_GDC
 ACX_PROG_CMP_IGNORE_INITIAL
 
 AC_ARG_ENABLE([bootstrap],
@@ -1982,6 +1983,22 @@ if test -d ${srcdir}/gcc; then
             ;;
         esac
 
+        # Disable D if no preexisting GDC is available.
+        case ${add_this_lang}:${language}:${have_gdc} in
+          yes:d:no)
+            # Specifically requested language; tell them.
+            AC_MSG_ERROR([GDC is required to build $language])
+           ;;
+          all:d:no)
+            AC_MSG_WARN([GDC is required to build $language])
+            add_this_lang=unsupported
+            ;;
+          *:d:no)
+            # Silently disable.
+            add_this_lang=unsupported
+            ;;
+        esac
+
         # Disable jit if -enable-host-shared not specified
         case ${add_this_lang}:${language}:${host_shared} in
           yes:jit:no)
@@ -2042,7 +2059,7 @@ directories, to avoid imposing the performance cost of
 		  *) stage1_languages="${stage1_languages}${language}," ;;
 		esac
 		# We need to bootstrap any supporting libraries.
-		bootstrap_target_libs="${bootstrap_target_libs}${target_libs},"
+		bootstrap_target_libs=`echo "${bootstrap_target_libs}${target_libs}," | sed "s/ /,/g"`
 		;;
 	    esac
 	    ;;
@@ -2713,6 +2730,16 @@ fi
 if echo " ${target_configdirs} " | grep " libvtv " > /dev/null 2>&1 &&
    test "$enable_vtable_verify" != no; then
   bootstrap_target_libs=${bootstrap_target_libs}target-libvtv,
+fi
+
+# If we are building libatomic and the list of enabled languages includes the
+# D frontend, bootstrap it.
+if echo " ${target_configdirs} " | grep " libatomic " > /dev/null 2>&1; then
+  case ,${enable_languages}, in
+    *,d,*)
+      bootstrap_target_libs=${bootstrap_target_libs}target-libatomic,
+      ;;
+  esac
 fi
 
 # Determine whether gdb needs tk/tcl or not.

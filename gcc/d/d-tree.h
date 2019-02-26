@@ -204,6 +204,7 @@ struct GTY(()) lang_identifier
 
   /* The frontend Declaration associated with this identifier.  */
   Declaration * GTY((skip)) dsymbol;
+  AggregateDeclaration * GTY((skip)) daggregate;
 };
 
 #define IDENTIFIER_LANG_SPECIFIC(NODE) \
@@ -217,6 +218,9 @@ struct GTY(()) lang_identifier
 
 #define IDENTIFIER_DSYMBOL(NODE) \
   (IDENTIFIER_LANG_SPECIFIC (NODE)->dsymbol)
+
+#define IDENTIFIER_DAGGREGATE(NODE) \
+  (IDENTIFIER_LANG_SPECIFIC (NODE)->daggregate)
 
 /* Global state pertinent to the current function.  */
 
@@ -600,6 +604,7 @@ extern tree d_signed_type (tree);
 extern void d_keep (tree);
 
 /* In decl.cc.  */
+const char *mangle_decl (Dsymbol *);
 extern tree mangle_internal_decl (Dsymbol *, const char *, const char *);
 extern void build_decl_tree (Dsymbol *);
 extern tree get_symbol_decl (Declaration *);
@@ -647,11 +652,12 @@ extern void d_finish_compilation (tree *, int);
 extern tree build_libcall (libcall_fn, Type *, int ...);
 
 /* In typeinfo.cc.  */
+extern bool have_typeinfo_p (ClassDeclaration *);
 extern tree layout_typeinfo (TypeInfoDeclaration *);
 extern tree layout_classinfo (ClassDeclaration *);
 extern tree get_typeinfo_decl (TypeInfoDeclaration *);
 extern tree get_classinfo_decl (ClassDeclaration *);
-extern tree build_typeinfo (Type *);
+extern tree build_typeinfo (const Loc &, Type *);
 extern void create_typeinfo (Type *, Module *);
 extern void create_tinfo_types (Module *);
 extern void layout_cpp_typeinfo (ClassDeclaration *);

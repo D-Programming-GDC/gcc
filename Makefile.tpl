@@ -265,11 +265,12 @@ POSTSTAGE1_HOST_EXPORTS = \
 	$(POSTSTAGE1_CXX_EXPORT) \
 	$(LTO_EXPORTS) \
 	GDC="$$r/$(HOST_SUBDIR)/prev-gcc/gdc$(exeext) -B$$r/$(HOST_SUBDIR)/prev-gcc/ \
-	  -B$(build_tooldir)/bin/ $(GDC_FLAGS_FOR_TARGET) \
+	  -B$(build_tooldir)/bin/ $(GDCFLAGS_FOR_TARGET) \
 	  -B$$r/prev-$(TARGET_SUBDIR)/libphobos/src \
 	  -I$$r/prev-$(TARGET_SUBDIR)/libphobos/libdruntime -I$$s/libphobos/libdruntime \
 	  -L$$r/prev-$(TARGET_SUBDIR)/libphobos/src/.libs \
-	  -L$$r/prev-$(TARGET_SUBDIR)/libphobos/libdruntime/.libs"; \
+	  -L$$r/prev-$(TARGET_SUBDIR)/libphobos/libdruntime/.libs \
+	  -L$$r/prev-$(TARGET_SUBDIR)/libstdc++-v3/src/.libs"; \
 	export GDC; \
 	GDC_FOR_BUILD="$$GDC"; export GDC_FOR_BUILD; \
 	GNATBIND="$$r/$(HOST_SUBDIR)/prev-gcc/gnatbind"; export GNATBIND; \

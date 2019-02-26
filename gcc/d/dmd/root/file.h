@@ -1,5 +1,6 @@
 
 /* Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * All Rights Reserved, written by Walter Bright
  * http://www.digitalmars.com
  * Distributed under the Boost Software License, Version 1.0.
  * http://www.boost.org/LICENSE_1_0.txt
@@ -8,12 +9,12 @@
 
 #pragma once
 
-#include "dsystem.h"
+#include <stddef.h>
+
 #include "array.h"
+#include "filename.h"
 
 typedef Array<struct File *> Files;
-
-struct FileName;
 
 struct File
 {
@@ -21,14 +22,12 @@ struct File
     unsigned char *buffer;      // data for our file
     size_t len;                 // amount of data in buffer[]
 
-    FileName *name;             // name of our file
+    FileName name;              // name of our file
 
-    File(const char *);
     static File *create(const char *);
-    File(const FileName *);
     ~File();
 
-    const char *toChars();
+    const char *toChars() const;
 
     /* Read file, return true if error
      */

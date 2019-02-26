@@ -113,5 +113,6 @@ extern rtl_opt_pass *make_pass_work_around_errata (gcc::context *);
 
 /* Routines implemented in sparc-d.c  */
 extern void sparc_d_target_versions (void);
+extern const char *sparc_d_float_abi_type (void);
 
 #endif /* __SPARC_PROTOS_H__ */

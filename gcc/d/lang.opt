@@ -106,29 +106,29 @@ Wall
 D
 ; Documented in C
 
-Walloca
-D
-; Documented in C
-
-Walloca-larger-than=
-D
-; Documented in C
-
-Wno-alloca-larger-than
-D
-; Documented in C
-
 Wcast-result
 D Warning Var(warn_cast_result)
 Warn about casts that will produce a null result.
 
 Wdeprecated
 D
-; Documented in common.opt
+; Documented in C
 
 Werror
 D
 ; Documented in common.opt
+
+Walloca
+D
+; Documented in C
+
+Walloca-larger-than=
+D
+; Documented in common.opt
+
+Wno-alloca-larger-than
+D
+; Documented in C
 
 Wpsabi
 D
@@ -229,6 +229,10 @@ fdoc-inc=
 D Joined RejectNegative
 -fdoc-inc=<file>	Include a Ddoc macro <file>.
 
+fdruntime
+D
+Assume that standard D runtime libraries and \"D main\" exist.
+
 fdump-d-original
 D
 Display the frontend AST after parsing and semantic passes.
@@ -250,7 +254,7 @@ D Joined RejectNegative
 -fmodule-file=<package.module>=<filespec>	use <filespec> as source file for <package.module>.
 
 fmoduleinfo
-D
+D Var(flag_moduleinfo)
 Generate ModuleInfo struct for output module.
 
 fonly=
@@ -268,6 +272,10 @@ Generate code for precondition contracts.
 frelease
 D
 Compile release version.
+
+frtti
+D
+; Documented in C
 
 fswitch-errors
 D Var(flag_switch_errors)
@@ -289,9 +297,17 @@ ftransition=dip1000
 D RejectNegative
 Implement DIP1000: Scoped pointers (experimental).
 
+ftransition=dip1008
+D RejectNegative
+Implement DIP1008: Allow exceptions in @nogc code (experimental).
+
 ftransition=dip25
 D RejectNegative
 Implement DIP25: Sealed references (experimental).
+
+ftransition=dtorfields
+D RejectNegative
+Destruct fields of partially constructed objects.
 
 ftransition=field
 D RejectNegative
@@ -300,6 +316,10 @@ List all non-mutable fields which occupy an object instance.
 ftransition=import
 D RejectNegative
 Revert to single phase name lookup.
+
+ftransition=intpromote
+D RejectNegative
+Use C-style integral promotion for unary '+', '-' and '~'.
 
 ftransition=nogc
 D RejectNegative

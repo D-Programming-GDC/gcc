@@ -32,9 +32,12 @@ headers.
 #define _GLIBCXX_USE_CXX11_ABI 0
 
 #include <stdio.h>
+#include <stdint.h>
 #include <assert.h>
 #include <exception>
 #include <cstdarg>
+
+#include "cppb.h"
 
 /**************************************/
 
@@ -268,13 +271,13 @@ void foo8(const char *p)
 }
 
 /**************************************/
-// 4059
+// https://issues.dlang.org/show_bug.cgi?id=4059
 
 struct elem9 { };
 void foobar9(elem9*, elem9*) { }
 
 /**************************************/
-// 5148
+// https://issues.dlang.org/show_bug.cgi?id=5148
 
 void foo10(const char*, const char*) { }
 void foo10(const int, const int) { }
@@ -347,7 +350,7 @@ size_t getoffset13161a()
 
 /****************************************************/
 
-#if __linux__ || __APPLE__ || __FreeBSD__
+#if __linux__ || __APPLE__ || __FreeBSD__ || __DragonFly__
 #include <memory>
 #include <vector>
 #include <string>
@@ -404,7 +407,7 @@ wchar_t f13289_cpp_wchar_t(wchar_t ch)
     }
 }
 
-#if __linux__ || __APPLE__ || __FreeBSD__ || __OpenBSD__ || __sun || __NetBSD__
+#if __linux__ || __APPLE__ || __FreeBSD__ || __OpenBSD__ || __sun || __NetBSD__ || __DragonFly__
 unsigned short f13289_d_wchar(unsigned short ch);
 wchar_t f13289_d_dchar(wchar_t ch);
 #elif _WIN32
@@ -414,7 +417,7 @@ unsigned int f13289_d_dchar(unsigned int ch);
 
 bool f13289_cpp_test()
 {
-#if __linux__ || __APPLE__ || __FreeBSD__ || __OpenBSD__ || __sun || __NetBSD__
+#if __linux__ || __APPLE__ || __FreeBSD__ || __OpenBSD__ || __sun || __NetBSD__ || __DragonFly__
     if (!(f13289_d_wchar((unsigned short)'c') == (unsigned short)'C')) return false;
     if (!(f13289_d_wchar((unsigned short)'D') == (unsigned short)'D')) return false;
     if (!(f13289_d_dchar(L'e') == L'E')) return false;
@@ -495,7 +498,7 @@ namespace N13337 {
 }
 
 /****************************************/
-// 14195
+// https://issues.dlang.org/show_bug.cgi?id=14195
 
 template <typename T>
 struct Delegate1 {};
@@ -514,17 +517,17 @@ void test14195a(Delegate1<void()> func) {}
 void test14195b(Delegate2<int(float, double), int(float, double)> func) {}
 
 /******************************************/
-// 14200
+// https://issues.dlang.org/show_bug.cgi?id=14200
 
 void test14200a(int a) {};
 void test14200b(float a, int b, double c) {};
 
 /******************************************/
-// 14956
+// https://issues.dlang.org/show_bug.cgi?id=14956
 
 namespace std {
     namespace N14956 {
-	struct S14956 { };
+    struct S14956 { };
     }
 }
 
@@ -573,25 +576,20 @@ Visitor2* getVisitor2()
 
 /******************************************/
 // issues detected by fuzzer
-#if _LP64
-#define longlong long
-#else
-#define longlong long long
-#endif
 
-void fuzz1_checkValues(longlong arg10, longlong arg11, bool arg12);
-void fuzz1_cppvararg(longlong arg10, longlong arg11, bool arg12)
+void fuzz1_checkValues(int64_t arg10, int64_t arg11, bool arg12);
+void fuzz1_cppvararg(int64_t arg10, int64_t arg11, bool arg12)
 {
     fuzz1_checkValues(arg10, arg11, arg12);
 }
 
-void fuzz2_checkValues(unsigned longlong arg10, unsigned longlong arg11, bool arg12);
-void fuzz2_cppvararg(unsigned longlong arg10, unsigned longlong arg11, bool arg12)
+void fuzz2_checkValues(uint64_t arg10, uint64_t arg11, bool arg12);
+void fuzz2_cppvararg(uint64_t arg10, uint64_t arg11, bool arg12)
 {
     fuzz2_checkValues(arg10, arg11, arg12);
 }
 
-#if __linux__ || __APPLE__ || __FreeBSD__ || __OpenBSD__ || __sun || __NetBSD__
+#if __linux__ || __APPLE__ || __FreeBSD__ || __OpenBSD__ || __sun || __NetBSD__ || __DragonFly__
 #define wchar unsigned short
 #elif _WIN32
 #define wchar wchar_t
@@ -628,10 +626,10 @@ void throwle()
 #endif
 
 /******************************************/
-// 15579
+// https://issues.dlang.org/show_bug.cgi?id=15579
 
 /******************************************/
-// 15579
+// https://issues.dlang.org/show_bug.cgi?id=15579
 
 class Base
 {
@@ -706,7 +704,7 @@ Interface *cppfooi(Interface *i)
 }
 
 /******************************************/
-// 15610
+// https://issues.dlang.org/show_bug.cgi?id=15610
 
 class Base2
 {
@@ -734,7 +732,7 @@ void Derived2::f()
 }
 
 /******************************************/
-// 15455
+// https://issues.dlang.org/show_bug.cgi?id=15455
 
 struct X6
 {
@@ -762,7 +760,7 @@ void test15455b(X8 s)
 }
 
 /******************************************/
-// 15372
+// https://issues.dlang.org/show_bug.cgi?id=15372
 
 template <typename T>
 int foo15372(int value)
@@ -772,11 +770,11 @@ int foo15372(int value)
 
 void test15372b()
 {
-	int t = foo15372<int>(1);
+    int t = foo15372<int>(1);
 }
 
 /****************************************/
-// 15576
+// https://issues.dlang.org/show_bug.cgi?id=15576
 
 namespace ns15576
 {
@@ -789,7 +787,7 @@ namespace ns15576
 }
 
 /****************************************/
-// 15802
+// https://issues.dlang.org/show_bug.cgi?id=15802
 
 template <typename T>
 class Foo15802
@@ -803,16 +801,174 @@ public:
 
 void test15802b()
 {
-	int t = Foo15802<int>::boo(1);
+    int t = Foo15802<int>::boo(1);
 }
 
 
 /****************************************/
-// 16536 - mangling mismatch on OSX
+// https://issues.dlang.org/show_bug.cgi?id=16536
+// mangling mismatch on OSX
 
 #if defined(__APPLE__)
-__UINTMAX_TYPE__ pass16536(__UINTMAX_TYPE__ a)
+uint64_t pass16536(uint64_t a)
 {
     return a;
 }
 #endif
+
+/****************************************/
+// https://issues.dlang.org/show_bug.cgi?id=15589
+// extern(C++) virtual destructors are not put in vtbl[]
+
+class A15589
+{
+public:
+    struct S
+    {
+    public:
+        int x;
+    };
+    virtual int foo();
+    virtual ~A15589();
+    S s1;
+    S s2;
+};
+class B15589 : public A15589
+{
+public:
+    virtual int bar();
+    virtual ~B15589();
+    S s3;
+};
+
+void test15589b(A15589 *p)
+{
+    assert(p->foo() == 100);
+    assert(((B15589*)p)->bar() == 200);
+    p->~A15589();
+}
+
+
+/////////////////
+void trace15589(int ch);
+
+Cpp15589Base::~Cpp15589Base()
+{
+    trace15589('b');
+}
+
+Cpp15589Derived::Cpp15589Derived()
+{
+    b = 1;
+}
+
+Cpp15589Derived::~Cpp15589Derived()
+{
+    trace15589('B');
+}
+
+Cpp15589BaseVirtual::Cpp15589BaseVirtual()
+{
+    c = 2;
+}
+
+Cpp15589BaseVirtual::~Cpp15589BaseVirtual()
+{
+    trace15589('v');
+}
+
+Cpp15589DerivedVirtual::Cpp15589DerivedVirtual()
+{
+    d = 3;
+}
+
+Cpp15589DerivedVirtual::~Cpp15589DerivedVirtual()
+{
+    trace15589('V');
+}
+
+Cpp15589IntroducingVirtual::Cpp15589IntroducingVirtual()
+{
+    e = 4;
+}
+
+Cpp15589IntroducingVirtual::~Cpp15589IntroducingVirtual()
+{
+    trace15589('I');
+}
+
+Cpp15589Struct::~Cpp15589Struct()
+{
+    trace15589('s');
+}
+
+/****************************************/
+// https://issues.dlang.org/show_bug.cgi?id=18928
+
+struct Small18928
+{
+    int x;
+};
+
+class CC18928
+{
+public:
+    virtual Small18928 getVirtual();
+    Small18928 getFinal();
+    static Small18928 getStatic();
+};
+
+Small18928 CC18928::getVirtual() { Small18928 s = {3}; return s; }
+Small18928 CC18928::getFinal()   { Small18928 s = {4}; return s; }
+Small18928 CC18928::getStatic()  { Small18928 s = {5}; return s; }
+
+CC18928* newCC18928()
+{
+    return new CC18928();
+}
+
+/****************************************/
+// https://issues.dlang.org/show_bug.cgi?id=18966
+Base18966::Base18966() { x = 10; }
+Base18966::~Base18966() {}
+void Base18966::vf()
+{
+    x = 100;
+}
+
+A18966::A18966() : calledOverloads(/*zero-init*/), i(0) { foo(); }
+void A18966::foo() { calledOverloads[i++] = 'A'; }
+
+B18966::B18966() { foo(); }
+void B18966::foo() { calledOverloads[i++] = 'B'; }
+
+#if _WIN32 // otherwise defined in C header files!
+// https://issues.dlang.org/show_bug.cgi?id=18955
+namespace std
+{
+    template<typename Char>
+    struct char_traits
+    {
+    };
+    template<typename Char>
+    class allocator
+    {
+    };
+    template<typename Char, typename Traits, typename Alloc>
+    class basic_string
+    {
+    };
+    typedef basic_string<char, char_traits<char>, allocator<char> > string;
+}
+#endif // _WIN32
+
+void callback18955(const std::string& s);
+
+void test18955()
+{
+    std::string s;
+// TODO: on OSX and FreeBSD, std is mangled as std::__1
+#if !__APPLE__ && !__FreeBSD__
+    callback18955(s);
+#endif
+}

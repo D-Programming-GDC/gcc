@@ -1,5 +1,6 @@
 
 /* Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * All Rights Reserved, written by Walter Bright
  * http://www.digitalmars.com
  * Distributed under the Boost Software License, Version 1.0.
  * http://www.boost.org/LICENSE_1_0.txt
@@ -8,8 +9,10 @@
 
 #pragma once
 
-#include "dsystem.h"
-#include "port.h"
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
+#include <assert.h>
 #include "rmem.h"
 
 class RootObject;
@@ -46,7 +49,6 @@ public:
     void setsize(size_t size);
     void reset();
     void write(const void *data, d_size_t nbytes);
-    void writebstring(utf8_t *string);
     void writestring(const char *string);
     void prependstring(const char *string);
     void writenl();                     // write newline

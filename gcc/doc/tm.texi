@@ -10747,6 +10747,17 @@ would return the @code{sizeof(CRITICAL_SECTION)}, while other platforms that
 implement pthreads would return @code{sizeof(pthread_mutex_t)}.
 @end deftypefn
 
+@deftypefn {D Target Hook} {const char *} TARGET_D_FLOAT_ABI_TYPE (void)
+Returns a string specifying which floating-point ABI is in use, or whether
+floating-point value types are passed in FPU registers.  For most targets,
+this would be described as either "hard" or "soft".
+@end deftypefn
+
+@deftypefn {D Target Hook} {const char *} TARGET_D_OBJECT_FORMAT (void)
+Returns a string specifying the executable object format of the platform
+the compiler is generating code for.
+@end deftypefn
+
 @node Named Address Spaces
 @section Adding support for named address spaces
 @cindex named address spaces

@@ -585,7 +585,7 @@ void test66()
 /******************************************/
 // https://bugzilla.gdcproject.org/show_bug.cgi?id=67
 
-__vector(float[4]) d[2];  // ICE
+__vector(float[4])[2] d;  // ICE
 
 
 /******************************************/

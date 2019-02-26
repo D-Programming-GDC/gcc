@@ -69,8 +69,8 @@
     ))
 
     Copyright: Copyright 2010 - 2012
-    License:   $(WEB www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
-    Authors:   Jonathan M Davis and Kato Shoichi
+    License:   $(HTTP www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
+    Authors:   $(HTTP jmdavisprog.com, Jonathan M Davis) and Kato Shoichi
     Source:    $(DRUNTIMESRC core/_time.d)
     Macros:
     NBSP=&nbsp;
@@ -549,7 +549,11 @@ public:
             foreach (U; _TypeTuple!(Duration, const Duration, immutable Duration))
             {
                 T t = 42;
-                U u = t;
+                // workaround https://issues.dlang.org/show_bug.cgi?id=18296
+                version (D_Coverage)
+                    U u = T(t._hnsecs);
+                else
+                    U u = t;
                 assert(t == u);
                 assert(copy(t) == u);
                 assert(t == copy(u));
@@ -2104,26 +2108,26 @@ struct MonoTimeImpl(ClockType clockType)
 
         version (Windows)
         {
-            long ticks;
-            if (QueryPerformanceCounter(&ticks) == 0)
-            {
-                // This probably cannot happen on Windows 95 or later
-                import core.internal.abort : abort;
-                abort("Call to QueryPerformanceCounter failed.");
-            }
+            long ticks = void;
+            QueryPerformanceCounter(&ticks);
             return MonoTimeImpl(ticks);
         }
         else version (Darwin)
             return MonoTimeImpl(mach_absolute_time());
         else version (Posix)
         {
-            timespec ts;
-            if (clock_gettime(clockArg, &ts) != 0)
+            timespec ts = void;
+            immutable error = clock_gettime(clockArg, &ts);
+            // clockArg is supported and if tv_sec is long or larger
+            // overflow won't happen before 292 billion years A.D.
+            static if (ts.tv_sec.max < long.max)
             {
-                import core.internal.abort : abort;
-                abort("Call to clock_gettime failed.");
+                if (error)
+                {
+                    import core.internal.abort : abort;
+                    abort("Call to clock_gettime failed.");
+                }
             }
-
             return MonoTimeImpl(convClockFreq(ts.tv_sec * 1_000_000_000L + ts.tv_nsec,
                                               1_000_000_000L,
                                               ticksPerSecond));
@@ -3340,10 +3344,8 @@ struct TickDuration
         import core.internal.abort : abort;
         version (Windows)
         {
-            ulong ticks;
-            if (QueryPerformanceCounter(cast(long*)&ticks) == 0)
-                abort("Failed in QueryPerformanceCounter().");
-
+            ulong ticks = void;
+            QueryPerformanceCounter(cast(long*)&ticks);
             return TickDuration(ticks);
         }
         else version (Darwin)
@@ -3352,10 +3354,8 @@ struct TickDuration
                 return TickDuration(cast(long)mach_absolute_time());
             else
             {
-                timeval tv;
-                if (gettimeofday(&tv, null) != 0)
-                    abort("Failed in gettimeofday().");
-
+                timeval tv = void;
+                gettimeofday(&tv, null);
                 return TickDuration(tv.tv_sec * TickDuration.ticksPerSec +
                                     tv.tv_usec * TickDuration.ticksPerSec / 1000 / 1000);
             }
@@ -3364,19 +3364,25 @@ struct TickDuration
         {
             static if (is(typeof(clock_gettime)))
             {
-                timespec ts;
-                if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
-                    abort("Failed in clock_gettime().");
-
+                timespec ts = void;
+                immutable error = clock_gettime(CLOCK_MONOTONIC, &ts);
+                // CLOCK_MONOTONIC is supported and if tv_sec is long or larger
+                // overflow won't happen before 292 billion years A.D.
+                static if (ts.tv_sec.max < long.max)
+                {
+                    if (error)
+                    {
+                        import core.internal.abort : abort;
+                        abort("Call to clock_gettime failed.");
+                    }
+                }
                 return TickDuration(ts.tv_sec * TickDuration.ticksPerSec +
                                     ts.tv_nsec * TickDuration.ticksPerSec / 1000 / 1000 / 1000);
             }
             else
             {
-                timeval tv;
-                if (gettimeofday(&tv, null) != 0)
-                    abort("Failed in gettimeofday().");
-
+                timeval tv = void;
+                gettimeofday(&tv, null);
                 return TickDuration(tv.tv_sec * TickDuration.ticksPerSec +
                                     tv.tv_usec * TickDuration.ticksPerSec / 1000 / 1000);
             }
@@ -3540,7 +3546,13 @@ unittest
 }
 
 
+// @@@DEPRECATED_2018-10@@@
 /++
+    $(RED Everything in druntime and Phobos that was using FracSec now uses
+          Duration for greater simplicity. So, FracSec has been deprecated.
+          It will be removed from the docs in October 2018, and removed
+          completely from druntime in October 2019.)
+
     Represents fractional seconds.
 
     This is the portion of the time which is smaller than a second and it cannot
@@ -3560,6 +3572,7 @@ unittest
     given as nsecs will be converted to hnsecs using $(D convert) (which uses
     truncating division when converting to smaller units).
   +/
+deprecated("FracSec has been deprecated in favor of just using Duration for the sake of simplicity")
 struct FracSec
 {
 @safe pure:

@@ -487,8 +487,8 @@ fiber_switchContext:
  */
         .text
         .global CSYM(fiber_switchContext)
-        .type   fiber_switchContext, %function
         .p2align  2
+        .type   fiber_switchContext, %function
 CSYM(fiber_switchContext):
         stp     d15, d14, [sp, #-20*8]!
         stp     d13, d12, [sp, #2*8]
@@ -519,7 +519,6 @@ CSYM(fiber_switchContext):
         ldp     d15, d14, [sp], #20*8
         ret
 
-
 /**
  * When generating any kind of backtrace (gdb, exception handling) for
  * a function called in a Fiber, we need to tell the unwinder to stop
@@ -541,7 +540,6 @@ CSYM(fiber_trampoline):
         // fiber_entryPoint never returns
         bl fiber_entryPoint
         .cfi_endproc
-
 #elif defined(__MINGW32__)
 /************************************************************************************
  * GDC MinGW ASM BITS

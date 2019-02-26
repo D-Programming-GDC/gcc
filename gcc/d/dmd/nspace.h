@@ -20,14 +20,9 @@ class Nspace : public ScopeDsymbol
 {
   public:
     bool mangleOnly;
-    Nspace(Loc loc, Identifier *ident, Dsymbols *members, bool mangleOnly);
-
     Dsymbol *syntaxCopy(Dsymbol *s);
     void addMember(Scope *sc, ScopeDsymbol *sds);
     void setScope(Scope *sc);
-    void semantic(Scope *sc);
-    void semantic2(Scope *sc);
-    void semantic3(Scope *sc);
     bool oneMember(Dsymbol **ps, Identifier *ident);
     Dsymbol *search(const Loc &loc, Identifier *ident, int flags = SearchLocalsOnly);
     int apply(Dsymbol_apply_ft_t fp, void *param);

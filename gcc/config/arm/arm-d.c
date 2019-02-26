@@ -36,18 +36,36 @@ arm_d_target_versions (void)
       d_add_builtin_version ("ARM_Thumb");
     }
 
-  if (TARGET_HARD_FLOAT_ABI)
+  if (arm_float_abi == ARM_FLOAT_ABI_HARD)
     d_add_builtin_version ("ARM_HardFloat");
-  else
-    {
-      if (TARGET_SOFT_FLOAT)
-	d_add_builtin_version ("ARM_SoftFloat");
-      else if (TARGET_HARD_FLOAT)
-	d_add_builtin_version ("ARM_SoftFP");
-    }
+  else if (arm_float_abi == ARM_FLOAT_ABI_SOFT)
+    d_add_builtin_version ("ARM_SoftFloat");
+  else if (arm_float_abi == ARM_FLOAT_ABI_SOFTFP)
+    d_add_builtin_version ("ARM_SoftFP");
 
   if (TARGET_SOFT_FLOAT)
     d_add_builtin_version ("D_SoftFloat");
   else if (TARGET_HARD_FLOAT)
     d_add_builtin_version ("D_HardFloat");
+}
+
+/* Implement TARGET_D_FLOAT_ABI_TYPE for ARM targets.  */
+
+const char *
+arm_d_float_abi_type (void)
+{
+  switch (arm_float_abi)
+    {
+    case ARM_FLOAT_ABI_HARD:
+      return "hard";
+
+    case ARM_FLOAT_ABI_SOFT:
+      return "soft";
+
+    case ARM_FLOAT_ABI_SOFTFP:
+      return "softfp";
+
+    default:
+      return NULL;
+    }
 }

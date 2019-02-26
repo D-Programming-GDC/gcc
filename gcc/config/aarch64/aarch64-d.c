@@ -29,3 +29,11 @@ aarch64_d_target_versions (void)
   d_add_builtin_version ("AArch64");
   d_add_builtin_version ("D_HardFloat");
 }
+
+/* Implement TARGET_D_FLOAT_ABI_TYPE for AArch64 targets.  */
+
+const char *
+aarch64_d_float_abi_type (void)
+{
+  return "hard";
+}

@@ -46,3 +46,11 @@ sparc_d_target_versions (void)
       d_add_builtin_version ("SPARC_SoftFloat");
     }
 }
+
+/* Implement TARGET_D_FLOAT_ABI_TYPE for SPARC targets.  */
+
+const char *
+sparc_d_float_abi_type (void)
+{
+  return (TARGET_FPU) ? "hard" : "soft";
+}

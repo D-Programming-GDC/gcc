@@ -33,6 +33,7 @@ extern(C)
 {
     int _d_isbaseof(ClassInfo, ClassInfo);
     void _d_createTrace(Object, void*);
+    void _d_print_throwable(Throwable t);
 
     // Not used in GDC but declaration required by rt/sections.d
     struct FuncTable
@@ -478,9 +479,16 @@ extern(C) void _d_throw(Throwable object)
     // Add to thrown exception stack.
     eh.push();
 
+    // Increment reference count if object is a refcounted Throwable.
+    auto refcount = object.refcount();
+    if (refcount)
+        object.refcount() = refcount + 1;
+
     // Called by unwinder when exception object needs destruction by other than our code.
     extern(C) void exception_cleanup(_Unwind_Reason_Code code, _Unwind_Exception* exc)
     {
+        auto eh = ExceptionHeader.toExceptionHeader(exc);
+
         // If we haven't been caught by a foreign handler, then this is
         // some sort of unwind error.  In that case just die immediately.
         // _Unwind_DeleteException in the HP-UX IA64 libunwind library
@@ -489,7 +497,6 @@ extern(C) void _d_throw(Throwable object)
         if (code != _URC_FOREIGN_EXCEPTION_CAUGHT && code != _URC_NO_REASON)
             terminate("uncaught exception", __LINE__);
 
-        auto eh = ExceptionHeader.toExceptionHeader(exc);
         ExceptionHeader.free(eh);
     }
 
@@ -514,7 +521,11 @@ extern(C) void _d_throw(Throwable object)
     // things, almost certainly we will have crashed before now, rather than
     // actually being able to diagnose the problem.
     if (r == _URC_END_OF_STACK)
+    {
+        __gdc_begin_catch(&eh.unwindHeader);
+        _d_print_throwable(object);
         terminate("uncaught exception", __LINE__);
+    }
 
     terminate("unwind error", __LINE__);
 }
@@ -949,14 +960,10 @@ private _Unwind_Reason_Code __gdc_personality(_Unwind_Action actions,
             if (currentLsd != nextLsd && currentCfa != nextCfa)
                 break;
 
-            // Add our object onto the end of the existing chain.
-            Throwable n = ehn.object;
-            while (n.next)
-                n = n.next;
-            n.next = eh.object;
+            // Add our object onto the end of the existing chain and replace
+            // our exception object with in-flight one.
+            eh.object = Throwable.chainTogether(ehn.object, eh.object);
 
-            // Replace our exception object with in-flight one
-            eh.object = ehn.object;
             if (nextHandler != handler && !bypassed)
             {
                 handler = nextHandler;

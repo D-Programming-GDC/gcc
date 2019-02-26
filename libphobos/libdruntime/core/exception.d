@@ -1,14 +1,12 @@
 /**
- * The exception module defines all system-level exceptions and provides a
- * mechanism to alter system-level error handling.
- *
- * Copyright: Copyright Sean Kelly 2005 - 2013.
- * License: Distributed under the
- *      $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost Software License 1.0).
- *    (See accompanying file LICENSE)
- * Authors:   Sean Kelly and Jonathan M Davis
- * Source:    $(DRUNTIMESRC core/_exception.d)
- */
+    The exception module defines all system-level exceptions and provides a
+    mechanism to alter system-level error handling.
+
+    Copyright: Copyright Sean Kelly 2005 - 2013.
+    License:   $(HTTP www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
+    Authors:   Sean Kelly and $(HTTP jmdavisprog.com, Jonathan M Davis)
+    Source:    $(DRUNTIMESRC core/_exception.d)
+*/
 
 /* NOTE: This file has been patched from the original DMD distribution to
  * work with the GDC compiler.
@@ -316,7 +314,7 @@ unittest
  */
 class SwitchError : Error
 {
-    @safe pure nothrow this( string file = __FILE__, size_t line = __LINE__, Throwable next = null )
+    @safe pure nothrow @nogc this( string file = __FILE__, size_t line = __LINE__, Throwable next = null )
     {
         super( "No appropriate switch clause found", file, line, next );
     }
@@ -580,9 +578,21 @@ extern (C) void onInvalidMemoryOperationError(void* pretend_sideffect = null) @t
  */
 extern (C) void onSwitchError( string file = __FILE__, size_t line = __LINE__ ) @safe pure nothrow
 {
-    throw new SwitchError( file, line, null );
+    version (D_Exceptions)
+        throw new SwitchError( file, line, null );
+    else
+        assert(0, "No appropriate switch clause found");
 }
 
+// Compiler lowers final switch default case to this (which is a runtime error)
+void __switch_errorT()(string file = __FILE__, size_t line = __LINE__) @trusted
+{
+    // Consider making this a compile time check.
+    version (D_Exceptions)
+        throw staticError!SwitchError(file, line, null);
+    else
+        assert(0, "No appropriate switch clause found");
+}
 
 /**
  * A callback for unicode errors in D.  A $(LREF UnicodeException) will be thrown.

@@ -28,12 +28,21 @@ enum
 };
 
 // The state of array bounds checking
-enum BOUNDSCHECK
+typedef unsigned char CHECKENABLE;
+enum
 {
-    BOUNDSCHECKdefault, // initial value
-    BOUNDSCHECKoff,     // never do bounds checking
-    BOUNDSCHECKon,      // always do bounds checking
-    BOUNDSCHECKsafeonly // do bounds checking only in @safe functions
+    CHECKENABLEdefault, // initial value
+    CHECKENABLEoff,     // never do bounds checking
+    CHECKENABLEon,      // always do bounds checking
+    CHECKENABLEsafeonly // do bounds checking only in @safe functions
+};
+
+typedef unsigned char CHECKACTION;
+enum
+{
+    CHECKACTION_D,        // call D assert on failure
+    CHECKACTION_C,        // call C assert on failure
+    CHECKACTION_halt      // cause program halt on failure
 };
 
 enum CPU
@@ -78,7 +87,7 @@ struct Param
     bool vcg_ast;       // write-out codegen-ast
     bool showColumns;   // print character (column) numbers in diagnostics
     bool vtls;          // identify thread local variables
-    char vgc;           // identify gc usage
+    bool vgc;           // identify gc usage
     bool vfield;        // identify non-mutable field variables
     bool vcomplex;      // identify complex/imaginary type usage
     char symdebug;      // insert debug symbolic information
@@ -93,16 +102,15 @@ struct Param
     bool isWindows;     // generate code for Windows
     bool isFreeBSD;     // generate code for FreeBSD
     bool isOpenBSD;     // generate code for OpenBSD
+    bool isDragonFlyBSD;// generate code for DragonFlyBSD
     bool isSolaris;     // generate code for Solaris
     bool hasObjectiveC; // target supports Objective-C
     bool mscoff;        // for Win32: write COFF object files instead of OMF
     Diagnostic useDeprecated;
-    bool useAssert;     // generate runtime code for assert()'s
     bool useInvariants; // generate class invariant checks
     bool useIn;         // generate precondition checks
     bool useOut;        // generate postcondition checks
     bool stackstomp;    // add stack stomping code
-    bool useSwitchError; // check for switches without a default
     bool useUnitTests;  // generate unittest code
     bool useInline;     // inline expand functions
     bool useDIP25;      // implement http://wiki.dlang.org/DIP25
@@ -115,20 +123,38 @@ struct Param
     unsigned char covPercent;   // 0..100 code coverage percentage required
     bool nofloat;       // code should not pull in floating point support
     bool ignoreUnsupportedPragmas;      // rather than error on them
-    bool enforcePropertySyntax;
+    bool useModuleInfo; // generate runtime module information
+    bool useTypeInfo;   // generate runtime type information
+    bool useExceptions; // support exception handling
     bool betterC;       // be a "better C" compiler; no dependency on D runtime
     bool addMain;       // add a default main() function
     bool allInst;       // generate code for all template instantiations
     bool check10378;    // check for issues transitioning to 10738
     bool bug10378;      // use pre-bugzilla 10378 search strategy
+    bool fix16997;      // fix integral promotions for unary + - ~ operators
+                        // https://issues.dlang.org/show_bug.cgi?id=16997
     bool vsafe;         // use enhanced @safe checking
+    bool ehnogc;        // use @nogc exception handling
+    bool dtorFields;        // destruct fields of partially constructed objects
+                            // https://issues.dlang.org/show_bug.cgi?id=14246
     unsigned cplusplus;     // version of C++ name mangling to support
     bool showGaggedErrors;  // print gagged errors anyway
+    bool manual;            // open browser on compiler manual
+    bool usage;             // print usage and exit
+    bool mcpuUsage;         // print help on -mcpu switch
+    bool transitionUsage;   // print help on -transition switch
+    bool logo;              // print logo;
 
     CPU cpu;                // CPU instruction set to target
-    BOUNDSCHECK useArrayBounds;
 
-    const char *argv0;    // program name
+    CHECKENABLE useArrayBounds;    // when to generate code for array bounds checks
+    CHECKENABLE useAssert;         // when to generate code for assert()'s
+    CHECKENABLE useSwitchError;    // check for switches without a default
+    CHECKACTION checkAction;       // action to take when bounds, asserts or switch defaults are violated
+
+    unsigned errorLimit;
+
+    DArray<const char>  argv0;    // program name
     Array<const char *> *modFileAliasStrings; // array of char*'s of -I module filename alias strings
     Array<const char *> *imppath;     // array of char*'s of where to look for import modules
     Array<const char *> *fileImppath; // array of char*'s of where to look for file import modules
@@ -139,7 +165,7 @@ struct Param
     bool doDocComments;  // process embedded documentation comments
     const char *docdir;  // write documentation file to docdir directory
     const char *docname; // write documentation file to docname
-    Array<const char *> *ddocfiles;  // macro include files for Ddoc
+    Array<const char *> ddocfiles;  // macro include files for Ddoc
 
     bool doHdrGeneration;  // process embedded documentation comments
     const char *hdrdir;    // write 'header' file to docdir directory
@@ -148,6 +174,7 @@ struct Param
 
     bool doJsonGeneration;    // write JSON file
     const char *jsonfilename; // write JSON file to jsonfilename
+    unsigned jsonFieldFlags;  // JSON field flags to include
 
     unsigned debuglevel;   // debug level
     Array<const char *> *debugids;     // debug identifiers
@@ -174,10 +201,10 @@ struct Param
     Strings runargs;    // arguments for executable
 
     // Linker stuff
-    Array<const char *> *objfiles;
-    Array<const char *> *linkswitches;
-    Array<const char *> *libfiles;
-    Array<const char *> *dllfiles;
+    Array<const char *> objfiles;
+    Array<const char *> linkswitches;
+    Array<const char *> libfiles;
+    Array<const char *> dllfiles;
     const char *deffile;
     const char *resfile;
     const char *exefile;
@@ -213,15 +240,16 @@ struct Global
     const char *vendor;      // Compiler backend name
 
     Param params;
-    unsigned errors;       // number of errors reported so far
-    unsigned warnings;     // number of warnings reported so far
-    FILE *stdmsg;          // where to send verbose messages
-    unsigned gag;          // !=0 means gag reporting of errors & warnings
-    unsigned gaggedErrors; // number of errors reported while gagged
-
-    unsigned errorLimit;
+    unsigned errors;         // number of errors reported so far
+    unsigned warnings;       // number of warnings reported so far
+    unsigned gag;            // !=0 means gag reporting of errors & warnings
+    unsigned gaggedErrors;   // number of errors reported while gagged
+    unsigned gaggedWarnings; // number of warnings reported while gagged
 
     void* console;         // opaque pointer to console for controlling text attributes
+
+    Array<class Identifier*>* versionids; // command line versions and predefined versions
+    Array<class Identifier*>* debugids;   // command line debug versions and predefined versions
 
     /* Start gagging. Return the current number of gagged errors
      */
@@ -239,17 +267,31 @@ struct Global
     void increaseErrorCount();
 
     void _init();
+
+    /**
+    Returns: the version as the number that would be returned for __VERSION__
+    */
+    unsigned versionNumber();
 };
 
 extern Global global;
 
+// Because int64_t and friends may be any integral type of the
+// correct size, we have to explicitly ask for the correct
+// integer type to get the correct mangling with dmd
+#if __LP64__
 // Be careful not to care about sign when using dinteger_t
 // use this instead of integer_t to
 // avoid conflicts with system #include's
-typedef uint64_t dinteger_t;
+typedef unsigned long dinteger_t;
 // Signed and unsigned variants
-typedef int64_t sinteger_t;
-typedef uint64_t uinteger_t;
+typedef long sinteger_t;
+typedef unsigned long uinteger_t;
+#else
+typedef unsigned long long dinteger_t;
+typedef long long sinteger_t;
+typedef unsigned long long uinteger_t;
+#endif
 
 typedef int8_t                  d_int8;
 typedef uint8_t                 d_uns8;
@@ -263,7 +305,7 @@ typedef uint64_t                d_uns64;
 // file location
 struct Loc
 {
-    const char *filename;
+    const char *filename; // either absolute or relative to cwd
     unsigned linnum;
     unsigned charnum;
 
@@ -277,7 +319,7 @@ struct Loc
     Loc(const char *filename, unsigned linnum, unsigned charnum);
 
     const char *toChars() const;
-    bool equals(const Loc& loc);
+    bool equals(const Loc& loc) const;
 };
 
 enum LINK

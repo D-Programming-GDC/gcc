@@ -43,3 +43,16 @@ rs6000_d_target_versions (void)
       d_add_builtin_version ("D_SoftFloat");
     }
 }
+
+/* Implement TARGET_D_FLOAT_ABI_TYPE for PowerPC targets.  */
+
+const char *
+rs6000_d_float_abi_type (void)
+{
+  if (TARGET_HARD_FLOAT)
+    return "hard";
+  else if (TARGET_SOFT_FLOAT)
+    return "soft";
+
+  return NULL;
+}

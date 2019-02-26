@@ -246,6 +246,7 @@ extern void ix86_register_pragmas (void);
 
 /* In i386-d.c  */
 extern void ix86_d_target_versions (void);
+extern const char *ix86_d_float_abi_type (void);
 
 /* In winnt.c  */
 extern void i386_pe_unique_section (tree, int);

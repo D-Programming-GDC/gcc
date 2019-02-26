@@ -27,8 +27,9 @@ along with GCC; see the file COPYING3.  If not see
 
 #define TARGET_CPU_CPP_BUILTINS() sparc_target_macros ()
 
-/* Target CPU versions for D.  */
+/* Target hooks for D language.  */
 #define TARGET_D_CPU_VERSIONS sparc_d_target_versions
+#define TARGET_D_FLOAT_ABI_TYPE sparc_d_float_abi_type
 
 /* Specify this in a cover file to provide bi-architecture (32/64) support.  */
 /* #define SPARC_BI_ARCH */

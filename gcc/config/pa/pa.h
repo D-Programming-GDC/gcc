@@ -1303,5 +1303,6 @@ do {									     \
 
 #define NEED_INDICATE_EXEC_STACK 0
 
-/* Target CPU versions for D.  */
+/* Target hooks for D language.  */
 #define TARGET_D_CPU_VERSIONS pa_d_target_versions
+#define TARGET_D_FLOAT_ABI_TYPE pa_d_float_abi_type

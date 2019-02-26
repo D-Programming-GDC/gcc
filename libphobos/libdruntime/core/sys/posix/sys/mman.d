@@ -26,23 +26,6 @@ else version (TVOS)
 else version (WatchOS)
     version = Darwin;
 
-version (ARM)     version = ARM_Any;
-version (AArch64) version = ARM_Any;
-version (HPPA)    version = HPPA_Any;
-version (HPPA64)  version = HPPA_Any;
-version (MIPS32)  version = MIPS_Any;
-version (MIPS64)  version = MIPS_Any;
-version (PPC)     version = PPC_Any;
-version (PPC64)   version = PPC_Any;
-version (RISCV32) version = RISCV_Any;
-version (RISCV64) version = RISCV_Any;
-version (S390)    version = IBMZ_Any;
-version (SPARC)   version = SPARC_Any;
-version (SPARC64) version = SPARC_Any;
-version (SystemZ) version = IBMZ_Any;
-version (X86)     version = X86_Any;
-version (X86_64)  version = X86_Any;
-
 version (Posix):
 extern (C) nothrow @nogc:
 
@@ -330,13 +313,25 @@ version (CRuntime_Glibc)
     }
     else version (SH)
         private enum DEFAULTS = true;
-    else version (ARM_Any)
+    else version (AArch64)
         private enum DEFAULTS = true;
-    else version (IBMZ_Any)
+    else version (ARM)
+        private enum DEFAULTS = true;
+    else version (S390)
+        private enum DEFAULTS = true;
+    else version (SystemZ)
         private enum DEFAULTS = true;
     else version (IA64)
         private enum DEFAULTS = true;
-    else version (HPPA_Any)
+    else version (HPPA)
+    {
+        private enum DEFAULTS = false;
+        enum MAP_ANON = 0x10;
+        enum MS_SYNC = 1;
+        enum MS_ASYNC = 2;
+        enum MS_INVALIDATE = 4;
+    }
+    else version (HPPA64)
     {
         private enum DEFAULTS = false;
         enum MAP_ANON = 0x10;
@@ -348,9 +343,11 @@ version (CRuntime_Glibc)
         private enum DEFAULTS = true;
     else version (TILE)
         private enum DEFAULTS = true;
-    else version (X86_Any)
+    else version (X86)
         private enum DEFAULTS = true;
-    else version (MIPS_Any)
+    else version (X86_64)
+        private enum DEFAULTS = true;
+    else version (MIPS32)
     {
         private enum DEFAULTS = false;
         enum MAP_ANON = 0x0800;
@@ -358,11 +355,21 @@ version (CRuntime_Glibc)
         enum MS_INVALIDATE = 2;
         enum MS_SYNC = 4;
     }
-    else version (RISCV_Any)
+    else version (MIPS64)
+    {
+        private enum DEFAULTS = false;
+        enum MAP_ANON = 0x0800;
+        enum MS_ASYNC = 1;
+        enum MS_INVALIDATE = 2;
+        enum MS_SYNC = 4;
+    }
+    else version (SPARC)
         private enum DEFAULTS = true;
-    else version (SPARC_Any)
+    else version (SPARC64)
         private enum DEFAULTS = true;
-    else version (PPC_Any)
+    else version (PPC)
+        private enum DEFAULTS = true;
+    else version (PPC64)
         private enum DEFAULTS = true;
     else
         static assert(0, "unimplemented");
@@ -536,12 +543,22 @@ int munlockall();
 
 version (CRuntime_Glibc)
 {
-    version (SPARC_Any) enum
+    version (SPARC) enum
     {
         MCL_CURRENT = 0x2000,
         MCL_FUTURE = 0x4000,
     }
-    else version (PPC_Any) enum
+    else version (SPARC64) enum
+    {
+        MCL_CURRENT = 0x2000,
+        MCL_FUTURE = 0x4000,
+    }
+    else version (PPC) enum
+    {
+        MCL_CURRENT = 0x2000,
+        MCL_FUTURE = 0x4000,
+    }
+    else version (PPC64) enum
     {
         MCL_CURRENT = 0x2000,
         MCL_FUTURE = 0x4000,

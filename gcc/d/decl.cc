@@ -59,7 +59,7 @@ along with GCC; see the file COPYING3.  If not see
 
 /* Return identifier for the external mangled name of DECL.  */
 
-static const char *
+const char *
 mangle_decl (Dsymbol *decl)
 {
   if (decl->isFuncDeclaration ())
@@ -109,6 +109,59 @@ gcc_attribute_p (Dsymbol *decl)
     }
 
   return false;
+}
+
+/* Subroutine of pragma declaration visitor for marking the function in the
+   defined in SYM as a global constructor or destructor.  If ISCTOR is true,
+   then we're applying pragma(crt_constructor).  */
+
+static int
+apply_pragma_crt (Dsymbol *sym, bool isctor)
+{
+  AttribDeclaration *ad = sym->isAttribDeclaration ();
+  if (ad != NULL)
+    {
+      int nested = 0;
+
+      /* Walk all declarations of the attribute scope.  */
+      Dsymbols *ds = ad->include (NULL);
+      if (ds)
+	{
+	  for (size_t i = 0; i < ds->dim; i++)
+	    nested += apply_pragma_crt ((*ds)[i], isctor);
+	}
+
+      return nested;
+    }
+
+  FuncDeclaration *fd = sym->isFuncDeclaration ();
+  if (fd != NULL)
+    {
+      tree decl = get_decl_tree (fd);
+
+      /* Apply flags to the function.  */
+      if (isctor)
+	{
+	  DECL_STATIC_CONSTRUCTOR (decl) = 1;
+	  decl_init_priority_insert (decl, DEFAULT_INIT_PRIORITY);
+	}
+      else
+	{
+	  DECL_STATIC_DESTRUCTOR (decl) = 1;
+	  decl_fini_priority_insert (decl, DEFAULT_INIT_PRIORITY);
+	}
+
+      if (fd->linkage != LINKc)
+	{
+	  error_at (make_location_t (fd->loc),
+		    "must be %<extern(C)%> for %<pragma(%s)%>",
+		    isctor ? "crt_constructor" : "crt_destructor");
+	}
+
+      return 1;
+    }
+
+  return 0;
 }
 
 /* Implements the visitor interface to lower all Declaration AST classes
@@ -216,7 +269,7 @@ public:
 
   void visit (AttribDeclaration *d)
   {
-    Dsymbols *ds = d->include (NULL, NULL);
+    Dsymbols *ds = d->include (NULL);
 
     if (!ds)
       return;
@@ -229,7 +282,7 @@ public:
   }
 
   /* Pragmas are a way to pass special information to the compiler and to add
-     vendor specific extensions to D.  We don't do anything here, yet.  */
+     vendor specific extensions to D.  */
 
   void visit (PragmaDeclaration *d)
   {
@@ -244,6 +297,19 @@ public:
       }
 
     visit ((AttribDeclaration *) d);
+
+    /* Handle pragma(crt_constructor) and pragma(crt_destructor).  Apply flag
+       to indicate that the functions enclosed should run automatically at the
+       beginning or end of execution.  */
+    if (d->ident == Identifier::idPool ("crt_constructor")
+	|| d->ident == Identifier::idPool ("crt_destructor"))
+      {
+	bool isctor = (d->ident == Identifier::idPool ("crt_constructor"));
+
+	if (apply_pragma_crt (d, isctor) > 1)
+	  error_at (make_location_t (d->loc),
+		    "can only apply to a single declaration");
+      }
   }
 
   /* Conditional compilation is the process of selecting which code to compile
@@ -371,7 +437,8 @@ public:
       return;
 
     /* Generate TypeInfo.  */
-    create_typeinfo (d->type, NULL);
+    if (have_typeinfo_p (Type::dtypeinfo))
+      create_typeinfo (d->type, NULL);
 
     /* Generate static initializer.  */
     d->sinit = aggregate_initializer_decl (d);
@@ -501,7 +568,8 @@ public:
 
     /* Generate C symbols.  */
     d->csym = get_classinfo_decl (d);
-    d->vtblsym = get_vtable_decl (d);
+    Dsymbol *vtblsym = d->vtblSymbol ();
+    vtblsym->csym = get_vtable_decl (d);
     d->sinit = aggregate_initializer_decl (d);
 
     /* Generate static initializer.  */
@@ -510,7 +578,9 @@ public:
     d_finish_decl (d->sinit);
 
     /* Put out the TypeInfo.  */
-    create_typeinfo (d->type, NULL);
+    if (have_typeinfo_p (Type::dtypeinfo))
+      create_typeinfo (d->type, NULL);
+
     DECL_INITIAL (d->csym) = layout_classinfo (d);
     d_linkonce_linkage (d->csym);
     d_finish_decl (d->csym);
@@ -526,17 +596,17 @@ public:
       {
 	FuncDeclaration *fd = d->vtbl[i]->isFuncDeclaration ();
 
-	if (fd && (fd->fbody || !d->isAbstract()))
+	if (fd && (fd->fbody || !d->isAbstract ()))
 	  {
 	    CONSTRUCTOR_APPEND_ELT (elms, size_int (i),
 				    build_address (get_symbol_decl (fd)));
 	  }
       }
 
-    DECL_INITIAL (d->vtblsym)
-      = build_constructor (TREE_TYPE (d->vtblsym), elms);
-    d_comdat_linkage (d->vtblsym);
-    d_finish_decl (d->vtblsym);
+    DECL_INITIAL (vtblsym->csym)
+      = build_constructor (TREE_TYPE (vtblsym->csym), elms);
+    d_comdat_linkage (vtblsym->csym);
+    d_finish_decl (vtblsym->csym);
 
     /* Add this decl to the current binding level.  */
     tree ctype = TREE_TYPE (build_ctype (d->type));
@@ -570,8 +640,11 @@ public:
     d->csym = get_classinfo_decl (d);
 
     /* Put out the TypeInfo.  */
-    create_typeinfo (d->type, NULL);
-    d->type->vtinfo->accept (this);
+    if (have_typeinfo_p (Type::dtypeinfo))
+      {
+	create_typeinfo (d->type, NULL);
+	d->type->vtinfo->accept (this);
+      }
 
     DECL_INITIAL (d->csym) = layout_classinfo (d);
     d_linkonce_linkage (d->csym);
@@ -602,7 +675,8 @@ public:
       return;
 
     /* Generate TypeInfo.  */
-    create_typeinfo (d->type, NULL);
+    if (have_typeinfo_p (Type::dtypeinfo))
+      create_typeinfo (d->type, NULL);
 
     TypeEnum *tc = (TypeEnum *) d->type;
     if (tc->sym->members && !d->type->isZeroInit ())
@@ -1106,8 +1180,12 @@ get_symbol_decl (Declaration *decl)
     {
       tree mangled_name;
 
-      if (decl->mangleOverride)
-	mangled_name = get_identifier (decl->mangleOverride);
+      if (decl->mangleOverride.length)
+	{
+	  mangled_name
+	    = get_identifier_with_length (decl->mangleOverride.ptr,
+					  decl->mangleOverride.length);
+	}
       else
 	mangled_name = get_identifier (mangle_decl (decl));
 
@@ -1278,9 +1356,9 @@ get_symbol_decl (Declaration *decl)
     TREE_THIS_VOLATILE (decl->csym) = 1;
 
   /* Protection attributes are used by the debugger.  */
-  if (decl->protection.kind == PROTprivate)
+  if (decl->protection.kind == Prot::private_)
     TREE_PRIVATE (decl->csym) = 1;
-  else if (decl->protection.kind == PROTprotected)
+  else if (decl->protection.kind == Prot::protected_)
     TREE_PROTECTED (decl->csym) = 1;
 
   /* Likewise, so could the deprecated attribute.  */
@@ -2004,26 +2082,27 @@ base_vtable_offset (ClassDeclaration *cd, BaseClass *bc)
 tree
 get_vtable_decl (ClassDeclaration *decl)
 {
-  if (decl->vtblsym)
-    return decl->vtblsym;
+  if (decl->vtblsym && decl->vtblsym->csym)
+    return decl->vtblsym->csym;
 
   tree ident = mangle_internal_decl (decl, "__vtbl", "Z");
   /* Note: Using a static array type for the VAR_DECL, the DECL_INITIAL value
      will have a different type.  However the back-end seems to accept this.  */
   tree type = build_ctype (Type::tvoidptr->sarrayOf (decl->vtbl.dim));
 
-  decl->vtblsym = declare_extern_var (ident, type);
-  DECL_LANG_SPECIFIC (decl->vtblsym) = build_lang_decl (NULL);
+  Dsymbol *vtblsym = decl->vtblSymbol ();
+  vtblsym->csym = declare_extern_var (ident, type);
+  DECL_LANG_SPECIFIC (vtblsym->csym) = build_lang_decl (NULL);
 
   /* Class is a reference, want the record type.  */
-  DECL_CONTEXT (decl->vtblsym) = TREE_TYPE (build_ctype (decl->type));
-  TREE_READONLY (decl->vtblsym) = 1;
-  DECL_VIRTUAL_P (decl->vtblsym) = 1;
+  DECL_CONTEXT (vtblsym->csym) = TREE_TYPE (build_ctype (decl->type));
+  TREE_READONLY (vtblsym->csym) = 1;
+  DECL_VIRTUAL_P (vtblsym->csym) = 1;
 
-  SET_DECL_ALIGN (decl->vtblsym, TARGET_VTABLE_ENTRY_ALIGN);
-  DECL_USER_ALIGN (decl->vtblsym) = true;
+  SET_DECL_ALIGN (vtblsym->csym, TARGET_VTABLE_ENTRY_ALIGN);
+  DECL_USER_ALIGN (vtblsym->csym) = true;
 
-  return decl->vtblsym;
+  return vtblsym->csym;
 }
 
 /* Helper function of build_class_instance.  Find the field inside aggregate

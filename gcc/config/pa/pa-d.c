@@ -37,3 +37,14 @@ pa_d_target_versions (void)
   else
     d_add_builtin_version ("D_HardFloat");
 }
+
+/* Implement TARGET_D_FLOAT_ABI_TYPE for HPPA targets.  */
+
+const char *
+pa_d_float_abi_type (void)
+{
+  if (TARGET_DISABLE_FPREGS || TARGET_SOFT_FLOAT)
+    return "soft";
+
+  return "hard";
+}

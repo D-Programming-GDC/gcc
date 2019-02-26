@@ -1762,7 +1762,10 @@ build_bounds_condition (const Loc& loc, tree index, tree len, bool inclusive)
      have already taken care of implicit casts to unsigned.  */
   tree condition = fold_build2 (inclusive ? GT_EXPR : GE_EXPR,
 				d_bool_type, index, len);
-  tree boundserr = d_assert_call (loc, LIBCALL_ARRAY_BOUNDS);
+  /* Terminate the program with a trap if no D runtime present.  */
+  tree boundserr = (global.params.checkAction == CHECKACTION_C)
+    ? build_call_expr (builtin_decl_explicit (BUILT_IN_TRAP), 0)
+    : d_assert_call (loc, LIBCALL_ARRAY_BOUNDS);
 
   return build_condition (TREE_TYPE (index), condition, boundserr, index);
 }
@@ -1776,13 +1779,13 @@ array_bounds_check (void)
 
   switch (global.params.useArrayBounds)
     {
-    case BOUNDSCHECKoff:
+    case CHECKENABLEoff:
       return false;
 
-    case BOUNDSCHECKon:
+    case CHECKENABLEon:
       return true;
 
-    case BOUNDSCHECKsafeonly:
+    case CHECKENABLEsafeonly:
       /* For D2 safe functions only.  */
       fd = d_function_chain->function;
       if (fd && fd->type->ty == Tfunction)

@@ -7340,6 +7340,10 @@ floating-point support; they are not included in this mechanism.
 
 @hook TARGET_D_CRITSEC_SIZE
 
+@hook TARGET_D_FLOAT_ABI_TYPE
+
+@hook TARGET_D_OBJECT_FORMAT
+
 @node Named Address Spaces
 @section Adding support for named address spaces
 @cindex named address spaces

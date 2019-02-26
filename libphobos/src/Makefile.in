@@ -161,9 +161,11 @@ am__objects_1 = etc/c/curl.lo etc/c/sqlite3.lo etc/c/zlib.lo \
 	std/demangle.lo std/digest/crc.lo std/digest/digest.lo \
 	std/digest/hmac.lo std/digest/md.lo std/digest/murmurhash.lo \
 	std/digest/package.lo std/digest/ripemd.lo std/digest/sha.lo \
-	std/encoding.lo std/exception.lo \
+	std/encoding.lo std/exception.lo std/experimental/all.lo \
 	std/experimental/allocator/building_blocks/affix_allocator.lo \
+	std/experimental/allocator/building_blocks/aligned_block_list.lo \
 	std/experimental/allocator/building_blocks/allocator_list.lo \
+	std/experimental/allocator/building_blocks/ascending_page_allocator.lo \
 	std/experimental/allocator/building_blocks/bitmapped_block.lo \
 	std/experimental/allocator/building_blocks/bucketizer.lo \
 	std/experimental/allocator/building_blocks/fallback_allocator.lo \
@@ -190,8 +192,8 @@ am__objects_1 = etc/c/curl.lo etc/c/sqlite3.lo etc/c/zlib.lo \
 	std/experimental/logger/nulllogger.lo \
 	std/experimental/logger/package.lo \
 	std/experimental/typecons.lo std/file.lo std/format.lo \
-	std/functional.lo std/getopt.lo std/internal/cstring.lo \
-	std/internal/math/biguintcore.lo \
+	std/functional.lo std/getopt.lo std/internal/attributes.lo \
+	std/internal/cstring.lo std/internal/math/biguintcore.lo \
 	std/internal/math/biguintnoasm.lo \
 	std/internal/math/errorfunction.lo \
 	std/internal/math/gammafunction.lo std/internal/scopebuffer.lo \
@@ -208,12 +210,12 @@ am__objects_1 = etc/c/curl.lo etc/c/sqlite3.lo etc/c/zlib.lo \
 	std/range/primitives.lo std/regex/internal/backtracking.lo \
 	std/regex/internal/generator.lo std/regex/internal/ir.lo \
 	std/regex/internal/kickstart.lo std/regex/internal/parser.lo \
-	std/regex/internal/tests.lo std/regex/internal/thompson.lo \
-	std/regex/package.lo std/signals.lo std/socket.lo \
-	std/stdint.lo std/stdio.lo std/string.lo std/system.lo \
-	std/traits.lo std/typecons.lo std/typetuple.lo std/uni.lo \
-	std/uri.lo std/utf.lo std/uuid.lo std/variant.lo \
-	std/windows/charset.lo std/windows/registry.lo \
+	std/regex/internal/tests.lo std/regex/internal/tests2.lo \
+	std/regex/internal/thompson.lo std/regex/package.lo \
+	std/signals.lo std/socket.lo std/stdint.lo std/stdio.lo \
+	std/string.lo std/system.lo std/traits.lo std/typecons.lo \
+	std/typetuple.lo std/uni.lo std/uri.lo std/utf.lo std/uuid.lo \
+	std/variant.lo std/windows/charset.lo std/windows/registry.lo \
 	std/windows/syserror.lo std/xml.lo std/zip.lo std/zlib.lo
 am__objects_2 = $(am__objects_1)
 am__objects_3 = $(am__objects_2)
@@ -474,9 +476,11 @@ PHOBOS_DSOURCES = etc/c/curl.d etc/c/sqlite3.d etc/c/zlib.d \
 	std/datetime/timezone.d std/demangle.d std/digest/crc.d \
 	std/digest/digest.d std/digest/hmac.d std/digest/md.d \
 	std/digest/murmurhash.d std/digest/package.d std/digest/ripemd.d \
-	std/digest/sha.d std/encoding.d std/exception.d \
+	std/digest/sha.d std/encoding.d std/exception.d std/experimental/all.d \
 	std/experimental/allocator/building_blocks/affix_allocator.d \
+	std/experimental/allocator/building_blocks/aligned_block_list.d \
 	std/experimental/allocator/building_blocks/allocator_list.d \
+	std/experimental/allocator/building_blocks/ascending_page_allocator.d \
 	std/experimental/allocator/building_blocks/bitmapped_block.d \
 	std/experimental/allocator/building_blocks/bucketizer.d \
 	std/experimental/allocator/building_blocks/fallback_allocator.d \
@@ -501,27 +505,27 @@ PHOBOS_DSOURCES = etc/c/curl.d etc/c/sqlite3.d etc/c/zlib.d \
 	std/experimental/logger/multilogger.d \
 	std/experimental/logger/nulllogger.d std/experimental/logger/package.d \
 	std/experimental/typecons.d std/file.d std/format.d std/functional.d \
-	std/getopt.d std/internal/cstring.d std/internal/math/biguintcore.d \
-	std/internal/math/biguintnoasm.d std/internal/math/errorfunction.d \
-	std/internal/math/gammafunction.d std/internal/scopebuffer.d \
-	std/internal/test/dummyrange.d std/internal/test/range.d \
-	std/internal/test/uda.d std/internal/unicode_comp.d \
-	std/internal/unicode_decomp.d std/internal/unicode_grapheme.d \
-	std/internal/unicode_norm.d std/internal/unicode_tables.d \
-	std/internal/windows/advapi32.d std/json.d std/math.d \
-	std/mathspecial.d std/meta.d std/mmfile.d std/net/curl.d \
-	std/net/isemail.d std/numeric.d std/outbuffer.d std/parallelism.d \
-	std/path.d std/process.d std/random.d std/range/interfaces.d \
-	std/range/package.d std/range/primitives.d \
+	std/getopt.d std/internal/attributes.d std/internal/cstring.d \
+	std/internal/math/biguintcore.d std/internal/math/biguintnoasm.d \
+	std/internal/math/errorfunction.d std/internal/math/gammafunction.d \
+	std/internal/scopebuffer.d std/internal/test/dummyrange.d \
+	std/internal/test/range.d std/internal/test/uda.d \
+	std/internal/unicode_comp.d std/internal/unicode_decomp.d \
+	std/internal/unicode_grapheme.d std/internal/unicode_norm.d \
+	std/internal/unicode_tables.d std/internal/windows/advapi32.d \
+	std/json.d std/math.d std/mathspecial.d std/meta.d std/mmfile.d \
+	std/net/curl.d std/net/isemail.d std/numeric.d std/outbuffer.d \
+	std/parallelism.d std/path.d std/process.d std/random.d \
+	std/range/interfaces.d std/range/package.d std/range/primitives.d \
 	std/regex/internal/backtracking.d std/regex/internal/generator.d \
 	std/regex/internal/ir.d std/regex/internal/kickstart.d \
 	std/regex/internal/parser.d std/regex/internal/tests.d \
-	std/regex/internal/thompson.d std/regex/package.d std/signals.d \
-	std/socket.d std/stdint.d std/stdio.d std/string.d std/system.d \
-	std/traits.d std/typecons.d std/typetuple.d std/uni.d std/uri.d \
-	std/utf.d std/uuid.d std/variant.d std/windows/charset.d \
-	std/windows/registry.d std/windows/syserror.d std/xml.d std/zip.d \
-	std/zlib.d
+	std/regex/internal/tests2.d std/regex/internal/thompson.d \
+	std/regex/package.d std/signals.d std/socket.d std/stdint.d \
+	std/stdio.d std/string.d std/system.d std/traits.d std/typecons.d \
+	std/typetuple.d std/uni.d std/uri.d std/utf.d std/uuid.d std/variant.d \
+	std/windows/charset.d std/windows/registry.d std/windows/syserror.d \
+	std/xml.d std/zip.d std/zlib.d
 
 all: all-am
 
@@ -657,12 +661,20 @@ std/digest/ripemd.lo: std/digest/$(am__dirstamp)
 std/digest/sha.lo: std/digest/$(am__dirstamp)
 std/encoding.lo: std/$(am__dirstamp)
 std/exception.lo: std/$(am__dirstamp)
+std/experimental/$(am__dirstamp):
+	@$(MKDIR_P) std/experimental
+	@: > std/experimental/$(am__dirstamp)
+std/experimental/all.lo: std/experimental/$(am__dirstamp)
 std/experimental/allocator/building_blocks/$(am__dirstamp):
 	@$(MKDIR_P) std/experimental/allocator/building_blocks
 	@: > std/experimental/allocator/building_blocks/$(am__dirstamp)
 std/experimental/allocator/building_blocks/affix_allocator.lo:  \
 	std/experimental/allocator/building_blocks/$(am__dirstamp)
+std/experimental/allocator/building_blocks/aligned_block_list.lo:  \
+	std/experimental/allocator/building_blocks/$(am__dirstamp)
 std/experimental/allocator/building_blocks/allocator_list.lo:  \
+	std/experimental/allocator/building_blocks/$(am__dirstamp)
+std/experimental/allocator/building_blocks/ascending_page_allocator.lo:  \
 	std/experimental/allocator/building_blocks/$(am__dirstamp)
 std/experimental/allocator/building_blocks/bitmapped_block.lo:  \
 	std/experimental/allocator/building_blocks/$(am__dirstamp)
@@ -707,9 +719,6 @@ std/experimental/allocator/showcase.lo:  \
 	std/experimental/allocator/$(am__dirstamp)
 std/experimental/allocator/typed.lo:  \
 	std/experimental/allocator/$(am__dirstamp)
-std/experimental/$(am__dirstamp):
-	@$(MKDIR_P) std/experimental
-	@: > std/experimental/$(am__dirstamp)
 std/experimental/checkedint.lo: std/experimental/$(am__dirstamp)
 std/experimental/logger/$(am__dirstamp):
 	@$(MKDIR_P) std/experimental/logger
@@ -732,6 +741,7 @@ std/getopt.lo: std/$(am__dirstamp)
 std/internal/$(am__dirstamp):
 	@$(MKDIR_P) std/internal
 	@: > std/internal/$(am__dirstamp)
+std/internal/attributes.lo: std/internal/$(am__dirstamp)
 std/internal/cstring.lo: std/internal/$(am__dirstamp)
 std/internal/math/$(am__dirstamp):
 	@$(MKDIR_P) std/internal/math
@@ -789,6 +799,7 @@ std/regex/internal/ir.lo: std/regex/internal/$(am__dirstamp)
 std/regex/internal/kickstart.lo: std/regex/internal/$(am__dirstamp)
 std/regex/internal/parser.lo: std/regex/internal/$(am__dirstamp)
 std/regex/internal/tests.lo: std/regex/internal/$(am__dirstamp)
+std/regex/internal/tests2.lo: std/regex/internal/$(am__dirstamp)
 std/regex/internal/thompson.lo: std/regex/internal/$(am__dirstamp)
 std/regex/$(am__dirstamp):
 	@$(MKDIR_P) std/regex

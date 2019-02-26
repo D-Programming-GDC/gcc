@@ -54,3 +54,16 @@ mips_d_target_versions (void)
       d_add_builtin_version ("D_SoftFloat");
     }
 }
+
+/* Implement TARGET_D_FLOAT_ABI_TYPE for MIPS targets.  */
+
+const char *
+mips_d_float_abi_type (void)
+{
+  if (TARGET_HARD_FLOAT_ABI)
+    return "hard";
+  else if (TARGET_SOFT_FLOAT_ABI)
+    return "soft";
+
+  return NULL;
+}

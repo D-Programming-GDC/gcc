@@ -3,7 +3,7 @@
 /**
  * Contains the elementary mathematical functions (powers, roots,
  * and trigonometric functions), and low-level floating-point operations.
- * Mathematical special functions are available in $(D std.mathspecial).
+ * Mathematical special functions are available in `std.mathspecial`.
  *
 $(SCRIPT inhibitQuickIndex = 1;)
 
@@ -49,9 +49,6 @@ $(TR $(TDNW Introspection) $(TD
     $(MYREF isNormal) $(MYREF isSubnormal) $(MYREF signbit) $(MYREF sgn)
     $(MYREF copysign) $(MYREF isPowerOf2)
 ))
-$(TR $(TDNW Complex Numbers) $(TD
-  $(MYREF abs) $(MYREF conj) $(MYREF sin) $(MYREF cos) $(MYREF expi)
-))
 $(TR $(TDNW Hardware Control) $(TD
     $(MYREF IeeeFlags) $(MYREF FloatingPointControl)
 ))
@@ -74,9 +71,6 @@ $(TR $(TDNW Hardware Control) $(TD
  * )
  * Unlike C, there is no global 'errno' variable. Consequently, almost all of
  * these functions are pure nothrow.
- *
- * Status:
- * The semantics and names of feqrel and approxEqual will be revised.
  *
  * Macros:
  *      TABLE_SV = <table border="1" cellpadding="4" cellspacing="0">
@@ -112,7 +106,7 @@ $(TR $(TDNW Hardware Control) $(TD
  *      SQRT = &radic;
  *      HALF = &frac12;
  *
- * Copyright: Copyright Digital Mars 2000 - 2011.
+ * Copyright: Copyright The D Language Foundation 2000 - 2011.
  *            D implementations of tan, atan, atan2, exp, expm1, exp2, log, log10, log1p,
  *            log2, floor, ceil and lrint functions are based on the CEPHES math library,
  *            which is Copyright (C) 2001 Stephen L. Moshier $(LT)steve@moshier.net$(GT)
@@ -123,7 +117,7 @@ $(TR $(TDNW Hardware Control) $(TD
  * License:   $(HTTP www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
  * Authors:   $(HTTP digitalmars.com, Walter Bright), Don Clugston,
  *            Conversion of CEPHES math library to D by Iain Buclaw and David Nadlinger
- * Source: $(PHOBOSSRC std/_math.d)
+ * Source: $(PHOBOSSRC std/math.d)
  */
 
 /* NOTE: This file has been patched from the original DMD distribution to
@@ -187,10 +181,8 @@ else version (X86)
     private alias haveSSE = core.cpuid.sse;
 }
 
-version (unittest)
+version (unittest) private
 {
-    import core.stdc.stdio; // : sprintf;
-
     static if (real.sizeof > double.sizeof)
         enum uint useDigits = 16;
     else
@@ -203,8 +195,10 @@ version (unittest)
      *  0       nomatch
      */
 
-    private bool equalsDigit(real x, real y, uint ndigits)
+    private bool equalsDigit(real x, real y, uint ndigits) @safe nothrow @nogc
     {
+        import core.stdc.stdio : sprintf;
+
         if (signbit(x) != signbit(y))
             return 0;
 
@@ -228,8 +222,12 @@ version (unittest)
             alias real_t = double;
         else
             alias real_t = real;
-        ix = sprintf(bufx.ptr, "%.*Lg", ndigits, cast(real_t) x);
-        iy = sprintf(bufy.ptr, "%.*Lg", ndigits, cast(real_t) y);
+
+        () @trusted {
+            ix = sprintf(bufx.ptr, "%.*Lg", ndigits, cast(real_t) x);
+            iy = sprintf(bufy.ptr, "%.*Lg", ndigits, cast(real_t) y);
+        } ();
+
         assert(ix < bufx.length && ix > 0);
         assert(ix < bufy.length && ix > 0);
 
@@ -250,10 +248,8 @@ version (LittleEndian)
 }
 else
 {
-    static assert(real.mant_dig == 53 || real.mant_dig == 106
-               || real.mant_dig == 113,
-    "Only 64-bit and 128-bit reals are supported for BigEndian CPUs."~
-    " double-double reals have partial support");
+    static assert(real.mant_dig == 53 || real.mant_dig == 113,
+    "Only 64-bit and 128-bit reals are supported for BigEndian CPUs.");
 }
 
 // Underlying format exposed through floatTraits
@@ -472,7 +468,7 @@ T floorImpl(T)(const T x) @trusted pure nothrow @nogc
             int pos = 0;
         else
             int pos = 7;
-        }
+    }
     else
         static assert(false, "Not implemented for this architecture");
 
@@ -536,7 +532,7 @@ enum real LOG2 =       0x1.34413509f79fef311f12b35816f92p-2L; /** $(SUB log, 10)
 enum real LOG10E =     0x1.bcb7b1526e50e32a6ab7555f5a67cp-2L; /** $(SUB log, 10)e = 0.434294... */
 enum real LN2 =        0x1.62e42fefa39ef35793c7673007e5fp-1L; /** ln 2  = 0.693147... */
 enum real LN10 =       0x1.26bb1bbb5551582dd4adac5705a61p+1L; /** ln 10 = 2.302585... */
-enum real PI =         0x1.921fb54442d18469898cc51701b84p+1L; /** $(_PI) = 3.141592... */
+enum real PI =         0x1.921fb54442d18469898cc51701b84p+1L; /** &pi; = 3.141592... */
 enum real PI_2 =       PI/2;                                  /** $(PI) / 2 = 1.570796... */
 enum real PI_4 =       PI/4;                                  /** $(PI) / 4 = 0.785398... */
 enum real M_1_PI =     0x1.45f306dc9c882a53f84eafa3ea69cp-2L; /** 1 / $(PI) = 0.318309... */
@@ -546,6 +542,36 @@ enum real SQRT2 =      0x1.6a09e667f3bcc908b2fb1366ea958p+0L; /** $(SQRT)2 = 1.4
 enum real SQRT1_2 =    SQRT2/2;                               /** $(SQRT)$(HALF) = 0.707106... */
 // Note: Make sure the magic numbers in compiler backend for x87 match these.
 
+// it's quite tricky check for a type who will trigger a deprecation when accessed
+template isDeprecatedComplex(T)
+{
+    static if (__traits(isDeprecated, T))
+    {
+        enum isDeprecatedComplex = true;
+    }
+    else
+    {
+        enum m = T.mangleof;
+        // cfloat, cdouble, creal
+        // ifloat, idouble, ireal
+        enum isDeprecatedComplex = m == "q" || m == "r" || m == "c" ||
+                                   m == "o" || m == "p" || m == "j";
+    }
+}
+
+@safe deprecated unittest
+{
+    static assert(isDeprecatedComplex!cfloat);
+    static assert(isDeprecatedComplex!cdouble);
+    static assert(isDeprecatedComplex!creal);
+    static assert(isDeprecatedComplex!ifloat);
+    static assert(isDeprecatedComplex!idouble);
+    static assert(isDeprecatedComplex!ireal);
+
+    static assert(!isDeprecatedComplex!float);
+    static assert(!isDeprecatedComplex!double);
+    static assert(!isDeprecatedComplex!real);
+}
 
 /***********************************
  * Calculates the absolute value of a number
@@ -553,43 +579,24 @@ enum real SQRT1_2 =    SQRT2/2;                               /** $(SQRT)$(HALF)
  * Params:
  *     Num = (template parameter) type of number
  *       x = real number value
- *       z = complex number value
- *       y = imaginary number value
  *
  * Returns:
  *     The absolute value of the number.  If floating-point or integral,
- *     the return type will be the same as the input; if complex or
- *     imaginary, the returned value will be the corresponding floating
- *     point type.
- *
- * For complex numbers, abs(z) = sqrt( $(POWER z.re, 2) + $(POWER z.im, 2) )
- * = hypot(z.re, z.im).
+ *     the return type will be the same as the input;
  */
-Num abs(Num)(Num x) @safe pure nothrow
-if (is(typeof(Num.init >= 0)) && is(typeof(-Num.init)) &&
-    !(is(Num* : const(ifloat*)) || is(Num* : const(idouble*))
-    || is(Num* : const(ireal*))))
+auto abs(Num)(Num x)
+if ((is(Unqual!Num == short) || is(Unqual!Num == byte)) ||
+    (is(typeof(Num.init >= 0)) && is(typeof(-Num.init))))
 {
     static if (isFloatingPoint!(Num))
         return fabs(x);
     else
-        return x >= 0 ? x : -x;
-}
-
-/// ditto
-auto abs(Num)(Num z) @safe pure nothrow @nogc
-if (is(Num* : const(cfloat*)) || is(Num* : const(cdouble*))
-    || is(Num* : const(creal*)))
-{
-    return hypot(z.re, z.im);
-}
-
-/// ditto
-auto abs(Num)(Num y) @safe pure nothrow @nogc
-if (is(Num* : const(ifloat*)) || is(Num* : const(idouble*))
-    || is(Num* : const(ireal*)))
-{
-    return fabs(y.im);
+    {
+        static if (is(Unqual!Num == short) || is(Unqual!Num == byte))
+            return x >= 0 ? x : cast(Num) -int(x);
+        else
+            return x >= 0 ? x : -x;
+    }
 }
 
 /// ditto
@@ -598,31 +605,88 @@ if (is(Num* : const(ifloat*)) || is(Num* : const(idouble*))
     assert(isIdentical(abs(-0.0L), 0.0L));
     assert(isNaN(abs(real.nan)));
     assert(abs(-real.infinity) == real.infinity);
-    assert(abs(-3.2Li) == 3.2L);
-    assert(abs(71.6Li) == 71.6L);
     assert(abs(-56) == 56);
     assert(abs(2321312L)  == 2321312L);
+}
+
+version (TestComplex)
+deprecated
+@safe pure nothrow @nogc unittest
+{
+    assert(abs(-3.2Li) == 3.2L);
+    assert(abs(71.6Li) == 71.6L);
     assert(abs(-1L+1i) == sqrt(2.0L));
 }
 
 @safe pure nothrow @nogc unittest
 {
+    short s = -8;
+    byte b = -8;
+    assert(abs(s) == 8);
+    assert(abs(b) == 8);
+    immutable(byte) c = -8;
+    assert(abs(c) == 8);
+}
+
+@safe pure nothrow @nogc unittest
+{
     import std.meta : AliasSeq;
-    foreach (T; AliasSeq!(float, double, real))
-    {
+    static foreach (T; AliasSeq!(float, double, real))
+    {{
         T f = 3;
         assert(abs(f) == f);
         assert(abs(-f) == f);
-    }
-    foreach (T; AliasSeq!(cfloat, cdouble, creal))
-    {
+    }}
+}
+
+version (TestComplex)
+deprecated
+@safe pure nothrow @nogc unittest
+{
+    import std.meta : AliasSeq;
+    static foreach (T; AliasSeq!(cfloat, cdouble, creal))
+    {{
         T f = -12+3i;
         assert(abs(f) == hypot(f.re, f.im));
         assert(abs(-f) == hypot(f.re, f.im));
+    }}
+}
+
+import std.meta : AliasSeq;
+deprecated("Please use std.complex")
+static foreach (Num; AliasSeq!(cfloat, cdouble, creal, ifloat, idouble, ireal))
+{
+    auto abs(Num z) @safe pure nothrow @nogc
+    {
+        enum m = Num.mangleof;
+        // cfloat, cdouble, creal
+        static if (m == "q" || m == "r" || m == "c")
+            return hypot(z.re, z.im);
+        // ifloat, idouble, ireal
+        else static if (m == "o" || m == "p" || m == "j")
+            return fabs(z.im);
+        else
+            static assert(0, "Unsupported type: " ~ Num.stringof);
     }
 }
 
-/***********************************
+// https://issues.dlang.org/show_bug.cgi?id=19162
+@safe unittest
+{
+    struct Vector(T, int size)
+    {
+        T x, y, z;
+    }
+
+    static auto abs(T, int size)(auto ref const Vector!(T, size) v)
+    {
+        return v;
+    }
+    Vector!(int, 3) v;
+    assert(abs(v) == v);
+}
+
+/*
  * Complex conjugate
  *
  *  conj(x + iy) = x - iy
@@ -630,6 +694,7 @@ if (is(Num* : const(ifloat*)) || is(Num* : const(idouble*))
  * Note that z * conj(z) = $(POWER z.re, 2) - $(POWER z.im, 2)
  * is always a real number
  */
+deprecated("Please use std.complex.conj")
 auto conj(Num)(Num z) @safe pure nothrow @nogc
 if (is(Num* : const(cfloat*)) || is(Num* : const(cdouble*))
     || is(Num* : const(creal*)))
@@ -642,7 +707,7 @@ if (is(Num* : const(cfloat*)) || is(Num* : const(cdouble*))
         return z.re - z.im*1fi;
 }
 
-/** ditto */
+deprecated("Please use std.complex.conj")
 auto conj(Num)(Num y) @safe pure nothrow @nogc
 if (is(Num* : const(ifloat*)) || is(Num* : const(idouble*))
     || is(Num* : const(ireal*)))
@@ -650,7 +715,7 @@ if (is(Num* : const(ifloat*)) || is(Num* : const(idouble*))
     return -y;
 }
 
-///
+deprecated
 @safe pure nothrow @nogc unittest
 {
     creal c = 7 + 3Li;
@@ -659,6 +724,7 @@ if (is(Num* : const(ifloat*)) || is(Num* : const(idouble*))
     assert(conj(z) == -z);
 }
 //Issue 14206
+deprecated
 @safe pure nothrow @nogc unittest
 {
     cdouble c = 7 + 3i;
@@ -667,6 +733,7 @@ if (is(Num* : const(ifloat*)) || is(Num* : const(idouble*))
     assert(conj(z) == -z);
 }
 //Issue 14206
+deprecated
 @safe pure nothrow @nogc unittest
 {
     cfloat c = 7f + 3fi;
@@ -694,6 +761,14 @@ double cos(double x) @safe pure nothrow @nogc { return cos(cast(real) x); }
 //FIXME
 ///ditto
 float cos(float x) @safe pure nothrow @nogc { return cos(cast(real) x); }
+
+///
+@safe unittest
+{
+    assert(cos(0.0) == 1.0);
+    assert(cos(1.0).approxEqual(0.540));
+    assert(cos(3.0).approxEqual(-0.989));
+}
 
 @safe unittest
 {
@@ -749,7 +824,7 @@ float sin(float x) @safe pure nothrow @nogc { return sin(cast(real) x); }
     assert(psin != null);
 }
 
-/***********************************
+/*
  *  Returns sine for complex and imaginary arguments.
  *
  *  sin(z) = sin(z.re)*cosh(z.im) + cos(z.re)*sinh(z.im)i
@@ -757,45 +832,49 @@ float sin(float x) @safe pure nothrow @nogc { return sin(cast(real) x); }
  * If both sin($(THETA)) and cos($(THETA)) are required,
  * it is most efficient to use expi($(THETA)).
  */
-creal sin(creal z) @safe pure nothrow @nogc
+deprecated("Use std.complex.sin")
+auto sin(creal z) @safe pure nothrow @nogc
 {
     const creal cs = expi(z.re);
     const creal csh = coshisinh(z.im);
     return cs.im * csh.re + cs.re * csh.im * 1i;
 }
 
-/** ditto */
-ireal sin(ireal y) @safe pure nothrow @nogc
+/* ditto */
+deprecated("Use std.complex.sin")
+auto sin(ireal y) @safe pure nothrow @nogc
 {
     return cosh(y.im)*1i;
 }
 
-///
+deprecated
 @safe pure nothrow @nogc unittest
 {
   assert(sin(0.0+0.0i) == 0.0);
   assert(sin(2.0+0.0i) == sin(2.0L) );
 }
 
-/***********************************
+/*
  *  cosine, complex and imaginary
  *
  *  cos(z) = cos(z.re)*cosh(z.im) - sin(z.re)*sinh(z.im)i
  */
-creal cos(creal z) @safe pure nothrow @nogc
+deprecated("Use std.complex.cos")
+auto cos(creal z) @safe pure nothrow @nogc
 {
     const creal cs = expi(z.re);
     const creal csh = coshisinh(z.im);
     return cs.re * csh.re - cs.im * csh.im * 1i;
 }
 
-/** ditto */
+/* ditto */
+deprecated("Use std.complex.cos")
 real cos(ireal y) @safe pure nothrow @nogc
 {
     return cosh(y.im);
 }
 
-///
+deprecated
 @safe pure nothrow @nogc unittest
 {
     assert(cos(0.0+0.0i)==1.0);
@@ -813,8 +892,32 @@ real cos(ireal y) @safe pure nothrow @nogc
  *      $(TR $(TD $(PLUSMNINF))  $(TD $(NAN))       $(TD yes))
  *      )
  */
+real tan(real x) @trusted pure nothrow @nogc // TODO: @safe
+{
+    version (InlineAsm_X86_Any)
+    {
+        if (!__ctfe)
+            return tanAsm(x);
+    }
+    return tanImpl(x);
+}
 
-real tan(real x) @trusted pure nothrow @nogc
+/// ditto
+double tan(double x) @safe pure nothrow @nogc { return __ctfe ? cast(double) tan(cast(real) x) : tanImpl(x); }
+
+/// ditto
+float tan(float x) @safe pure nothrow @nogc { return __ctfe ? cast(float) tan(cast(real) x) : tanImpl(x); }
+
+///
+@safe unittest
+{
+    assert(isIdentical(tan(0.0), 0.0));
+    assert(tan(PI).approxEqual(0));
+    assert(tan(PI / 3).approxEqual(sqrt(3.0)));
+}
+
+version (InlineAsm_X86_Any)
+private real tanAsm(real x) @trusted pure nothrow @nogc
 {
     version (D_InlineAsm_X86)
     {
@@ -905,158 +1008,209 @@ Clear1: asm pure nothrow @nogc{
 Lret: {}
     }
     else
+        static assert(0);
+}
+
+private T tanImpl(T)(T x) @safe pure nothrow @nogc
+{
+    // Coefficients for tan(x) and PI/4 split into three parts.
+    enum realFormat = floatTraits!T.realFormat;
+    static if (realFormat == RealFormat.ieeeQuadruple)
     {
-        // Coefficients for tan(x) and PI/4 split into three parts.
-        static if (floatTraits!real.realFormat == RealFormat.ieeeQuadruple)
-        {
-            static immutable real[6] P = [
-                2.883414728874239697964612246732416606301E10L,
-                -2.307030822693734879744223131873392503321E9L,
-                5.160188250214037865511600561074819366815E7L,
-                -4.249691853501233575668486667664718192660E5L,
-                1.272297782199996882828849455156962260810E3L,
-                -9.889929415807650724957118893791829849557E-1L
-            ];
-            static immutable real[7] Q = [
-                8.650244186622719093893836740197250197602E10L,
-                -4.152206921457208101480801635640958361612E10L,
-                2.758476078803232151774723646710890525496E9L,
-                -5.733709132766856723608447733926138506824E7L,
-                4.529422062441341616231663543669583527923E5L,
-                -1.317243702830553658702531997959756728291E3L,
-                1.0
-            ];
+        static immutable T[6] P = [
+            2.883414728874239697964612246732416606301E10L,
+            -2.307030822693734879744223131873392503321E9L,
+            5.160188250214037865511600561074819366815E7L,
+            -4.249691853501233575668486667664718192660E5L,
+            1.272297782199996882828849455156962260810E3L,
+            -9.889929415807650724957118893791829849557E-1L
+        ];
+        static immutable T[7] Q = [
+            8.650244186622719093893836740197250197602E10L,
+            -4.152206921457208101480801635640958361612E10L,
+            2.758476078803232151774723646710890525496E9L,
+            -5.733709132766856723608447733926138506824E7L,
+            4.529422062441341616231663543669583527923E5L,
+            -1.317243702830553658702531997959756728291E3L,
+            1.0
+        ];
 
-            enum real P1 =
-                7.853981633974483067550664827649598009884357452392578125E-1L;
-            enum real P2 =
-                2.8605943630549158983813312792950660807511260829685741796657E-18L;
-            enum real P3 =
-                2.1679525325309452561992610065108379921905808E-35L;
-        }
-        else
-        {
-            static immutable real[3] P = [
-               -1.7956525197648487798769E7L,
-                1.1535166483858741613983E6L,
-               -1.3093693918138377764608E4L,
-            ];
-            static immutable real[5] Q = [
-               -5.3869575592945462988123E7L,
-                2.5008380182335791583922E7L,
-               -1.3208923444021096744731E6L,
-                1.3681296347069295467845E4L,
-                1.0000000000000000000000E0L,
-            ];
+        enum T P1 =
+            7.853981633974483067550664827649598009884357452392578125E-1L;
+        enum T P2 =
+            2.8605943630549158983813312792950660807511260829685741796657E-18L;
+        enum T P3 =
+            2.1679525325309452561992610065108379921905808E-35L;
+    }
+    else static if (realFormat == RealFormat.ieeeExtended ||
+                    realFormat == RealFormat.ieeeDouble)
+    {
+        static immutable T[3] P = [
+           -1.7956525197648487798769E7L,
+            1.1535166483858741613983E6L,
+           -1.3093693918138377764608E4L,
+        ];
+        static immutable T[5] Q = [
+           -5.3869575592945462988123E7L,
+            2.5008380182335791583922E7L,
+           -1.3208923444021096744731E6L,
+            1.3681296347069295467845E4L,
+            1.0000000000000000000000E0L,
+        ];
 
-            enum real P1 = 7.853981554508209228515625E-1L;
-            enum real P2 = 7.946627356147928367136046290398E-9L;
-            enum real P3 = 3.061616997868382943065164830688E-17L;
-        }
+        enum T P1 = 7.853981554508209228515625E-1L;
+        enum T P2 = 7.946627356147928367136046290398E-9L;
+        enum T P3 = 3.061616997868382943065164830688E-17L;
+    }
+    else static if (realFormat == RealFormat.ieeeSingle)
+    {
+        static immutable T[6] P = [
+            3.33331568548E-1,
+            1.33387994085E-1,
+            5.34112807005E-2,
+            2.44301354525E-2,
+            3.11992232697E-3,
+            9.38540185543E-3,
+        ];
 
-        // Special cases.
-        if (x == 0.0 || isNaN(x))
-            return x;
-        if (isInfinity(x))
-            return real.nan;
+        enum T P1 = 0.78515625;
+        enum T P2 = 2.4187564849853515625E-4;
+        enum T P3 = 3.77489497744594108E-8;
+    }
+    else
+        static assert(0, "no coefficients for tan()");
 
-        // Make argument positive but save the sign.
-        bool sign = false;
-        if (signbit(x))
-        {
-            sign = true;
-            x = -x;
-        }
+    // Special cases.
+    if (x == cast(T) 0.0 || isNaN(x))
+        return x;
+    if (isInfinity(x))
+        return T.nan;
 
-        // Compute x mod PI/4.
-        real y = floor(x / PI_4);
+    // Make argument positive but save the sign.
+    bool sign = false;
+    if (signbit(x))
+    {
+        sign = true;
+        x = -x;
+    }
+
+    // Compute x mod PI/4.
+    static if (realFormat == RealFormat.ieeeSingle)
+    {
+        enum T FOPI = 4 / PI;
+        int j = cast(int) (FOPI * x);
+        T y = j;
+        T z;
+    }
+    else
+    {
+        T y = floor(x / cast(T) PI_4);
         // Strip high bits of integer part.
-        real z = ldexp(y, -4);
-        // Compute y - 16 * (y / 16).
-        z = y - ldexp(floor(z), 4);
+        enum T highBitsFactor = (realFormat == RealFormat.ieeeDouble ? 0x1p3 : 0x1p4);
+        enum T highBitsInv = 1.0 / highBitsFactor;
+        T z = y * highBitsInv;
+        // Compute y - 2^numHighBits * (y / 2^numHighBits).
+        z = y - highBitsFactor * floor(z);
 
         // Integer and fraction part modulo one octant.
         int j = cast(int)(z);
-
-        // Map zeros and singularities to origin.
-        if (j & 1)
-        {
-            j += 1;
-            y += 1.0;
-        }
-
-        z = ((x - y * P1) - y * P2) - y * P3;
-        const real zz = z * z;
-
-        if (zz > 1.0e-20L)
-            y = z + z * (zz * poly(zz, P) / poly(zz, Q));
-        else
-            y = z;
-
-        if (j & 2)
-            y = -1.0 / y;
-
-        return (sign) ? -y : y;
     }
-}
 
-@safe nothrow @nogc unittest
-{
-    static real[2][] vals =     // angle,tan
-        [
-         [   0,   0],
-         [   .5,  .5463024898],
-         [   1,   1.557407725],
-         [   1.5, 14.10141995],
-         [   2,  -2.185039863],
-         [   2.5,-.7470222972],
-         [   3,  -.1425465431],
-         [   3.5, .3745856402],
-         [   4,   1.157821282],
-         [   4.5, 4.637332055],
-         [   5,  -3.380515006],
-         [   5.5,-.9955840522],
-         [   6,  -.2910061914],
-         [   6.5, .2202772003],
-         [   10,  .6483608275],
-
-         // special angles
-         [   PI_4,   1],
-         //[   PI_2,   real.infinity], // PI_2 is not _exactly_ pi/2.
-         [   3*PI_4, -1],
-         [   PI,     0],
-         [   5*PI_4, 1],
-         //[   3*PI_2, -real.infinity],
-         [   7*PI_4, -1],
-         [   2*PI,   0],
-         ];
-    int i;
-
-    for (i = 0; i < vals.length; i++)
+    // Map zeros and singularities to origin.
+    if (j & 1)
     {
-        real x = vals[i][0];
-        real r = vals[i][1];
-        real t = tan(x);
-
-        //printf("tan(%Lg) = %Lg, should be %Lg\n", x, t, r);
-        if (!isIdentical(r, t)) assert(fabs(r-t) <= .0000001);
-
-        x = -x;
-        r = -r;
-        t = tan(x);
-        //printf("tan(%Lg) = %Lg, should be %Lg\n", x, t, r);
-        if (!isIdentical(r, t) && !(r != r && t != t)) assert(fabs(r-t) <= .0000001);
+        j += 1;
+        y += cast(T) 1.0;
     }
-    // overflow
-    assert(isNaN(tan(real.infinity)));
-    assert(isNaN(tan(-real.infinity)));
-    // NaN propagation
-    assert(isIdentical( tan(NaN(0x0123L)), NaN(0x0123L) ));
+
+    z = ((x - y * P1) - y * P2) - y * P3;
+    const T zz = z * z;
+
+    enum T zzThreshold = (realFormat == RealFormat.ieeeSingle ? 1.0e-4L :
+                          realFormat == RealFormat.ieeeDouble ? 1.0e-14L : 1.0e-20L);
+    if (zz > zzThreshold)
+    {
+        static if (realFormat == RealFormat.ieeeSingle)
+            y = z + z * (zz * poly(zz, P));
+        else
+            y = z + z * (zz * poly(zz, P) / poly(zz, Q));
+    }
+    else
+        y = z;
+
+    if (j & 2)
+        y = (cast(T) -1.0) / y;
+
+    return (sign) ? -y : y;
 }
 
-@system unittest
+@safe @nogc nothrow unittest
 {
-    assert(equalsDigit(tan(PI / 3), std.math.sqrt(3.0), useDigits));
+    static void testTan(T)()
+    {
+        // ±0
+        const T zero = 0.0;
+        assert(isIdentical(tan(zero), zero));
+        assert(isIdentical(tan(-zero), -zero));
+        // ±∞
+        const T inf = T.infinity;
+        assert(isNaN(tan(inf)));
+        assert(isNaN(tan(-inf)));
+        // NaN
+        const T specialNaN = NaN(0x0123L);
+        assert(isIdentical(tan(specialNaN), specialNaN));
+
+        static immutable T[2][] vals =
+        [
+            // angle, tan
+            [   .5,  .5463024898],
+            [   1,   1.557407725],
+            [   1.5, 14.10141995],
+            [   2,  -2.185039863],
+            [   2.5,-.7470222972],
+            [   3,  -.1425465431],
+            [   3.5, .3745856402],
+            [   4,   1.157821282],
+            [   4.5, 4.637332055],
+            [   5,  -3.380515006],
+            [   5.5,-.9955840522],
+            [   6,  -.2910061914],
+            [   6.5, .2202772003],
+            [   10,  .6483608275],
+
+            // special angles
+            [   PI_4,   1],
+            //[   PI_2,   T.infinity], // PI_2 is not _exactly_ pi/2.
+            [   3*PI_4, -1],
+            [   PI,     0],
+            [   5*PI_4, 1],
+            //[   3*PI_2, -T.infinity],
+            [   7*PI_4, -1],
+            [   2*PI,   0],
+         ];
+
+        foreach (ref val; vals)
+        {
+            T x = val[0];
+            T r = val[1];
+            T t = tan(x);
+
+            //printf("tan(%Lg) = %Lg, should be %Lg\n", cast(real) x, cast(real) t, cast(real) r);
+            assert(approxEqual(r, t));
+
+            x = -x;
+            r = -r;
+            t = tan(x);
+            //printf("tan(%Lg) = %Lg, should be %Lg\n", cast(real) x, cast(real) t, cast(real) r);
+            assert(approxEqual(r, t));
+        }
+    }
+
+    import std.meta : AliasSeq;
+    foreach (T; AliasSeq!(real, double, float))
+        testTan!T();
+
+    assert(equalsDigit(tan(PI / 3), std.math.sqrt(3.0L), useDigits));
 }
 
 /***************
@@ -1081,7 +1235,15 @@ double acos(double x) @safe pure nothrow @nogc { return acos(cast(real) x); }
 /// ditto
 float acos(float x) @safe pure nothrow @nogc  { return acos(cast(real) x); }
 
-@system unittest
+///
+@safe unittest
+{
+    assert(acos(0.0).approxEqual(1.570));
+    assert(acos(0.5).approxEqual(std.math.PI / 3));
+    assert(acos(PI).isNaN);
+}
+
+@safe @nogc nothrow unittest
 {
     assert(equalsDigit(acos(0.5), std.math.PI / 3, useDigits));
 }
@@ -1108,7 +1270,15 @@ double asin(double x) @safe pure nothrow @nogc { return asin(cast(real) x); }
 /// ditto
 float asin(float x) @safe pure nothrow @nogc  { return asin(cast(real) x); }
 
-@system unittest
+///
+@safe unittest
+{
+    assert(isIdentical(asin(0.0), 0.0));
+    assert(asin(0.5).approxEqual(PI / 6));
+    assert(asin(PI).isNaN);
+}
+
+@safe @nogc nothrow unittest
 {
     assert(equalsDigit(asin(0.5), PI / 6, useDigits));
 }
@@ -1127,106 +1297,229 @@ real atan(real x) @safe pure nothrow @nogc
 {
     version (InlineAsm_X86_Any)
     {
-        return atan2(x, 1.0L);
+        if (!__ctfe)
+            return atan2Asm(x, 1.0L);
+    }
+    return atanImpl(x);
+}
+
+/// ditto
+double atan(double x) @safe pure nothrow @nogc { return __ctfe ? cast(double) atan(cast(real) x) : atanImpl(x); }
+
+/// ditto
+float atan(float x) @safe pure nothrow @nogc { return __ctfe ? cast(float) atan(cast(real) x) : atanImpl(x); }
+
+///
+@safe unittest
+{
+    assert(isIdentical(atan(0.0), 0.0));
+    assert(atan(sqrt(3.0)).approxEqual(PI / 3));
+}
+
+private T atanImpl(T)(T x) @safe pure nothrow @nogc
+{
+    // Coefficients for atan(x)
+    enum realFormat = floatTraits!T.realFormat;
+    static if (realFormat == RealFormat.ieeeQuadruple)
+    {
+        static immutable T[9] P = [
+            -6.880597774405940432145577545328795037141E2L,
+            -2.514829758941713674909996882101723647996E3L,
+            -3.696264445691821235400930243493001671932E3L,
+            -2.792272753241044941703278827346430350236E3L,
+            -1.148164399808514330375280133523543970854E3L,
+            -2.497759878476618348858065206895055957104E2L,
+            -2.548067867495502632615671450650071218995E1L,
+            -8.768423468036849091777415076702113400070E-1L,
+            -6.635810778635296712545011270011752799963E-4L
+        ];
+        static immutable T[9] Q = [
+            2.064179332321782129643673263598686441900E3L,
+            8.782996876218210302516194604424986107121E3L,
+            1.547394317752562611786521896296215170819E4L,
+            1.458510242529987155225086911411015961174E4L,
+            7.928572347062145288093560392463784743935E3L,
+            2.494680540950601626662048893678584497900E3L,
+            4.308348370818927353321556740027020068897E2L,
+            3.566239794444800849656497338030115886153E1L,
+            1.0
+        ];
+    }
+    else static if (realFormat == RealFormat.ieeeExtended)
+    {
+        static immutable T[5] P = [
+           -5.0894116899623603312185E1L,
+           -9.9988763777265819915721E1L,
+           -6.3976888655834347413154E1L,
+           -1.4683508633175792446076E1L,
+           -8.6863818178092187535440E-1L,
+        ];
+        static immutable T[6] Q = [
+            1.5268235069887081006606E2L,
+            3.9157570175111990631099E2L,
+            3.6144079386152023162701E2L,
+            1.4399096122250781605352E2L,
+            2.2981886733594175366172E1L,
+            1.0000000000000000000000E0L,
+        ];
+    }
+    else static if (realFormat == RealFormat.ieeeDouble)
+    {
+        static immutable T[5] P = [
+           -6.485021904942025371773E1L,
+           -1.228866684490136173410E2L,
+           -7.500855792314704667340E1L,
+           -1.615753718733365076637E1L,
+           -8.750608600031904122785E-1L,
+        ];
+        static immutable T[6] Q = [
+            1.945506571482613964425E2L,
+            4.853903996359136964868E2L,
+            4.328810604912902668951E2L,
+            1.650270098316988542046E2L,
+            2.485846490142306297962E1L,
+            1.000000000000000000000E0L,
+        ];
+
+        enum T MOREBITS = 6.123233995736765886130E-17L;
+    }
+    else static if (realFormat == RealFormat.ieeeSingle)
+    {
+        static immutable T[4] P = [
+           -3.33329491539E-1,
+            1.99777106478E-1,
+           -1.38776856032E-1,
+            8.05374449538E-2,
+        ];
     }
     else
+        static assert(0, "no coefficients for atan()");
+
+    // tan(PI/8)
+    enum T TAN_PI_8 = 0.414213562373095048801688724209698078569672L;
+    // tan(3 * PI/8)
+    enum T TAN3_PI_8 = 2.414213562373095048801688724209698078569672L;
+
+    // Special cases.
+    if (x == cast(T) 0.0)
+        return x;
+    if (isInfinity(x))
+        return copysign(cast(T) PI_2, x);
+
+    // Make argument positive but save the sign.
+    bool sign = false;
+    if (signbit(x))
     {
-        // Coefficients for atan(x)
-        static if (floatTraits!real.realFormat == RealFormat.ieeeQuadruple)
-        {
-            static immutable real[9] P = [
-                -6.880597774405940432145577545328795037141E2L,
-                -2.514829758941713674909996882101723647996E3L,
-                -3.696264445691821235400930243493001671932E3L,
-                -2.792272753241044941703278827346430350236E3L,
-                -1.148164399808514330375280133523543970854E3L,
-                -2.497759878476618348858065206895055957104E2L,
-                -2.548067867495502632615671450650071218995E1L,
-                -8.768423468036849091777415076702113400070E-1L,
-                -6.635810778635296712545011270011752799963E-4L
-            ];
-            static immutable real[9] Q = [
-                2.064179332321782129643673263598686441900E3L,
-                8.782996876218210302516194604424986107121E3L,
-                1.547394317752562611786521896296215170819E4L,
-                1.458510242529987155225086911411015961174E4L,
-                7.928572347062145288093560392463784743935E3L,
-                2.494680540950601626662048893678584497900E3L,
-                4.308348370818927353321556740027020068897E2L,
-                3.566239794444800849656497338030115886153E1L,
-                1.0
-            ];
-        }
-        else
-        {
-            static immutable real[5] P = [
-               -5.0894116899623603312185E1L,
-               -9.9988763777265819915721E1L,
-               -6.3976888655834347413154E1L,
-               -1.4683508633175792446076E1L,
-               -8.6863818178092187535440E-1L,
-            ];
-            static immutable real[6] Q = [
-                1.5268235069887081006606E2L,
-                3.9157570175111990631099E2L,
-                3.6144079386152023162701E2L,
-                1.4399096122250781605352E2L,
-                2.2981886733594175366172E1L,
-                1.0000000000000000000000E0L,
-            ];
-        }
+        sign = true;
+        x = -x;
+    }
 
-        // tan(PI/8)
-        enum real TAN_PI_8 = 0.414213562373095048801688724209698078569672L;
-        // tan(3 * PI/8)
-        enum real TAN3_PI_8 = 2.414213562373095048801688724209698078569672L;
-
-        // Special cases.
-        if (x == 0.0)
-            return x;
-        if (isInfinity(x))
-            return copysign(PI_2, x);
-
-        // Make argument positive but save the sign.
-        bool sign = false;
-        if (signbit(x))
-        {
-            sign = true;
-            x = -x;
-        }
-
-        // Range reduction.
-        real y;
+    static if (realFormat == RealFormat.ieeeDouble) // special case for double precision
+    {
+        short flag = 0;
+        T y;
         if (x > TAN3_PI_8)
         {
             y = PI_2;
+            flag = 1;
             x = -(1.0 / x);
+        }
+        else if (x <= 0.66)
+        {
+            y = 0.0;
+        }
+        else
+        {
+            y = PI_4;
+            flag = 2;
+            x = (x - 1.0)/(x + 1.0);
+        }
+
+        T z = x * x;
+        z = z * poly(z, P) / poly(z, Q);
+        z = x * z + x;
+        if (flag == 2)
+            z += 0.5 * MOREBITS;
+        else if (flag == 1)
+            z += MOREBITS;
+        y = y + z;
+    }
+    else
+    {
+        // Range reduction.
+        T y;
+        if (x > TAN3_PI_8)
+        {
+            y = PI_2;
+            x = -((cast(T) 1.0) / x);
         }
         else if (x > TAN_PI_8)
         {
             y = PI_4;
-            x = (x - 1.0)/(x + 1.0);
+            x = (x - cast(T) 1.0)/(x + cast(T) 1.0);
         }
         else
             y = 0.0;
 
         // Rational form in x^^2.
-        const real z = x * x;
-        y = y + (poly(z, P) / poly(z, Q)) * z * x + x;
-
-        return (sign) ? -y : y;
+        const T z = x * x;
+        static if (realFormat == RealFormat.ieeeSingle)
+            y += poly(z, P) * z * x + x;
+        else
+            y = y + (poly(z, P) / poly(z, Q)) * z * x + x;
     }
+
+    return (sign) ? -y : y;
 }
 
-/// ditto
-double atan(double x) @safe pure nothrow @nogc { return atan(cast(real) x); }
-
-/// ditto
-float atan(float x)  @safe pure nothrow @nogc { return atan(cast(real) x); }
-
-@system unittest
+@safe @nogc nothrow unittest
 {
-    assert(equalsDigit(atan(std.math.sqrt(3.0)), PI / 3, useDigits));
+    static void testAtan(T)()
+    {
+        // ±0
+        const T zero = 0.0;
+        assert(isIdentical(atan(zero), zero));
+        assert(isIdentical(atan(-zero), -zero));
+        // ±∞
+        const T inf = T.infinity;
+        assert(approxEqual(atan(inf), cast(T) PI_2));
+        assert(approxEqual(atan(-inf), cast(T) -PI_2));
+        // NaN
+        const T specialNaN = NaN(0x0123L);
+        assert(isIdentical(atan(specialNaN), specialNaN));
+
+        static immutable T[2][] vals =
+        [
+            // x, atan(x)
+            [ 0.25, 0.2449786631 ],
+            [ 0.5,  0.4636476090 ],
+            [ 1,    PI_4         ],
+            [ 1.5,  0.9827937232 ],
+            [ 10,   1.4711276743 ],
+        ];
+
+        foreach (ref val; vals)
+        {
+            T x = val[0];
+            T r = val[1];
+            T a = atan(x);
+
+            //printf("atan(%Lg) = %Lg, should be %Lg\n", cast(real) x, cast(real) a, cast(real) r);
+            assert(approxEqual(r, a));
+
+            x = -x;
+            r = -r;
+            a = atan(x);
+            //printf("atan(%Lg) = %Lg, should be %Lg\n", cast(real) x, cast(real) a, cast(real) r);
+            assert(approxEqual(r, a));
+        }
+    }
+
+    import std.meta : AliasSeq;
+    foreach (T; AliasSeq!(real, double, float))
+        testAtan!T();
+
+    assert(equalsDigit(atan(std.math.sqrt(3.0L)), PI / 3, useDigits));
 }
 
 /***************
@@ -1250,95 +1543,180 @@ float atan(float x)  @safe pure nothrow @nogc { return atan(cast(real) x); }
  *      $(TR $(TD $(PLUSMN)$(INFIN)) $(TD -$(INFIN))    $(TD $(PLUSMN)3$(PI)/4))
  *      )
  */
-real atan2(real y, real x) @trusted pure nothrow @nogc
+real atan2(real y, real x) @trusted pure nothrow @nogc // TODO: @safe
 {
     version (InlineAsm_X86_Any)
     {
-        version (Win64)
-        {
-            asm pure nothrow @nogc {
-                naked;
-                fld real ptr [RDX]; // y
-                fld real ptr [RCX]; // x
-                fpatan;
-                ret;
-            }
-        }
-        else
-        {
-            asm pure nothrow @nogc {
-                fld y;
-                fld x;
-                fpatan;
-            }
-        }
+        if (!__ctfe)
+            return atan2Asm(y, x);
     }
-    else
-    {
-        // Special cases.
-        if (isNaN(x) || isNaN(y))
-            return real.nan;
-        if (y == 0.0)
-        {
-            if (x >= 0 && !signbit(x))
-                return copysign(0, y);
-            else
-                return copysign(PI, y);
-        }
-        if (x == 0.0)
-            return copysign(PI_2, y);
-        if (isInfinity(x))
-        {
-            if (signbit(x))
-            {
-                if (isInfinity(y))
-                    return copysign(3*PI_4, y);
-                else
-                    return copysign(PI, y);
-            }
-            else
-            {
-                if (isInfinity(y))
-                    return copysign(PI_4, y);
-                else
-                    return copysign(0.0, y);
-            }
-        }
-        if (isInfinity(y))
-            return copysign(PI_2, y);
-
-        // Call atan and determine the quadrant.
-        real z = atan(y / x);
-
-        if (signbit(x))
-        {
-            if (signbit(y))
-                z = z - PI;
-            else
-                z = z + PI;
-        }
-
-        if (z == 0.0)
-            return copysign(z, y);
-
-        return z;
-    }
+    return atan2Impl(y, x);
 }
 
 /// ditto
 double atan2(double y, double x) @safe pure nothrow @nogc
 {
-    return atan2(cast(real) y, cast(real) x);
+    return __ctfe ? cast(double) atan2(cast(real) y, cast(real) x) : atan2Impl(y, x);
 }
 
 /// ditto
 float atan2(float y, float x) @safe pure nothrow @nogc
 {
-    return atan2(cast(real) y, cast(real) x);
+    return __ctfe ? cast(float) atan2(cast(real) y, cast(real) x) : atan2Impl(y, x);
 }
 
-@system unittest
+///
+@safe unittest
 {
+    assert(atan2(1.0, sqrt(3.0)).approxEqual(PI / 6));
+}
+
+version (InlineAsm_X86_Any)
+private real atan2Asm(real y, real x) @trusted pure nothrow @nogc
+{
+    version (Win64)
+    {
+        asm pure nothrow @nogc {
+            naked;
+            fld real ptr [RDX]; // y
+            fld real ptr [RCX]; // x
+            fpatan;
+            ret;
+        }
+    }
+    else
+    {
+        asm pure nothrow @nogc {
+            fld y;
+            fld x;
+            fpatan;
+        }
+    }
+}
+
+private T atan2Impl(T)(T y, T x) @safe pure nothrow @nogc
+{
+    // Special cases.
+    if (isNaN(x) || isNaN(y))
+        return T.nan;
+    if (y == cast(T) 0.0)
+    {
+        if (x >= 0 && !signbit(x))
+            return copysign(0, y);
+        else
+            return copysign(cast(T) PI, y);
+    }
+    if (x == cast(T) 0.0)
+        return copysign(cast(T) PI_2, y);
+    if (isInfinity(x))
+    {
+        if (signbit(x))
+        {
+            if (isInfinity(y))
+                return copysign(3 * cast(T) PI_4, y);
+            else
+                return copysign(cast(T) PI, y);
+        }
+        else
+        {
+            if (isInfinity(y))
+                return copysign(cast(T) PI_4, y);
+            else
+                return copysign(cast(T) 0.0, y);
+        }
+    }
+    if (isInfinity(y))
+        return copysign(cast(T) PI_2, y);
+
+    // Call atan and determine the quadrant.
+    T z = atan(y / x);
+
+    if (signbit(x))
+    {
+        if (signbit(y))
+            z = z - cast(T) PI;
+        else
+            z = z + cast(T) PI;
+    }
+
+    if (z == cast(T) 0.0)
+        return copysign(z, y);
+
+    return z;
+}
+
+@safe @nogc nothrow unittest
+{
+    static void testAtan2(T)()
+    {
+        // NaN
+        const T nan = T.nan;
+        assert(isNaN(atan2(nan, cast(T) 1)));
+        assert(isNaN(atan2(cast(T) 1, nan)));
+
+        const T inf = T.infinity;
+        static immutable T[3][] vals =
+        [
+            // y, x, atan2(y, x)
+
+            // ±0
+            [  0.0,  1.0,  0.0 ],
+            [ -0.0,  1.0, -0.0 ],
+            [  0.0,  0.0,  0.0 ],
+            [ -0.0,  0.0, -0.0 ],
+            [  0.0, -1.0,  PI ],
+            [ -0.0, -1.0, -PI ],
+            [  0.0, -0.0,  PI ],
+            [ -0.0, -0.0, -PI ],
+            [  1.0,  0.0,  PI_2 ],
+            [  1.0, -0.0,  PI_2 ],
+            [ -1.0,  0.0, -PI_2 ],
+            [ -1.0, -0.0, -PI_2 ],
+
+            // ±∞
+            [  1.0,  inf,  0.0 ],
+            [ -1.0,  inf, -0.0 ],
+            [  1.0, -inf,  PI ],
+            [ -1.0, -inf, -PI ],
+            [  inf,  1.0,  PI_2 ],
+            [  inf, -1.0,  PI_2 ],
+            [ -inf,  1.0, -PI_2 ],
+            [ -inf, -1.0, -PI_2 ],
+            [  inf,  inf,  PI_4 ],
+            [ -inf,  inf, -PI_4 ],
+            [  inf, -inf,  3 * PI_4 ],
+            [ -inf, -inf, -3 * PI_4 ],
+
+            [  1.0,  1.0,  PI_4 ],
+            [ -2.0,  2.0, -PI_4 ],
+            [  3.0, -3.0,  3 * PI_4 ],
+            [ -4.0, -4.0, -3 * PI_4 ],
+
+            [  0.75,  0.25,   1.249045772398 ],
+            [ -0.5,   0.375, -0.927295218002 ],
+            [  0.5,  -0.125,  1.815774989922 ],
+            [ -0.75, -0.5,   -2.158798930342 ],
+        ];
+
+        foreach (ref val; vals)
+        {
+            const T y = val[0];
+            const T x = val[1];
+            const T r = val[2];
+            const T a = atan2(y, x);
+
+            //printf("atan2(%Lg, %Lg) = %Lg, should be %Lg\n", cast(real) y, cast(real) x, cast(real) a, cast(real) r);
+            if (r == 0)
+                assert(isIdentical(r, a)); // check sign
+            else
+                assert(approxEqual(r, a));
+        }
+    }
+
+    import std.meta : AliasSeq;
+    foreach (T; AliasSeq!(real, double, float))
+        testAtan2!T();
+
     assert(equalsDigit(atan2(1.0L, std.math.sqrt(3.0L)), PI / 6, useDigits));
 }
 
@@ -1364,7 +1742,14 @@ double cosh(double x) @safe pure nothrow @nogc { return cosh(cast(real) x); }
 /// ditto
 float cosh(float x) @safe pure nothrow @nogc  { return cosh(cast(real) x); }
 
-@system unittest
+///
+@safe unittest
+{
+    assert(cosh(0.0) == 1.0);
+    assert(cosh(1.0).approxEqual((E + 1.0 / E) / 2));
+}
+
+@safe @nogc nothrow unittest
 {
     assert(equalsDigit(cosh(1.0), (E + 1.0 / E) / 2, useDigits));
 }
@@ -1399,7 +1784,14 @@ double sinh(double x) @safe pure nothrow @nogc { return sinh(cast(real) x); }
 /// ditto
 float sinh(float x) @safe pure nothrow @nogc  { return sinh(cast(real) x); }
 
-@system unittest
+///
+@safe unittest
+{
+    assert(isIdentical(sinh(0.0), 0.0));
+    assert(sinh(1.0).approxEqual((E - 1.0 / E) / 2));
+}
+
+@safe @nogc nothrow unittest
 {
     assert(equalsDigit(sinh(1.0), (E - 1.0 / E) / 2, useDigits));
 }
@@ -1431,7 +1823,14 @@ double tanh(double x) @safe pure nothrow @nogc { return tanh(cast(real) x); }
 /// ditto
 float tanh(float x) @safe pure nothrow @nogc { return tanh(cast(real) x); }
 
-@system unittest
+///
+@safe unittest
+{
+    assert(isIdentical(tanh(0.0), 0.0));
+    assert(tanh(1.0).approxEqual(sinh(1.0) / cosh(1.0)));
+}
+
+@safe @nogc nothrow unittest
 {
     assert(equalsDigit(tanh(1.0), sinh(1.0) / cosh(1.0), 15));
 }
@@ -1441,7 +1840,8 @@ package:
 /* Returns cosh(x) + I * sinh(x)
  * Only one call to exp() is performed.
  */
-creal coshisinh(real x) @safe pure nothrow @nogc
+deprecated("Use std.complex")
+auto coshisinh(real x) @safe pure nothrow @nogc
 {
     // See comments for cosh, sinh.
     if (fabs(x) > real.mant_dig * LN2)
@@ -1456,6 +1856,7 @@ creal coshisinh(real x) @safe pure nothrow @nogc
     }
 }
 
+deprecated
 @safe pure nothrow @nogc unittest
 {
     creal c = coshisinh(3.0L);
@@ -1497,14 +1898,18 @@ double acosh(double x) @safe pure nothrow @nogc { return acosh(cast(real) x); }
 /// ditto
 float acosh(float x) @safe pure nothrow @nogc  { return acosh(cast(real) x); }
 
-
-@system unittest
+///
+@safe @nogc nothrow unittest
 {
     assert(isNaN(acosh(0.9)));
     assert(isNaN(acosh(real.nan)));
-    assert(acosh(1.0)==0.0);
+    assert(isIdentical(acosh(1.0), 0.0));
     assert(acosh(real.infinity) == real.infinity);
     assert(isNaN(acosh(0.5)));
+}
+
+@safe @nogc nothrow unittest
+{
     assert(equalsDigit(acosh(cosh(3.0)), 3, useDigits));
 }
 
@@ -1539,13 +1944,18 @@ double asinh(double x) @safe pure nothrow @nogc { return asinh(cast(real) x); }
 /// ditto
 float asinh(float x) @safe pure nothrow @nogc { return asinh(cast(real) x); }
 
-@system  unittest
+///
+@safe @nogc nothrow unittest
 {
     assert(isIdentical(asinh(0.0), 0.0));
     assert(isIdentical(asinh(-0.0), -0.0));
     assert(asinh(real.infinity) == real.infinity);
     assert(asinh(-real.infinity) == -real.infinity);
     assert(isNaN(asinh(real.nan)));
+}
+
+@safe unittest
+{
     assert(equalsDigit(asinh(sinh(3.0)), 3, useDigits));
 }
 
@@ -1579,14 +1989,18 @@ double atanh(double x) @safe pure nothrow @nogc { return atanh(cast(real) x); }
 /// ditto
 float atanh(float x) @safe pure nothrow @nogc { return atanh(cast(real) x); }
 
-
-@system unittest
+///
+@safe @nogc nothrow unittest
 {
     assert(isIdentical(atanh(0.0), 0.0));
     assert(isIdentical(atanh(-0.0),-0.0));
     assert(isNaN(atanh(real.nan)));
     assert(isNaN(atanh(-real.infinity)));
     assert(atanh(0.0) == 0);
+}
+
+@safe unittest
+{
     assert(equalsDigit(atanh(tanh(0.5L)), 0.5, useDigits));
 }
 
@@ -1604,19 +2018,49 @@ long rndtol(double x) @safe pure nothrow @nogc { return rndtol(cast(real) x); }
 ///ditto
 long rndtol(float x) @safe pure nothrow @nogc { return rndtol(cast(real) x); }
 
+///
+@safe unittest
+{
+    assert(rndtol(1.0) == 1L);
+    assert(rndtol(1.2) == 1L);
+    assert(rndtol(1.7) == 2L);
+    assert(rndtol(1.0001) == 1L);
+}
+
 @safe unittest
 {
     long function(real) prndtol = &rndtol;
     assert(prndtol != null);
 }
 
-/*****************************************
- * Returns x rounded to a long value using the FE_TONEAREST rounding mode.
- * If the integer value of x is
- * greater than long.max, the result is
- * indeterminate.
+/**
+$(RED Deprecated. Please use $(LREF round) instead.)
+
+Returns `x` rounded to a `long` value using the `FE_TONEAREST` rounding mode.
+If the integer value of `x` is greater than `long.max`, the result is
+indeterminate.
+
+Only works with the Digital Mars C Runtime.
+
+Params:
+    x = the number to round
+Returns:
+    `x` rounded to an integer value
  */
+deprecated("rndtonl is to be removed by 2.089. Please use round instead")
 extern (C) real rndtonl(real x);
+
+///
+deprecated @system unittest
+{
+    version (CRuntime_DigitalMars)
+    {
+        assert(rndtonl(1.0) is -real.nan);
+        assert(rndtonl(1.2) is -real.nan);
+        assert(rndtonl(1.7) is -real.nan);
+        assert(rndtonl(1.0001) is -real.nan);
+    }
+}
 
 /***************************************
  * Compute square root of x.
@@ -1636,12 +2080,11 @@ double sqrt(double x) @nogc @safe pure nothrow { pragma(inline, true); return co
 /// ditto
 real sqrt(real x) @nogc @safe pure nothrow { pragma(inline, true); return core.math.sqrt(x); }
 
+///
 @safe pure nothrow @nogc unittest
 {
-    //ctfe
-    enum ZX80 = sqrt(7.0f);
-    enum ZX81 = sqrt(7.0);
-    enum ZX82 = sqrt(7.0L);
+    assert(sqrt(2.0).feqrel(1.4142) > 16);
+    assert(sqrt(9.0).feqrel(3.0) > 16);
 
     assert(isNaN(sqrt(-1.0f)));
     assert(isNaN(sqrt(-1.0)));
@@ -1656,9 +2099,15 @@ real sqrt(real x) @nogc @safe pure nothrow { pragma(inline, true); return core.m
     assert(psqrtd != null);
     real function(real) psqrtr = &sqrt;
     assert(psqrtr != null);
+
+    //ctfe
+    enum ZX80 = sqrt(7.0f);
+    enum ZX81 = sqrt(7.0);
+    enum ZX82 = sqrt(7.0L);
 }
 
-creal sqrt(creal z) @nogc @safe pure nothrow
+deprecated("Use std.complex.sqrt")
+auto sqrt(creal z) @nogc @safe pure nothrow
 {
     creal c;
     real x,y,w,r;
@@ -1709,149 +2158,301 @@ creal sqrt(creal z) @nogc @safe pure nothrow
  *    $(TR $(TD $(NAN))        $(TD $(NAN))    )
  *  )
  */
-real exp(real x) @trusted pure nothrow @nogc
+real exp(real x) @trusted pure nothrow @nogc // TODO: @safe
 {
     version (D_InlineAsm_X86)
     {
         //  e^^x = 2^^(LOG2E*x)
         // (This is valid because the overflow & underflow limits for exp
         // and exp2 are so similar).
-        return exp2(LOG2E*x);
+        if (!__ctfe)
+            return exp2Asm(LOG2E*x);
     }
     else version (D_InlineAsm_X86_64)
     {
         //  e^^x = 2^^(LOG2E*x)
         // (This is valid because the overflow & underflow limits for exp
         // and exp2 are so similar).
-        return exp2(LOG2E*x);
+        if (!__ctfe)
+            return exp2Asm(LOG2E*x);
     }
-    else
-    {
-        alias F = floatTraits!real;
-        static if (F.realFormat == RealFormat.ieeeDouble)
-        {
-            // Coefficients for exp(x)
-            static immutable real[3] P = [
-                9.99999999999999999910E-1L,
-                3.02994407707441961300E-2L,
-                1.26177193074810590878E-4L,
-            ];
-            static immutable real[4] Q = [
-                2.00000000000000000009E0L,
-                2.27265548208155028766E-1L,
-                2.52448340349684104192E-3L,
-                3.00198505138664455042E-6L,
-            ];
-
-            // C1 + C2 = LN2.
-            enum real C1 = 6.93145751953125E-1;
-            enum real C2 = 1.42860682030941723212E-6;
-
-            // Overflow and Underflow limits.
-            enum real OF =  7.09782712893383996732E2;  // ln((1-2^-53) * 2^1024)
-            enum real UF = -7.451332191019412076235E2; // ln(2^-1075)
-        }
-        else static if (F.realFormat == RealFormat.ieeeExtended)
-        {
-            // Coefficients for exp(x)
-            static immutable real[3] P = [
-                9.9999999999999999991025E-1L,
-                3.0299440770744196129956E-2L,
-                1.2617719307481059087798E-4L,
-            ];
-            static immutable real[4] Q = [
-                2.0000000000000000000897E0L,
-                2.2726554820815502876593E-1L,
-                2.5244834034968410419224E-3L,
-                3.0019850513866445504159E-6L,
-            ];
-
-            // C1 + C2 = LN2.
-            enum real C1 = 6.9314575195312500000000E-1L;
-            enum real C2 = 1.4286068203094172321215E-6L;
-
-            // Overflow and Underflow limits.
-            enum real OF =  1.1356523406294143949492E4L;  // ln((1-2^-64) * 2^16384)
-            enum real UF = -1.13994985314888605586758E4L; // ln(2^-16446)
-        }
-        else static if (F.realFormat == RealFormat.ieeeQuadruple)
-        {
-            // Coefficients for exp(x) - 1
-            static immutable real[5] P = [
-                9.999999999999999999999999999999999998502E-1L,
-                3.508710990737834361215404761139478627390E-2L,
-                2.708775201978218837374512615596512792224E-4L,
-                6.141506007208645008909088812338454698548E-7L,
-                3.279723985560247033712687707263393506266E-10L
-            ];
-            static immutable real[6] Q = [
-                2.000000000000000000000000000000000000150E0,
-                2.368408864814233538909747618894558968880E-1L,
-                3.611828913847589925056132680618007270344E-3L,
-                1.504792651814944826817779302637284053660E-5L,
-                1.771372078166251484503904874657985291164E-8L,
-                2.980756652081995192255342779918052538681E-12L
-            ];
-
-            // C1 + C2 = LN2.
-            enum real C1 = 6.93145751953125E-1L;
-            enum real C2 = 1.428606820309417232121458176568075500134E-6L;
-
-            // Overflow and Underflow limits.
-            enum real OF =  1.135583025911358400418251384584930671458833e4L;
-            enum real UF = -1.143276959615573793352782661133116431383730e4L;
-        }
-        else
-            static assert(0, "Not implemented for this architecture");
-
-        // Special cases. Raises an overflow or underflow flag accordingly,
-        // except in the case for CTFE, where there are no hardware controls.
-        if (isNaN(x))
-            return x;
-        if (x > OF)
-        {
-            if (__ctfe)
-                return real.infinity;
-            else
-                return real.max * copysign(real.max, real.infinity);
-        }
-        if (x < UF)
-        {
-            if (__ctfe)
-                return 0.0;
-            else
-                return real.min_normal * copysign(real.min_normal, 0.0);
-        }
-
-        // Express: e^^x = e^^g * 2^^n
-        //   = e^^g * e^^(n * LOG2E)
-        //   = e^^(g + n * LOG2E)
-        int n = cast(int) floor(LOG2E * x + 0.5);
-        x -= n * C1;
-        x -= n * C2;
-
-        // Rational approximation for exponential of the fractional part:
-        //  e^^x = 1 + 2x P(x^^2) / (Q(x^^2) - P(x^^2))
-        const real xx = x * x;
-        const real px = x * poly(xx, P);
-        x = px / (poly(xx, Q) - px);
-        x = 1.0 + ldexp(x, 1);
-
-        // Scale by power of 2.
-        x = ldexp(x, n);
-
-        return x;
-    }
+    return expImpl(x);
 }
 
 /// ditto
-double exp(double x) @safe pure nothrow @nogc  { return exp(cast(real) x); }
+double exp(double x) @safe pure nothrow @nogc { return __ctfe ? cast(double) exp(cast(real) x) : expImpl(x); }
 
 /// ditto
-float exp(float x)  @safe pure nothrow @nogc   { return exp(cast(real) x); }
+float exp(float x) @safe pure nothrow @nogc { return __ctfe ? cast(float) exp(cast(real) x) : expImpl(x); }
 
-@system unittest
+///
+@safe unittest
 {
+    assert(exp(0.0) == 1.0);
+    assert(exp(3.0).feqrel(E * E * E) > 16);
+}
+
+private T expImpl(T)(T x) @safe pure nothrow @nogc
+{
+    alias F = floatTraits!T;
+    static if (F.realFormat == RealFormat.ieeeSingle)
+    {
+        static immutable T[6] P = [
+            5.0000001201E-1,
+            1.6666665459E-1,
+            4.1665795894E-2,
+            8.3334519073E-3,
+            1.3981999507E-3,
+            1.9875691500E-4,
+        ];
+
+        enum T C1 = 0.693359375;
+        enum T C2 = -2.12194440e-4;
+
+        // Overflow and Underflow limits.
+        enum T OF = 88.72283905206835;
+        enum T UF = -103.278929903431851103; // ln(2^-149)
+    }
+    else static if (F.realFormat == RealFormat.ieeeDouble)
+    {
+        // Coefficients for exp(x)
+        static immutable T[3] P = [
+            9.99999999999999999910E-1L,
+            3.02994407707441961300E-2L,
+            1.26177193074810590878E-4L,
+        ];
+        static immutable T[4] Q = [
+            2.00000000000000000009E0L,
+            2.27265548208155028766E-1L,
+            2.52448340349684104192E-3L,
+            3.00198505138664455042E-6L,
+        ];
+
+        // C1 + C2 = LN2.
+        enum T C1 = 6.93145751953125E-1;
+        enum T C2 = 1.42860682030941723212E-6;
+
+        // Overflow and Underflow limits.
+        enum T OF =  7.09782712893383996732E2;  // ln((1-2^-53) * 2^1024)
+        enum T UF = -7.451332191019412076235E2; // ln(2^-1075)
+    }
+    else static if (F.realFormat == RealFormat.ieeeExtended)
+    {
+        // Coefficients for exp(x)
+        static immutable T[3] P = [
+            9.9999999999999999991025E-1L,
+            3.0299440770744196129956E-2L,
+            1.2617719307481059087798E-4L,
+        ];
+        static immutable T[4] Q = [
+            2.0000000000000000000897E0L,
+            2.2726554820815502876593E-1L,
+            2.5244834034968410419224E-3L,
+            3.0019850513866445504159E-6L,
+        ];
+
+        // C1 + C2 = LN2.
+        enum T C1 = 6.9314575195312500000000E-1L;
+        enum T C2 = 1.4286068203094172321215E-6L;
+
+        // Overflow and Underflow limits.
+        enum T OF =  1.1356523406294143949492E4L;  // ln((1-2^-64) * 2^16384)
+        enum T UF = -1.13994985314888605586758E4L; // ln(2^-16446)
+    }
+    else static if (F.realFormat == RealFormat.ieeeQuadruple)
+    {
+        // Coefficients for exp(x) - 1
+        static immutable T[5] P = [
+            9.999999999999999999999999999999999998502E-1L,
+            3.508710990737834361215404761139478627390E-2L,
+            2.708775201978218837374512615596512792224E-4L,
+            6.141506007208645008909088812338454698548E-7L,
+            3.279723985560247033712687707263393506266E-10L
+        ];
+        static immutable T[6] Q = [
+            2.000000000000000000000000000000000000150E0,
+            2.368408864814233538909747618894558968880E-1L,
+            3.611828913847589925056132680618007270344E-3L,
+            1.504792651814944826817779302637284053660E-5L,
+            1.771372078166251484503904874657985291164E-8L,
+            2.980756652081995192255342779918052538681E-12L
+        ];
+
+        // C1 + C2 = LN2.
+        enum T C1 = 6.93145751953125E-1L;
+        enum T C2 = 1.428606820309417232121458176568075500134E-6L;
+
+        // Overflow and Underflow limits.
+        enum T OF =  1.135583025911358400418251384584930671458833e4L;
+        enum T UF = -1.143276959615573793352782661133116431383730e4L;
+    }
+    else
+        static assert(0, "Not implemented for this architecture");
+
+    // Special cases.
+    if (isNaN(x))
+        return x;
+    if (x > OF)
+        return real.infinity;
+    if (x < UF)
+        return 0.0;
+
+    // Express: e^^x = e^^g * 2^^n
+    //   = e^^g * e^^(n * LOG2E)
+    //   = e^^(g + n * LOG2E)
+    T xx = floor((cast(T) LOG2E) * x + cast(T) 0.5);
+    const int n = cast(int) xx;
+    x -= xx * C1;
+    x -= xx * C2;
+
+    static if (F.realFormat == RealFormat.ieeeSingle)
+    {
+        xx = x * x;
+        x = poly(x, P) * xx + x + 1.0f;
+    }
+    else
+    {
+        // Rational approximation for exponential of the fractional part:
+        //  e^^x = 1 + 2x P(x^^2) / (Q(x^^2) - P(x^^2))
+        xx = x * x;
+        const T px = x * poly(xx, P);
+        x = px / (poly(xx, Q) - px);
+        x = (cast(T) 1.0) + (cast(T) 2.0) * x;
+    }
+
+    // Scale by power of 2.
+    x = ldexp(x, n);
+
+    return x;
+}
+
+@safe @nogc nothrow unittest
+{
+    FloatingPointControl ctrl;
+    if (FloatingPointControl.hasExceptionTraps)
+        ctrl.disableExceptions(FloatingPointControl.allExceptions);
+    ctrl.rounding = FloatingPointControl.roundToNearest;
+
+    static void testExp(T)()
+    {
+        enum realFormat = floatTraits!T.realFormat;
+        static if (realFormat == RealFormat.ieeeQuadruple)
+        {
+            static immutable T[2][] exptestpoints =
+            [ //  x               exp(x)
+                [ 1.0L,           E                                        ],
+                [ 0.5L,           0x1.a61298e1e069bc972dfefab6df34p+0L     ],
+                [ 3.0L,           E*E*E                                    ],
+                [ 0x1.6p+13L,     0x1.6e509d45728655cdb4840542acb5p+16250L ], // near overflow
+                [ 0x1.7p+13L,     T.infinity                               ], // close overflow
+                [ 0x1p+80L,       T.infinity                               ], // far overflow
+                [ T.infinity,     T.infinity                               ],
+                [-0x1.18p+13L,    0x1.5e4bf54b4807034ea97fef0059a6p-12927L ], // near underflow
+                [-0x1.625p+13L,   0x1.a6bd68a39d11fec3a250cd97f524p-16358L ], // ditto
+                [-0x1.62dafp+13L, 0x0.cb629e9813b80ed4d639e875be6cp-16382L ], // near underflow - subnormal
+                [-0x1.6549p+13L,  0x0.0000000000000000000000000001p-16382L ], // ditto
+                [-0x1.655p+13L,   0                                        ], // close underflow
+                [-0x1p+30L,       0                                        ], // far underflow
+            ];
+        }
+        else static if (realFormat == RealFormat.ieeeExtended)
+        {
+            static immutable T[2][] exptestpoints =
+            [ //  x               exp(x)
+                [ 1.0L,           E                            ],
+                [ 0.5L,           0x1.a61298e1e069bc97p+0L     ],
+                [ 3.0L,           E*E*E                        ],
+                [ 0x1.1p+13L,     0x1.29aeffefc8ec645p+12557L  ], // near overflow
+                [ 0x1.7p+13L,     T.infinity                   ], // close overflow
+                [ 0x1p+80L,       T.infinity                   ], // far overflow
+                [ T.infinity,     T.infinity                   ],
+                [-0x1.18p+13L,    0x1.5e4bf54b4806db9p-12927L  ], // near underflow
+                [-0x1.625p+13L,   0x1.a6bd68a39d11f35cp-16358L ], // ditto
+                [-0x1.62dafp+13L, 0x1.96c53d30277021dp-16383L  ], // near underflow - subnormal
+                [-0x1.643p+13L,   0x1p-16444L                  ], // ditto
+                [-0x1.645p+13L,   0                            ], // close underflow
+                [-0x1p+30L,       0                            ], // far underflow
+            ];
+        }
+        else static if (realFormat == RealFormat.ieeeDouble)
+        {
+            static immutable T[2][] exptestpoints =
+            [ //  x,             exp(x)
+                [ 1.0L,          E                        ],
+                [ 0.5L,          0x1.a61298e1e069cp+0L    ],
+                [ 3.0L,          E*E*E                    ],
+                [ 0x1.6p+9L,     0x1.93bf4ec282efbp+1015L ], // near overflow
+                [ 0x1.7p+9L,     T.infinity               ], // close overflow
+                [ 0x1p+80L,      T.infinity               ], // far overflow
+                [ T.infinity,    T.infinity               ],
+                [-0x1.6p+9L,     0x1.44a3824e5285fp-1016L ], // near underflow
+                [-0x1.64p+9L,    0x0.06f84920bb2d4p-1022L ], // near underflow - subnormal
+                [-0x1.743p+9L,   0x0.0000000000001p-1022L ], // ditto
+                [-0x1.8p+9L,     0                        ], // close underflow
+                [-0x1p+30L,      0                        ], // far underflow
+            ];
+        }
+        else static if (realFormat == RealFormat.ieeeSingle)
+        {
+            static immutable T[2][] exptestpoints =
+            [ //  x,             exp(x)
+                [ 1.0L,          E                ],
+                [ 0.5L,          0x1.a61299p+0L   ],
+                [ 3.0L,          E*E*E            ],
+                [ 0x1.62p+6L,    0x1.99b988p+127L ], // near overflow
+                [ 0x1.7p+6L,     T.infinity       ], // close overflow
+                [ 0x1p+80L,      T.infinity       ], // far overflow
+                [ T.infinity,    T.infinity       ],
+                [-0x1.5cp+6L,    0x1.666d0ep-126L ], // near underflow
+                [-0x1.7p+6L,     0x0.026a42p-126L ], // near underflow - subnormal
+                [-0x1.9cp+6L,    0x0.000002p-126L ], // ditto
+                [-0x1.ap+6L,     0                ], // close underflow
+                [-0x1p+30L,      0                ], // far underflow
+            ];
+        }
+        else
+            static assert(0, "No exp() tests for real type!");
+
+        const minEqualMantissaBits = T.mant_dig - 13;
+        T x;
+        IeeeFlags f;
+        foreach (ref pair; exptestpoints)
+        {
+            resetIeeeFlags();
+            x = exp(pair[0]);
+            //printf("exp(%La) = %La, should be %La\n", cast(real) pair[0], cast(real) x, cast(real) pair[1]);
+            assert(feqrel(x, pair[1]) >= minEqualMantissaBits);
+        }
+
+        // Ideally, exp(0) would not set the inexact flag.
+        // Unfortunately, fldl2e sets it!
+        // So it's not realistic to avoid setting it.
+        assert(exp(cast(T) 0.0) == 1.0);
+
+        // NaN propagation. Doesn't set flags, bcos was already NaN.
+        resetIeeeFlags();
+        x = exp(T.nan);
+        f = ieeeFlags;
+        assert(isIdentical(abs(x), T.nan));
+        assert(f.flags == 0);
+
+        resetIeeeFlags();
+        x = exp(-T.nan);
+        f = ieeeFlags;
+        assert(isIdentical(abs(x), T.nan));
+        assert(f.flags == 0);
+
+        x = exp(NaN(0x123));
+        assert(isIdentical(x, NaN(0x123)));
+    }
+
+    import std.meta : AliasSeq;
+    foreach (T; AliasSeq!(real, double, float))
+        testExp!T();
+
+    // High resolution test (verified against GNU MPFR/Mathematica).
+    assert(exp(0.5L) == 0x1.A612_98E1_E069_BC97_2DFE_FAB6_DF34p+0L);
+
     assert(equalsDigit(exp(3.0L), E * E * E, useDigits));
 }
 
@@ -1870,7 +2471,39 @@ float exp(float x)  @safe pure nothrow @nogc   { return exp(cast(real) x); }
  *    $(TR $(TD $(NAN))        $(TD $(NAN))       )
  *  )
  */
-real expm1(real x) @trusted pure nothrow @nogc
+real expm1(real x) @trusted pure nothrow @nogc // TODO: @safe
+{
+    version (InlineAsm_X86_Any)
+    {
+        if (!__ctfe)
+            return expm1Asm(x);
+    }
+    return expm1Impl(x);
+}
+
+/// ditto
+double expm1(double x) @safe pure nothrow @nogc
+{
+    return __ctfe ? cast(double) expm1(cast(real) x) : expm1Impl(x);
+}
+
+/// ditto
+float expm1(float x) @safe pure nothrow @nogc
+{
+    // no single-precision version in Cephes => use double precision
+    return __ctfe ? cast(float) expm1(cast(real) x) : cast(float) expm1Impl(cast(double) x);
+}
+
+///
+@safe unittest
+{
+    assert(isIdentical(expm1(0.0), 0.0));
+    assert(expm1(1.0).feqrel(1.71828) > 16);
+    assert(expm1(2.0).feqrel(6.3890) > 16);
+}
+
+version (InlineAsm_X86_Any)
+private real expm1Asm(real x) @trusted pure nothrow @nogc
 {
     version (D_InlineAsm_X86)
     {
@@ -2034,99 +2667,148 @@ L_largenegative:
         }
     }
     else
+        static assert(0);
+}
+
+private T expm1Impl(T)(T x) @safe pure nothrow @nogc
+{
+    // Coefficients for exp(x) - 1 and overflow/underflow limits.
+    enum realFormat = floatTraits!T.realFormat;
+    static if (realFormat == RealFormat.ieeeQuadruple)
     {
-        // Coefficients for exp(x) - 1 and overflow/underflow limits.
-        static if (floatTraits!real.realFormat == RealFormat.ieeeQuadruple)
-        {
-            static immutable real[8] P = [
-                2.943520915569954073888921213330863757240E8L,
-                -5.722847283900608941516165725053359168840E7L,
-                8.944630806357575461578107295909719817253E6L,
-                -7.212432713558031519943281748462837065308E5L,
-                4.578962475841642634225390068461943438441E4L,
-                -1.716772506388927649032068540558788106762E3L,
-                4.401308817383362136048032038528753151144E1L,
-                -4.888737542888633647784737721812546636240E-1L
-            ];
+        static immutable T[8] P = [
+            2.943520915569954073888921213330863757240E8L,
+            -5.722847283900608941516165725053359168840E7L,
+            8.944630806357575461578107295909719817253E6L,
+            -7.212432713558031519943281748462837065308E5L,
+            4.578962475841642634225390068461943438441E4L,
+            -1.716772506388927649032068540558788106762E3L,
+            4.401308817383362136048032038528753151144E1L,
+            -4.888737542888633647784737721812546636240E-1L
+        ];
 
-            static immutable real[9] Q = [
-                1.766112549341972444333352727998584753865E9L,
-                -7.848989743695296475743081255027098295771E8L,
-                1.615869009634292424463780387327037251069E8L,
-                -2.019684072836541751428967854947019415698E7L,
-                1.682912729190313538934190635536631941751E6L,
-                -9.615511549171441430850103489315371768998E4L,
-                3.697714952261803935521187272204485251835E3L,
-                -8.802340681794263968892934703309274564037E1L,
-                1.0
-            ];
+        static immutable T[9] Q = [
+            1.766112549341972444333352727998584753865E9L,
+            -7.848989743695296475743081255027098295771E8L,
+            1.615869009634292424463780387327037251069E8L,
+            -2.019684072836541751428967854947019415698E7L,
+            1.682912729190313538934190635536631941751E6L,
+            -9.615511549171441430850103489315371768998E4L,
+            3.697714952261803935521187272204485251835E3L,
+            -8.802340681794263968892934703309274564037E1L,
+            1.0
+        ];
 
-            enum real OF = 1.1356523406294143949491931077970764891253E4L;
-            enum real UF = -1.143276959615573793352782661133116431383730e4L;
-        }
-        else
-        {
-            static immutable real[5] P = [
-               -1.586135578666346600772998894928250240826E4L,
-                2.642771505685952966904660652518429479531E3L,
-               -3.423199068835684263987132888286791620673E2L,
-                1.800826371455042224581246202420972737840E1L,
-               -5.238523121205561042771939008061958820811E-1L,
-            ];
-            static immutable real[6] Q = [
-               -9.516813471998079611319047060563358064497E4L,
-                3.964866271411091674556850458227710004570E4L,
-               -7.207678383830091850230366618190187434796E3L,
-                7.206038318724600171970199625081491823079E2L,
-               -4.002027679107076077238836622982900945173E1L,
-                1.0
-            ];
+        enum T OF = 1.1356523406294143949491931077970764891253E4L;
+        enum T UF = -1.143276959615573793352782661133116431383730e4L;
+    }
+    else static if (realFormat == RealFormat.ieeeExtended)
+    {
+        static immutable T[5] P = [
+           -1.586135578666346600772998894928250240826E4L,
+            2.642771505685952966904660652518429479531E3L,
+           -3.423199068835684263987132888286791620673E2L,
+            1.800826371455042224581246202420972737840E1L,
+           -5.238523121205561042771939008061958820811E-1L,
+        ];
+        static immutable T[6] Q = [
+           -9.516813471998079611319047060563358064497E4L,
+            3.964866271411091674556850458227710004570E4L,
+           -7.207678383830091850230366618190187434796E3L,
+            7.206038318724600171970199625081491823079E2L,
+           -4.002027679107076077238836622982900945173E1L,
+            1.0
+        ];
 
-            enum real OF =  1.1356523406294143949492E4L;
-            enum real UF = -4.5054566736396445112120088E1L;
-        }
+        enum T OF =  1.1356523406294143949492E4L;
+        enum T UF = -4.5054566736396445112120088E1L;
+    }
+    else static if (realFormat == RealFormat.ieeeDouble)
+    {
+        static immutable T[3] P = [
+            9.9999999999999999991025E-1,
+            3.0299440770744196129956E-2,
+            1.2617719307481059087798E-4,
+        ];
+        static immutable T[4] Q = [
+            2.0000000000000000000897E0,
+            2.2726554820815502876593E-1,
+            2.5244834034968410419224E-3,
+            3.0019850513866445504159E-6,
+        ];
+    }
+    else
+        static assert(0, "no coefficients for expm1()");
 
-
-        // C1 + C2 = LN2.
-        enum real C1 = 6.9314575195312500000000E-1L;
-        enum real C2 = 1.428606820309417232121458176568075500134E-6L;
-
-        // Special cases. Raises an overflow flag, except in the case
-        // for CTFE, where there are no hardware controls.
-        if (x > OF)
-        {
-            if (__ctfe)
-                return real.infinity;
-            else
-                return real.max * copysign(real.max, real.infinity);
-        }
+    static if (realFormat == RealFormat.ieeeDouble) // special case for double precision
+    {
+        if (x < -0.5 || x > 0.5)
+            return exp(x) - 1.0;
         if (x == 0.0)
+            return x;
+
+        const T xx = x * x;
+        x = x * poly(xx, P);
+        x = x / (poly(xx, Q) - x);
+        return x + x;
+    }
+    else
+    {
+        // C1 + C2 = LN2.
+        enum T C1 = 6.9314575195312500000000E-1L;
+        enum T C2 = 1.428606820309417232121458176568075500134E-6L;
+
+        // Special cases.
+        if (x > OF)
+            return real.infinity;
+        if (x == cast(T) 0.0)
             return x;
         if (x < UF)
             return -1.0;
 
         // Express x = LN2 (n + remainder), remainder not exceeding 1/2.
-        int n = cast(int) floor(0.5 + x / LN2);
+        int n = cast(int) floor((cast(T) 0.5) + x / cast(T) LN2);
         x -= n * C1;
         x -= n * C2;
 
         // Rational approximation:
         //  exp(x) - 1 = x + 0.5 x^^2 + x^^3 P(x) / Q(x)
-        real px = x * poly(x, P);
-        real qx = poly(x, Q);
-        const real xx = x * x;
-        qx = x + (0.5 * xx + xx * px / qx);
+        T px = x * poly(x, P);
+        T qx = poly(x, Q);
+        const T xx = x * x;
+        qx = x + ((cast(T) 0.5) * xx + xx * px / qx);
 
         // We have qx = exp(remainder LN2) - 1, so:
         //  exp(x) - 1 = 2^^n (qx + 1) - 1 = 2^^n qx + 2^^n - 1.
-        px = ldexp(1.0, n);
-        x = px * qx + (px - 1.0);
+        px = ldexp(cast(T) 1.0, n);
+        x = px * qx + (px - cast(T) 1.0);
 
         return x;
     }
 }
 
+@safe @nogc nothrow unittest
+{
+    static void testExpm1(T)()
+    {
+        // NaN
+        assert(isNaN(expm1(cast(T) T.nan)));
 
+        static immutable T[] xs = [ -2, -0.75, -0.3, 0.0, 0.1, 0.2, 0.5, 1.0 ];
+        foreach (x; xs)
+        {
+            const T e = expm1(x);
+            const T r = exp(x) - 1;
+
+            //printf("expm1(%Lg) = %Lg, should approximately be %Lg\n", cast(real) x, cast(real) e, cast(real) r);
+            assert(approxEqual(r, e));
+        }
+    }
+
+    import std.meta : AliasSeq;
+    foreach (T; AliasSeq!(real, double))
+        testExpm1!T();
+}
 
 /**
  * Calculates 2$(SUPERSCRIPT x).
@@ -2138,19 +2820,37 @@ L_largenegative:
  *    $(TR $(TD $(NAN))        $(TD $(NAN))    )
  *  )
  */
-pragma(inline, true)
-real exp2(real x) @nogc @trusted pure nothrow
+real exp2(real x) @nogc @trusted pure nothrow // TODO: @safe
 {
     version (InlineAsm_X86_Any)
     {
         if (!__ctfe)
             return exp2Asm(x);
-        else
-            return exp2Impl(x);
     }
-    else
+    return exp2Impl(x);
+}
+
+/// ditto
+double exp2(double x) @nogc @safe pure nothrow { return __ctfe ? cast(double) exp2(cast(real) x) : exp2Impl(x); }
+
+/// ditto
+float exp2(float x) @nogc @safe pure nothrow { return __ctfe ? cast(float) exp2(cast(real) x) : exp2Impl(x); }
+
+///
+@safe unittest
+{
+    assert(isIdentical(exp2(0.0), 1.0));
+    assert(exp2(2.0).feqrel(4.0) > 16);
+    assert(exp2(8.0).feqrel(256.0) > 16);
+}
+
+@safe unittest
+{
+    version (CRuntime_Microsoft) {} else // aexp2/exp2f/exp2l not implemented
     {
-        return exp2Impl(x);
+        assert( core.stdc.math.exp2f(0.0f) == 1 );
+        assert( core.stdc.math.exp2 (0.0)  == 1 );
+        assert( core.stdc.math.exp2l(0.0L) == 1 );
     }
 }
 
@@ -2348,12 +3048,13 @@ L_was_nan:
         static assert(0);
 }
 
-private real exp2Impl(real x) @nogc @trusted pure nothrow
+private T exp2Impl(T)(T x) @nogc @safe pure nothrow
 {
     // Coefficients for exp2(x)
-    static if (floatTraits!real.realFormat == RealFormat.ieeeQuadruple)
+    enum realFormat = floatTraits!T.realFormat;
+    static if (realFormat == RealFormat.ieeeQuadruple)
     {
-        static immutable real[5] P = [
+        static immutable T[5] P = [
             9.079594442980146270952372234833529694788E12L,
             1.530625323728429161131811299626419117557E11L,
             5.677513871931844661829755443994214173883E8L,
@@ -2361,7 +3062,7 @@ private real exp2Impl(real x) @nogc @trusted pure nothrow
             1.587171580015525194694938306936721666031E2L
         ];
 
-        static immutable real[6] Q = [
+        static immutable T[6] Q = [
             2.619817175234089411411070339065679229869E13L,
             1.490560994263653042761789432690793026977E12L,
             1.092141473886177435056423606755843616331E10L,
@@ -2370,54 +3071,93 @@ private real exp2Impl(real x) @nogc @trusted pure nothrow
             1.0
         ];
     }
-    else
+    else static if (realFormat == RealFormat.ieeeExtended)
     {
-        static immutable real[3] P = [
+        static immutable T[3] P = [
             2.0803843631901852422887E6L,
             3.0286971917562792508623E4L,
             6.0614853552242266094567E1L,
         ];
-        static immutable real[4] Q = [
+        static immutable T[4] Q = [
             6.0027204078348487957118E6L,
             3.2772515434906797273099E5L,
             1.7492876999891839021063E3L,
             1.0000000000000000000000E0L,
         ];
     }
+    else static if (realFormat == RealFormat.ieeeDouble)
+    {
+        static immutable T[3] P = [
+            1.51390680115615096133E3L,
+            2.02020656693165307700E1L,
+            2.30933477057345225087E-2L,
+        ];
+        static immutable T[3] Q = [
+            4.36821166879210612817E3L,
+            2.33184211722314911771E2L,
+            1.00000000000000000000E0L,
+        ];
+    }
+    else static if (realFormat == RealFormat.ieeeSingle)
+    {
+        static immutable T[6] P = [
+            6.931472028550421E-001L,
+            2.402264791363012E-001L,
+            5.550332471162809E-002L,
+            9.618437357674640E-003L,
+            1.339887440266574E-003L,
+            1.535336188319500E-004L,
+        ];
+    }
+    else
+        static assert(0, "no coefficients for exp2()");
 
     // Overflow and Underflow limits.
-    enum real OF =  16_384.0L;
-    enum real UF = -16_382.0L;
+    enum T OF = T.max_exp;
+    enum T UF = T.min_exp - 1;
 
-    // Special cases. Raises an overflow or underflow flag accordingly,
-    // except in the case for CTFE, where there are no hardware controls.
+    // Special cases.
     if (isNaN(x))
         return x;
     if (x > OF)
-    {
-        if (__ctfe)
-            return real.infinity;
-        else
-            return real.max * copysign(real.max, real.infinity);
-    }
+        return real.infinity;
     if (x < UF)
+        return 0.0;
+
+    static if (realFormat == RealFormat.ieeeSingle) // special case for single precision
     {
-        if (__ctfe)
-            return 0.0;
-        else
-            return real.min_normal * copysign(real.min_normal, 0.0);
+        // The following is necessary because range reduction blows up.
+        if (x == 0.0f)
+            return 1.0f;
+
+        // Separate into integer and fractional parts.
+        const T i = floor(x);
+        int n = cast(int) i;
+        x -= i;
+        if (x > 0.5f)
+        {
+            n += 1;
+            x -= 1.0f;
+        }
+
+        // Rational approximation:
+        //  exp2(x) = 1.0 + x P(x)
+        x = 1.0f + x * poly(x, P);
     }
+    else
+    {
+        // Separate into integer and fractional parts.
+        const T i = floor(x + cast(T) 0.5);
+        int n = cast(int) i;
+        x -= i;
 
-    // Separate into integer and fractional parts.
-    int n = cast(int) floor(x + 0.5);
-    x -= n;
-
-    // Rational approximation:
-    //  exp2(x) = 1.0 + 2x P(x^^2) / (Q(x^^2) - P(x^^2))
-    const real xx = x * x;
-    const real px = x * poly(xx, P);
-    x = px / (poly(xx, Q) - px);
-    x = 1.0 + ldexp(x, 1);
+        // Rational approximation:
+        //  exp2(x) = 1.0 + 2x P(x^^2) / (Q(x^^2) - P(x^^2))
+        const T xx = x * x;
+        const T px = x * poly(xx, P);
+        x = px / (poly(xx, Q) - px);
+        x = (cast(T) 1.0) + (cast(T) 2.0) * x;
+    }
 
     // Scale by power of 2.
     x = ldexp(x, n);
@@ -2425,151 +3165,58 @@ private real exp2Impl(real x) @nogc @trusted pure nothrow
     return x;
 }
 
-///
-@safe unittest
+@safe @nogc nothrow unittest
 {
     assert(feqrel(exp2(0.5L), SQRT2) >= real.mant_dig -1);
     assert(exp2(8.0L) == 256.0);
     assert(exp2(-9.0L)== 1.0L/512.0);
-}
 
-@safe unittest
-{
-    version (CRuntime_Microsoft) {} else // aexp2/exp2f/exp2l not implemented
+    static void testExp2(T)()
     {
-        assert( core.stdc.math.exp2f(0.0f) == 1 );
-        assert( core.stdc.math.exp2 (0.0)  == 1 );
-        assert( core.stdc.math.exp2l(0.0L) == 1 );
-    }
-}
+        // NaN
+        const T specialNaN = NaN(0x0123L);
+        assert(isIdentical(exp2(specialNaN), specialNaN));
 
-@system unittest
-{
-    FloatingPointControl ctrl;
-    if (FloatingPointControl.hasExceptionTraps)
-        ctrl.disableExceptions(FloatingPointControl.allExceptions);
-    ctrl.rounding = FloatingPointControl.roundToNearest;
+        // over-/underflow
+        enum T OF = T.max_exp;
+        enum T UF = T.min_exp - T.mant_dig;
+        assert(isIdentical(exp2(OF + 1), cast(T) T.infinity));
+        assert(isIdentical(exp2(UF - 1), cast(T) 0.0));
 
-    static if (real.mant_dig == 113)
-    {
-        static immutable real[2][] exptestpoints =
-        [ //  x               exp(x)
-            [ 1.0L,           E                                        ],
-            [ 0.5L,           0x1.a61298e1e069bc972dfefab6df34p+0L     ],
-            [ 3.0L,           E*E*E                                    ],
-            [ 0x1.6p+13L,     0x1.6e509d45728655cdb4840542acb5p+16250L ], // near overflow
-            [ 0x1.7p+13L,     real.infinity                            ], // close overflow
-            [ 0x1p+80L,       real.infinity                            ], // far overflow
-            [ real.infinity,  real.infinity                            ],
-            [-0x1.18p+13L,    0x1.5e4bf54b4807034ea97fef0059a6p-12927L ], // near underflow
-            [-0x1.625p+13L,   0x1.a6bd68a39d11fec3a250cd97f524p-16358L ], // ditto
-            [-0x1.62dafp+13L, 0x0.cb629e9813b80ed4d639e875be6cp-16382L ], // near underflow - subnormal
-            [-0x1.6549p+13L,  0x0.0000000000000000000000000001p-16382L ], // ditto
-            [-0x1.655p+13L,   0                                        ], // close underflow
-            [-0x1p+30L,       0                                        ], // far underflow
+        static immutable T[2][] vals =
+        [
+            // x, exp2(x)
+            [  0.0, 1.0 ],
+            [ -0.0, 1.0 ],
+            [  0.5, SQRT2 ],
+            [  8.0, 256.0 ],
+            [ -9.0, 1.0 / 512 ],
         ];
-    }
-    else static if (real.mant_dig == 64) // 80-bit reals
-    {
-        static immutable real[2][] exptestpoints =
-        [ //  x               exp(x)
-            [ 1.0L,           E                            ],
-            [ 0.5L,           0x1.a61298e1e069bc97p+0L     ],
-            [ 3.0L,           E*E*E                        ],
-            [ 0x1.1p+13L,     0x1.29aeffefc8ec645p+12557L  ], // near overflow
-            [ 0x1.7p+13L,     real.infinity                ], // close overflow
-            [ 0x1p+80L,       real.infinity                ], // far overflow
-            [ real.infinity,  real.infinity                ],
-            [-0x1.18p+13L,    0x1.5e4bf54b4806db9p-12927L  ], // near underflow
-            [-0x1.625p+13L,   0x1.a6bd68a39d11f35cp-16358L ], // ditto
-            [-0x1.62dafp+13L, 0x1.96c53d30277021dp-16383L  ], // near underflow - subnormal
-            [-0x1.643p+13L,   0x1p-16444L                  ], // ditto
-            [-0x1.645p+13L,   0                            ], // close underflow
-            [-0x1p+30L,       0                            ], // far underflow
-        ];
-    }
-    else static if (real.mant_dig == 53) // 64-bit reals
-    {
-        static immutable real[2][] exptestpoints =
-        [ //  x,             exp(x)
-            [ 1.0L,          E                        ],
-            [ 0.5L,          0x1.a61298e1e069cp+0L    ],
-            [ 3.0L,          E*E*E                    ],
-            [ 0x1.6p+9L,     0x1.93bf4ec282efbp+1015L ], // near overflow
-            [ 0x1.7p+9L,     real.infinity            ], // close overflow
-            [ 0x1p+80L,      real.infinity            ], // far overflow
-            [ real.infinity, real.infinity            ],
-            [-0x1.6p+9L,     0x1.44a3824e5285fp-1016L ], // near underflow
-            [-0x1.64p+9L,    0x0.06f84920bb2d3p-1022L ], // near underflow - subnormal
-            [-0x1.743p+9L,   0x0.0000000000001p-1022L ], // ditto
-            [-0x1.8p+9L,     0                        ], // close underflow
-            [-0x1p30L,       0                        ], // far underflow
-        ];
-    }
-    else
-        static assert(0, "No exp() tests for real type!");
 
-    const minEqualDecimalDigits = real.dig - 3;
-    real x;
-    IeeeFlags f;
-    foreach (ref pair; exptestpoints)
-    {
-        resetIeeeFlags();
-        x = exp(pair[0]);
-        f = ieeeFlags;
-        assert(equalsDigit(x, pair[1], minEqualDecimalDigits));
-
-        version (IeeeFlagsSupport)
+        foreach (ref val; vals)
         {
-            // Check the overflow bit
-            if (x == real.infinity)
-            {
-                // don't care about the overflow bit if input was inf
-                // (e.g., the LLVM intrinsic doesn't set it on Linux x86_64)
-                assert(pair[0] == real.infinity || f.overflow);
-            }
-            else
-                assert(!f.overflow);
-            // Check the underflow bit
-            assert(f.underflow == (fabs(x) < real.min_normal));
-            // Invalid and div by zero shouldn't be affected.
-            assert(!f.invalid);
-            assert(!f.divByZero);
+            const T x = val[0];
+            const T r = val[1];
+            const T e = exp2(x);
+
+            //printf("exp2(%Lg) = %Lg, should be %Lg\n", cast(real) x, cast(real) e, cast(real) r);
+            assert(approxEqual(r, e));
         }
     }
-    // Ideally, exp(0) would not set the inexact flag.
-    // Unfortunately, fldl2e sets it!
-    // So it's not realistic to avoid setting it.
-    assert(exp(0.0L) == 1.0);
 
-    // NaN propagation. Doesn't set flags, bcos was already NaN.
-    resetIeeeFlags();
-    x = exp(real.nan);
-    f = ieeeFlags;
-    assert(isIdentical(abs(x), real.nan));
-    assert(f.flags == 0);
-
-    resetIeeeFlags();
-    x = exp(-real.nan);
-    f = ieeeFlags;
-    assert(isIdentical(abs(x), real.nan));
-    assert(f.flags == 0);
-
-    x = exp(NaN(0x123));
-    assert(isIdentical(x, NaN(0x123)));
-
-    // High resolution test (verified against GNU MPFR/Mathematica).
-    assert(exp(0.5L) == 0x1.A612_98E1_E069_BC97_2DFE_FAB6_DF34p+0L);
+    import std.meta : AliasSeq;
+    foreach (T; AliasSeq!(real, double, float))
+        testExp2!T();
 }
 
-
-/**
+/*
  * Calculate cos(y) + i sin(y).
  *
  * On many CPUs (such as x86), this is a very efficient operation;
  * almost twice as fast as calculating sin(y) and cos(y) separately,
  * and is the preferred method when both are required.
  */
+deprecated("Use std.complex.expi")
 creal expi(real y) @trusted pure nothrow @nogc
 {
     version (InlineAsm_X86_Any)
@@ -2601,7 +3248,7 @@ creal expi(real y) @trusted pure nothrow @nogc
     }
 }
 
-///
+deprecated
 @safe pure nothrow @nogc unittest
 {
     assert(expi(1.3e5L) == cos(1.3e5L) + sin(1.3e5L) * 1i);
@@ -2806,13 +3453,12 @@ if (isFloatingPoint!T)
 }
 
 ///
-@system unittest
+@safe unittest
 {
     int exp;
     real mantissa = frexp(123.456L, exp);
 
-    // check if values are equal to 19 decimal digits of precision
-    assert(equalsDigit(mantissa * pow(2.0L, cast(real) exp), 123.456L, 19));
+    assert(approxEqual(mantissa * pow(2.0L, cast(real) exp), 123.456L));
 
     assert(frexp(-real.nan, exp) && exp == int.min);
     assert(frexp(real.nan, exp) && exp == int.min);
@@ -2822,13 +3468,22 @@ if (isFloatingPoint!T)
     assert(frexp(0.0, exp) == 0.0 && exp == 0);
 }
 
+@safe @nogc nothrow unittest
+{
+    int exp;
+    real mantissa = frexp(123.456L, exp);
+
+    // check if values are equal to 19 decimal digits of precision
+    assert(equalsDigit(mantissa * pow(2.0L, cast(real) exp), 123.456L, 19));
+}
+
 @safe unittest
 {
     import std.meta : AliasSeq;
     import std.typecons : tuple, Tuple;
 
-    foreach (T; AliasSeq!(real, double, float))
-    {
+    static foreach (T; AliasSeq!(real, double, float))
+    {{
         Tuple!(T, T, int)[] vals =     // x,frexp,exp
             [
              tuple(T(0.0),  T( 0.0 ), 0),
@@ -2878,21 +3533,21 @@ if (isFloatingPoint!T)
 
             }
         }
-    }
+    }}
 }
 
 @safe unittest
 {
     import std.meta : AliasSeq;
     void foo() {
-        foreach (T; AliasSeq!(real, double, float))
-        {
+        static foreach (T; AliasSeq!(real, double, float))
+        {{
             int exp;
             const T a = 1;
             immutable T b = 2;
             auto c = frexp(a, exp);
             auto d = frexp(b, exp);
-        }
+        }}
     }
 }
 
@@ -3046,7 +3701,7 @@ if (isFloatingPoint!T)
     }
     else // static if (F.realFormat == RealFormat.ibmExtended)
     {
-        core.stdc.math.ilogbl(x);
+        assert(0, "ilogb not implemented");
     }
 }
 /// ditto
@@ -3073,15 +3728,41 @@ if (isIntegral!T && isSigned!T)
     return ilogb(absx);
 }
 
+///
+@safe pure unittest
+{
+    assert(ilogb(1) == 0);
+    assert(ilogb(3) == 1);
+    assert(ilogb(3.0) == 1);
+    assert(ilogb(100_000_000) == 26);
+
+    assert(ilogb(0) == FP_ILOGB0);
+    assert(ilogb(0.0) == FP_ILOGB0);
+    assert(ilogb(double.nan) == FP_ILOGBNAN);
+    assert(ilogb(double.infinity) == int.max);
+}
+
+/**
+Special return values of $(LREF ilogb).
+ */
 alias FP_ILOGB0   = core.stdc.math.FP_ILOGB0;
+/// ditto
 alias FP_ILOGBNAN = core.stdc.math.FP_ILOGBNAN;
 
-@system nothrow @nogc unittest
+///
+@safe pure unittest
+{
+    assert(ilogb(0) == FP_ILOGB0);
+    assert(ilogb(0.0) == FP_ILOGB0);
+    assert(ilogb(double.nan) == FP_ILOGBNAN);
+}
+
+@safe nothrow @nogc unittest
 {
     import std.meta : AliasSeq;
     import std.typecons : Tuple;
-    foreach (F; AliasSeq!(float, double, real))
-    {
+    static foreach (F; AliasSeq!(float, double, real))
+    {{
         alias T = Tuple!(F, int);
         T[13] vals =   // x, ilogb(x)
         [
@@ -3104,7 +3785,7 @@ alias FP_ILOGBNAN = core.stdc.math.FP_ILOGBNAN;
         {
             assert(ilogb(elem[0]) == elem[1]);
         }
-    }
+    }}
 
     // min_normal and subnormals
     assert(ilogb(-float.min_normal) == -126);
@@ -3153,8 +3834,8 @@ float ldexp(float n, int exp) @safe pure nothrow @nogc { return ldexp(cast(real)
 @nogc @safe pure nothrow unittest
 {
     import std.meta : AliasSeq;
-    foreach (T; AliasSeq!(float, double, real))
-    {
+    static foreach (T; AliasSeq!(float, double, real))
+    {{
         T r;
 
         r = ldexp(3.0L, 3);
@@ -3167,7 +3848,7 @@ float ldexp(float n, int exp) @safe pure nothrow @nogc { return ldexp(cast(real)
         int exp = 3;
         r = ldexp(n, exp);
         assert(r == 24);
-    }
+    }}
 }
 
 @safe pure nothrow @nogc unittest
@@ -3220,7 +3901,7 @@ float ldexp(float n, int exp) @safe pure nothrow @nogc { return ldexp(cast(real)
 }
 */
 
-@system unittest
+@safe @nogc nothrow unittest
 {
     static real[3][] vals =    // value,exp,ldexp
     [
@@ -3537,18 +4218,18 @@ real log10(real x) @safe pure nothrow @nogc
     assert(fabs(log10(1000) - 3) < .000001);
 }
 
-/******************************************
- *      Calculates the natural logarithm of 1 + x.
+/**
+ * Calculates the natural logarithm of 1 + x.
  *
- *      For very small x, log1p(x) will be more accurate than
- *      log(1 + x).
+ * For very small x, log1p(x) will be more accurate than
+ * log(1 + x).
  *
  *  $(TABLE_SV
  *  $(TR $(TH x)            $(TH log1p(x))     $(TH divide by 0?) $(TH invalid?))
  *  $(TR $(TD $(PLUSMN)0.0) $(TD $(PLUSMN)0.0) $(TD no)           $(TD no))
  *  $(TR $(TD -1.0)         $(TD -$(INFIN))    $(TD yes)          $(TD no))
- *  $(TR $(TD $(LT)-1.0)    $(TD $(NAN))       $(TD no)           $(TD yes))
- *  $(TR $(TD +$(INFIN))    $(TD -$(INFIN))    $(TD no)           $(TD no))
+ *  $(TR $(TD $(LT)-1.0)    $(TD -$(NAN))      $(TD no)           $(TD yes))
+ *  $(TR $(TD +$(INFIN))    $(TD +$(INFIN))    $(TD no)           $(TD no))
  *  )
  */
 real log1p(real x) @safe pure nothrow @nogc
@@ -3573,6 +4254,19 @@ real log1p(real x) @safe pure nothrow @nogc
 
         return log(x + 1.0);
     }
+}
+
+///
+@safe pure unittest
+{
+    assert(isIdentical(log1p(0.0), 0.0));
+    assert(log1p(1.0).feqrel(0.69314) > 16);
+
+    assert(log1p(-1.0) == -real.infinity);
+    assert(isNaN(log1p(-2.0)));
+    assert(log1p(real.nan) is real.nan);
+    assert(log1p(-real.nan) is -real.nan);
+    assert(log1p(real.infinity) == real.infinity);
 }
 
 /***************************************
@@ -3659,7 +4353,12 @@ real log2(real x) @safe pure nothrow @nogc
 }
 
 ///
-@system unittest
+@safe unittest
+{
+    assert(approxEqual(log2(1024.0L), 10));
+}
+
+@safe @nogc nothrow unittest
 {
     // check if values are equal to 19 decimal digits of precision
     assert(equalsDigit(log2(1024.0L), 10, 19));
@@ -3705,6 +4404,17 @@ real logb(real x) @trusted nothrow @nogc
         return core.stdc.math.logbl(x);
 }
 
+///
+@safe @nogc nothrow unittest
+{
+    assert(logb(1.0) == 0);
+    assert(logb(100.0) == 6);
+
+    assert(logb(0.0) == -real.infinity);
+    assert(logb(real.infinity) == real.infinity);
+    assert(logb(-real.infinity) == real.infinity);
+}
+
 /************************************
  * Calculates the remainder from the calculation x/y.
  * Returns:
@@ -3729,6 +4439,14 @@ real fmod(real x, real y) @trusted nothrow @nogc
         return core.stdc.math.fmodl(x, y);
 }
 
+///
+@safe unittest
+{
+    assert(isIdentical(fmod(0.0, 1.0), 0.0));
+    assert(fmod(5.0, 3.0).feqrel(2.0) > 16);
+    assert(isNaN(fmod(5.0, 0.0)));
+}
+
 /************************************
  * Breaks x into an integral part and a fractional part, each of which has
  * the same sign as x. The integral part is stored in i.
@@ -3749,6 +4467,17 @@ real modf(real x, ref real i) @trusted nothrow @nogc
     }
     else
         return core.stdc.math.modfl(x,&i);
+}
+
+///
+@safe unittest
+{
+    real frac;
+    real intpart;
+
+    frac = modf(3.14159, intpart);
+    assert(intpart.feqrel(3.0) > 16);
+    assert(frac.feqrel(0.14159) > 16);
 }
 
 /*************************************
@@ -3825,6 +4554,13 @@ real cbrt(real x) @trusted nothrow @nogc
         return core.stdc.math.cbrtl(x);
 }
 
+///
+@safe unittest
+{
+    assert(cbrt(1.0).feqrel(1.0) > 16);
+    assert(cbrt(27.0).feqrel(3.0) > 16);
+    assert(cbrt(15.625).feqrel(2.5) > 16);
+}
 
 /*******************************
  * Returns |x|
@@ -3842,6 +4578,14 @@ double fabs(double x) @safe pure nothrow @nogc { return fabs(cast(real) x); }
 //FIXME
 ///ditto
 float fabs(float x) @safe pure nothrow @nogc { return fabs(cast(real) x); }
+
+///
+@safe unittest
+{
+    assert(isIdentical(fabs(0.0), 0.0));
+    assert(isIdentical(fabs(-0.0), 0.0));
+    assert(fabs(-10.0) == 10.0);
+}
 
 @safe unittest
 {
@@ -3920,6 +4664,15 @@ real hypot(real x, real y) @safe pure nothrow @nogc
 
     // both are in the normal range
     return sqrt(u*u + v*v);
+}
+
+///
+@safe unittest
+{
+    assert(hypot(1.0, 1.0).feqrel(1.4142) > 16);
+    assert(hypot(3.0, 4.0).feqrel(5.0) > 16);
+    assert(hypot(real.infinity, 1.0) == real.infinity);
+    assert(hypot(real.infinity, real.nan) == real.infinity);
 }
 
 @safe unittest
@@ -4026,7 +4779,7 @@ real ceil(real x) @trusted pure nothrow @nogc
     assert(isNaN(ceil(real.init)));
 }
 
-// ditto
+/// ditto
 double ceil(double x) @trusted pure nothrow @nogc
 {
     // Special cases.
@@ -4054,7 +4807,7 @@ double ceil(double x) @trusted pure nothrow @nogc
     assert(isNaN(ceil(double.init)));
 }
 
-// ditto
+/// ditto
 float ceil(float x) @trusted pure nothrow @nogc
 {
     // Special cases.
@@ -4140,6 +4893,8 @@ real floor(real x) @trusted pure nothrow @nogc
 {
     assert(floor(+123.456L) == +123);
     assert(floor(-123.456L) == -124);
+    assert(floor(+123.0L) == +123);
+    assert(floor(-124.0L) == -124);
     assert(floor(-1.234L) == -2);
     assert(floor(-0.123L) == -1);
     assert(floor(0.0L) == 0);
@@ -4150,7 +4905,7 @@ real floor(real x) @trusted pure nothrow @nogc
     assert(isNaN(floor(real.init)));
 }
 
-// ditto
+/// ditto
 double floor(double x) @trusted pure nothrow @nogc
 {
     // Special cases.
@@ -4164,6 +4919,8 @@ double floor(double x) @trusted pure nothrow @nogc
 {
     assert(floor(+123.456) == +123);
     assert(floor(-123.456) == -124);
+    assert(floor(+123.0) == +123);
+    assert(floor(-124.0) == -124);
     assert(floor(-1.234) == -2);
     assert(floor(-0.123) == -1);
     assert(floor(0.0) == 0);
@@ -4174,7 +4931,7 @@ double floor(double x) @trusted pure nothrow @nogc
     assert(isNaN(floor(double.init)));
 }
 
-// ditto
+/// ditto
 float floor(float x) @trusted pure nothrow @nogc
 {
     // Special cases.
@@ -4188,6 +4945,8 @@ float floor(float x) @trusted pure nothrow @nogc
 {
     assert(floor(+123.456f) == +123);
     assert(floor(-123.456f) == -124);
+    assert(floor(+123.0f) == +123);
+    assert(floor(-124.0f) == -124);
     assert(floor(-1.234f) == -2);
     assert(floor(-0.123f) == -1);
     assert(floor(0.0f) == 0);
@@ -4273,8 +5032,8 @@ if (is(typeof(rfunc(F.init)) : F) && isFloatingPoint!F)
 {
     import std.meta : AliasSeq;
 
-    foreach (F; AliasSeq!(real, double, float))
-    {
+    static foreach (F; AliasSeq!(real, double, float))
+    {{
         const maxL10 = cast(int) F.max.log10.floor;
         const maxR10 = pow(cast(F) 10, maxL10);
         assert((cast(F) 0.9L * maxR10).quantize!10(maxL10) ==  maxR10);
@@ -4286,7 +5045,7 @@ if (is(typeof(rfunc(F.init)) : F) && isFloatingPoint!F)
         assert((-F.min_normal).quantize(F.max) == 0);
         assert(F.min_normal.quantize(F.min_normal) == F.min_normal);
         assert((-F.min_normal).quantize(F.min_normal) == -F.min_normal);
-    }
+    }}
 }
 
 /******************************************
@@ -4295,24 +5054,44 @@ if (is(typeof(rfunc(F.init)) : F) && isFloatingPoint!F)
  *
  * Unlike the rint functions, nearbyint does not raise the
  * FE_INEXACT exception.
+ *
+ * Note:
+ *     Not implemented for Microsoft C Runtime
  */
-real nearbyint(real x) @trusted nothrow @nogc
+real nearbyint(real x) @safe pure nothrow @nogc
 {
     version (CRuntime_Microsoft)
-    {
-        assert(0);      // not implemented in C library
-    }
+        assert(0, "nearbyintl not implemented in Microsoft C library");
     else
         return core.stdc.math.nearbyintl(x);
+}
+
+///
+@safe pure unittest
+{
+    version (CRuntime_Microsoft) {}
+    else
+    {
+        assert(nearbyint(0.4) == 0);
+        assert(nearbyint(0.5) == 0);
+        assert(nearbyint(0.6) == 1);
+        assert(nearbyint(100.0) == 100);
+
+        assert(isNaN(nearbyint(real.nan)));
+        assert(nearbyint(real.infinity) == real.infinity);
+        assert(nearbyint(-real.infinity) == -real.infinity);
+    }
 }
 
 /**********************************
  * Rounds x to the nearest integer value, using the current rounding
  * mode.
+ *
  * If the return value is not equal to x, the FE_INEXACT
  * exception is raised.
- * $(B nearbyint) performs
- * the same operation, but does not set the FE_INEXACT exception.
+ *
+ * $(LREF nearbyint) performs the same operation, but does
+ * not set the FE_INEXACT exception.
  */
 real rint(real x) @safe pure nothrow @nogc { pragma(inline, true); return core.math.rint(x); }
 //FIXME
@@ -4321,6 +5100,22 @@ double rint(double x) @safe pure nothrow @nogc { return rint(cast(real) x); }
 //FIXME
 ///ditto
 float rint(float x) @safe pure nothrow @nogc { return rint(cast(real) x); }
+
+///
+@safe unittest
+{
+    resetIeeeFlags();
+    assert(rint(0.4) == 0);
+    assert(ieeeFlags.inexact);
+
+    assert(rint(0.5) == 0);
+    assert(rint(0.6) == 1);
+    assert(rint(100.0) == 100);
+
+    assert(isNaN(rint(real.nan)));
+    assert(rint(real.infinity) == real.infinity);
+    assert(rint(-real.infinity) == -real.infinity);
+}
 
 @safe unittest
 {
@@ -4538,14 +5333,17 @@ static if (real.mant_dig >= long.sizeof * 8)
  * Return the value of x rounded to the nearest integer.
  * If the fractional part of x is exactly 0.5, the return value is
  * rounded away from zero.
+ *
+ * Returns:
+ *     A `real`.
  */
-real round(real x) @trusted nothrow @nogc
+auto round(real x) @trusted nothrow @nogc
 {
     version (CRuntime_Microsoft)
     {
         auto old = FloatingPointControl.getControlState();
         FloatingPointControl.setControlState(
-            (old & ~FloatingPointControl.roundingMask) | FloatingPointControl.roundToZero
+            (old & (-1 - FloatingPointControl.roundingMask)) | FloatingPointControl.roundToZero
         );
         x = rint((x >= 0) ? x + 0.5 : x - 0.5);
         FloatingPointControl.setControlState(old);
@@ -4553,6 +5351,24 @@ real round(real x) @trusted nothrow @nogc
     }
     else
         return core.stdc.math.roundl(x);
+}
+
+///
+@safe nothrow @nogc unittest
+{
+    assert(round(4.5) == 5);
+    assert(round(5.4) == 5);
+    assert(round(-4.5) == -5);
+    assert(round(-5.1) == -5);
+}
+
+// assure purity on Posix
+version (Posix)
+{
+    @safe pure nothrow @nogc unittest
+    {
+        assert(round(4.5) == 5);
+    }
 }
 
 /**********************************************
@@ -4571,9 +5387,10 @@ long lround(real x) @trusted nothrow @nogc
         assert(0, "lround not implemented");
 }
 
-version (Posix)
+///
+@safe nothrow @nogc unittest
 {
-    @safe nothrow @nogc unittest
+    version (Posix)
     {
         assert(lround(0.49) == 0);
         assert(lround(0.5) == 1);
@@ -4581,12 +5398,12 @@ version (Posix)
     }
 }
 
-/****************************************************
- * Returns the integer portion of x, dropping the fractional portion.
- *
- * This is also known as "chop" rounding.
+/**
+ Returns the integer portion of x, dropping the fractional portion.
+ This is also known as "chop" rounding.
+ `pure` on all platforms.
  */
-real trunc(real x) @trusted nothrow @nogc
+real trunc(real x) @trusted nothrow @nogc pure
 {
     version (Win64_DMD_InlineAsm)
     {
@@ -4629,6 +5446,15 @@ real trunc(real x) @trusted nothrow @nogc
         return core.stdc.math.truncl(x);
 }
 
+///
+@safe pure unittest
+{
+    assert(trunc(0.01) == 0);
+    assert(trunc(0.49) == 0);
+    assert(trunc(0.5) == 0);
+    assert(trunc(1.5) == 1);
+}
+
 /****************************************************
  * Calculate the remainder x REM y, following IEC 60559.
  *
@@ -4639,13 +5465,13 @@ real trunc(real x) @trusted nothrow @nogc
  * Otherwise, the sign of the result is the sign of x / y.
  * Precision mode has no effect on the remainder functions.
  *
- * remquo returns n in the parameter n.
+ * remquo returns `n` in the parameter `n`.
  *
  * $(TABLE_SV
  *  $(TR $(TH x)               $(TH y)            $(TH remainder(x, y)) $(TH n)   $(TH invalid?))
  *  $(TR $(TD $(PLUSMN)0.0)    $(TD not 0.0)      $(TD $(PLUSMN)0.0)    $(TD 0.0) $(TD no))
- *  $(TR $(TD $(PLUSMNINF))    $(TD anything)     $(TD $(NAN))          $(TD ?)   $(TD yes))
- *  $(TR $(TD anything)        $(TD $(PLUSMN)0.0) $(TD $(NAN))          $(TD ?)   $(TD yes))
+ *  $(TR $(TD $(PLUSMNINF))    $(TD anything)     $(TD -$(NAN))         $(TD ?)   $(TD yes))
+ *  $(TR $(TD anything)        $(TD $(PLUSMN)0.0) $(TD $(PLUSMN)$(NAN)) $(TD ?)   $(TD yes))
  *  $(TR $(TD != $(PLUSMNINF)) $(TD $(PLUSMNINF)) $(TD x)               $(TD ?)   $(TD no))
  * )
  *
@@ -4662,12 +5488,40 @@ real remainder(real x, real y) @trusted nothrow @nogc
         return core.stdc.math.remainderl(x, y);
 }
 
+/// ditto
 real remquo(real x, real y, out int n) @trusted nothrow @nogc  /// ditto
 {
     version (Posix)
         return core.stdc.math.remquol(x, y, &n);
     else
         assert(0, "remquo not implemented");
+}
+
+///
+@safe @nogc nothrow unittest
+{
+    version (Posix)
+    {
+        assert(remainder(5.1, 3.0).feqrel(-0.9) > 16);
+        assert(remainder(-5.1, 3.0).feqrel(0.9) > 16);
+        assert(remainder(0.0, 3.0) == 0.0);
+
+        assert(isNaN(remainder(1.0, 0.0)));
+        assert(isNaN(remainder(-1.0, 0.0)));
+    }
+}
+
+///
+@safe @nogc nothrow unittest
+{
+    version (Posix)
+    {
+        int n;
+
+        assert(remquo(5.1, 3.0, n).feqrel(-0.9) > 16 && n == 2);
+        assert(remquo(-5.1, 3.0, n).feqrel(0.9) > 16 && n == -2);
+        assert(remquo(0.0, 3.0, n) == 0.0 && n == 0);
+    }
 }
 
 /** IEEE exception status flags ('sticky bits')
@@ -4680,6 +5534,8 @@ real remquo(real x, real y, out int n) @trusted nothrow @nogc  /// ditto
  */
 struct IeeeFlags
 {
+nothrow @nogc:
+
 private:
     // The x87 FPU status register is 16 bits.
     // The Pentium SSE2 status register is 32 bits.
@@ -4719,7 +5575,7 @@ private:
     }
 
 private:
-    static uint getIeeeFlags()
+    static uint getIeeeFlags() @trusted pure
     {
         version (GNU)
         {
@@ -4791,13 +5647,14 @@ private:
         else
             assert(0, "Not yet supported");
     }
-    static void resetIeeeFlags() @nogc
+
+    static void resetIeeeFlags() @trusted
     {
         version (GNU)
         {
             version (X86_Any)
             {
-                asm pure nothrow @nogc
+                asm nothrow @nogc
                 {
                     "fnclex";
                 }
@@ -4806,12 +5663,12 @@ private:
                 if (haveSSE)
                 {
                     uint mxcsr;
-                    asm pure nothrow @nogc
+                    asm nothrow @nogc
                     {
                         "stmxcsr %0" : "=m" (mxcsr);
                     }
                     mxcsr &= ~EXCEPTIONS_MASK;
-                    asm pure nothrow @nogc
+                    asm nothrow @nogc
                     {
                         "ldmxcsr %0" : : "m" (mxcsr);
                     }
@@ -4825,7 +5682,7 @@ private:
                 {
                     uint old = FloatingPointControl.getControlState();
                     old &= ~0b11111; // http://infocenter.arm.com/help/topic/com.arm.doc.ddi0408i/Chdfifdc.html
-                    asm pure nothrow @nogc
+                    asm nothrow @nogc
                     {
                         "vmsr FPSCR, %0" : : "r" (old);
                     }
@@ -4837,7 +5694,7 @@ private:
         else
         version (InlineAsm_X86_Any)
         {
-            asm pure nothrow @nogc
+            asm nothrow @nogc
             {
                 fnclex;
             }
@@ -4870,31 +5727,31 @@ public:
       * The result cannot be represented exactly, so rounding occurred.
       * Example: `x = sin(0.1);`
       */
-     @property bool inexact() const { return (flags & INEXACT_MASK) != 0; }
+     @property bool inexact() @safe const { return (flags & INEXACT_MASK) != 0; }
 
      /**
       * A zero was generated by underflow
       * Example: `x = real.min*real.epsilon/2;`
       */
-     @property bool underflow() const { return (flags & UNDERFLOW_MASK) != 0; }
+     @property bool underflow() @safe const { return (flags & UNDERFLOW_MASK) != 0; }
 
      /**
       * An infinity was generated by overflow
       * Example: `x = real.max*2;`
       */
-     @property bool overflow() const { return (flags & OVERFLOW_MASK) != 0; }
+     @property bool overflow() @safe const { return (flags & OVERFLOW_MASK) != 0; }
 
      /**
       * An infinity was generated by division by zero
       * Example: `x = 3/0.0;`
       */
-     @property bool divByZero() const { return (flags & DIVBYZERO_MASK) != 0; }
+     @property bool divByZero() @safe const { return (flags & DIVBYZERO_MASK) != 0; }
 
      /**
       * A machine NaN was generated.
       * Example: `x = real.infinity * 0.0;`
       */
-     @property bool invalid() const { return (flags & INVALID_MASK) != 0; }
+     @property bool invalid() @safe const { return (flags & INVALID_MASK) != 0; }
 
      }
 }
@@ -4905,22 +5762,22 @@ version (GNU)
     // ieeeFlags test disabled, see LDC Issue #888.
 }
 else
-@system unittest
+@safe unittest
 {
     static void func() {
         int a = 10 * 10;
     }
 
-    real a=3.5;
+    real a = 3.5;
     // Set all the flags to zero
     resetIeeeFlags();
     assert(!ieeeFlags.divByZero);
     // Perform a division by zero.
-    a/=0.0L;
+    a /= 0.0L;
     assert(a == real.infinity);
     assert(ieeeFlags.divByZero);
     // Create a NaN
-    a*=0.0L;
+    a *= 0.0L;
     assert(ieeeFlags.invalid);
     assert(isNaN(a));
 
@@ -4936,18 +5793,18 @@ version (GNU)
     // ieeeFlags test disabled, see LDC Issue #888.
 }
 else
-@system unittest
+@safe unittest
 {
     import std.meta : AliasSeq;
 
     static struct Test
     {
-        void delegate() action;
-        bool function() ieeeCheck;
+        void delegate() @trusted action;
+        bool function() @trusted ieeeCheck;
     }
 
-    foreach (T; AliasSeq!(float, double, real))
-    {
+    static foreach (T; AliasSeq!(float, double, real))
+    {{
         T x; /* Needs to be here to trick -O. It would optimize away the
             calculations if x were local to the function literals. */
         auto tests = [
@@ -4979,7 +5836,7 @@ else
             test.action();
             assert(test.ieeeCheck());
         }
-    }
+    }}
 }
 
 version (X86_Any)
@@ -5004,12 +5861,43 @@ else version (ARM_Any)
 }
 
 /// Set all of the floating-point status flags to false.
-void resetIeeeFlags() @nogc { IeeeFlags.resetIeeeFlags(); }
+void resetIeeeFlags() @trusted nothrow @nogc
+{
+    IeeeFlags.resetIeeeFlags();
+}
+
+///
+@safe unittest
+{
+    resetIeeeFlags();
+    real a = 3.5;
+    a /= 0.0L;
+    assert(a == real.infinity);
+    assert(ieeeFlags.divByZero);
+
+    resetIeeeFlags();
+    assert(!ieeeFlags.divByZero);
+}
 
 /// Returns: snapshot of the current state of the floating-point status flags
-@property IeeeFlags ieeeFlags()
+@property IeeeFlags ieeeFlags() @trusted pure nothrow @nogc
 {
    return IeeeFlags(IeeeFlags.getIeeeFlags());
+}
+
+///
+@safe nothrow unittest
+{
+    resetIeeeFlags();
+    real a = 3.5;
+
+    a /= 0.0L;
+    assert(a == real.infinity);
+    assert(ieeeFlags.divByZero);
+
+    a *= 0.0L;
+    assert(isNaN(a));
+    assert(ieeeFlags.invalid);
 }
 
 /** Control the Floating point hardware
@@ -5046,23 +5934,16 @@ Example:
     // NaN-s with other payload are valid:
     real z = y * real.nan; // ok
 
-    // Changing the rounding mode:
-    fpctrl.rounding = FloatingPointControl.roundUp;
-    assert(rint(1.1) == 2);
-
-    // The set hardware exceptions will be disabled when leaving this scope.
-    // The original rounding mode will also be restored.
+    // The set hardware exceptions and rounding modes will be disabled when
+    // leaving this scope.
 }
-
-// Ensure previous values are returned:
-assert(!FloatingPointControl.enabledExceptions);
-assert(FloatingPointControl.rounding == FloatingPointControl.roundToNearest);
-assert(rint(1.1) == 1);
 ----
 
  */
 struct FloatingPointControl
 {
+nothrow @nogc:
+
     alias RoundingMode = uint; ///
 
     version (StdDdoc)
@@ -5108,14 +5989,14 @@ struct FloatingPointControl
     }
 
     //// Change the floating-point hardware rounding mode
-    @property void rounding(RoundingMode newMode) @nogc
+    @property void rounding(RoundingMode newMode) @trusted
     {
         initialize();
-        setControlState(cast(ushort)((getControlState() & (-1 - roundingMask)) | (newMode & roundingMask)));
+        setControlState((getControlState() & (-1 - roundingMask)) | (newMode & roundingMask));
     }
 
     /// Returns: the currently active rounding mode
-    @property static RoundingMode rounding() @nogc
+    @property static RoundingMode rounding() @trusted pure
     {
         return cast(RoundingMode)(getControlState() & roundingMask);
     }
@@ -5267,17 +6148,9 @@ struct FloatingPointControl
     else
         static assert(false, "Not implemented for this architecture");
 
-public:
-    /// Returns: true if the current FPU supports exception trapping
-    @property static bool hasExceptionTraps() @safe nothrow @nogc
+    version (ARM_Any)
     {
-        version (X86_Any)
-            return true;
-        else version (PPC_Any)
-            return true;
-        else version (MIPS_Any)
-            return true;
-        else version (ARM_Any)
+        static bool hasExceptionTraps_impl() @safe
         {
             auto oldState = getControlState();
             // If exceptions are not supported, we set the bit but read it back as zero
@@ -5287,12 +6160,32 @@ public:
             setControlState(oldState);
             return result;
         }
+    }
+
+public:
+    /// Returns: true if the current FPU supports exception trapping
+    @property static bool hasExceptionTraps() @safe pure
+    {
+        version (X86_Any)
+            return true;
+        else version (PPC_Any)
+            return true;
+        else version (MIPS_Any)
+            return true;
+        else version (ARM_Any)
+        {
+            // The hasExceptionTraps_impl function is basically pure,
+            // as it restores all global state
+            auto fptr = ( () @trusted => cast(bool function() @safe
+                pure nothrow @nogc)&hasExceptionTraps_impl)();
+            return fptr();
+        }
         else
             assert(0, "Not yet supported");
     }
 
     /// Enable (unmask) specific hardware exceptions. Multiple exceptions may be ORed together.
-    void enableExceptions(ExceptionMask exceptions) @nogc
+    void enableExceptions(ExceptionMask exceptions) @trusted
     {
         assert(hasExceptionTraps);
         initialize();
@@ -5303,7 +6196,7 @@ public:
     }
 
     /// Disable (mask) specific hardware exceptions. Multiple exceptions may be ORed together.
-    void disableExceptions(ExceptionMask exceptions) @nogc
+    void disableExceptions(ExceptionMask exceptions) @trusted
     {
         assert(hasExceptionTraps);
         initialize();
@@ -5314,7 +6207,7 @@ public:
     }
 
     /// Returns: the exceptions which are currently enabled (unmasked)
-    @property static ExceptionMask enabledExceptions() @nogc
+    @property static ExceptionMask enabledExceptions() @trusted pure
     {
         assert(hasExceptionTraps);
         version (X86_Any)
@@ -5324,7 +6217,7 @@ public:
     }
 
     ///  Clear all pending exceptions, then restore the original exception state and rounding mode.
-    ~this() @nogc
+    ~this() @trusted
     {
         clearExceptions();
         if (initialized)
@@ -5371,7 +6264,7 @@ private:
     else
         static assert(false, "Not implemented for this architecture");
 
-    void initialize() @nogc
+    void initialize() @safe
     {
         // BUG: This works around the absence of this() constructors.
         if (initialized) return;
@@ -5381,13 +6274,13 @@ private:
     }
 
     // Clear all pending exceptions
-    static void clearExceptions() @nogc
+    static void clearExceptions() @safe
     {
         resetIeeeFlags();
     }
 
     // Read from the control register
-    static ControlState getControlState() @trusted nothrow @nogc
+    static ControlState getControlState() @trusted pure
     {
         version (GNU)
         {
@@ -5402,7 +6295,6 @@ private:
             }
             else version (AArch64)
             {
-                ControlState cont;
                 asm pure nothrow @nogc
                 {
                     "mrs %0, FPCR;" : "=r" cont;
@@ -5430,7 +6322,7 @@ private:
         version (D_InlineAsm_X86)
         {
             short cont;
-            asm nothrow @nogc
+            asm pure nothrow @nogc
             {
                 xor EAX, EAX;
                 fstcw cont;
@@ -5441,7 +6333,7 @@ private:
         version (D_InlineAsm_X86_64)
         {
             short cont;
-            asm nothrow @nogc
+            asm pure nothrow @nogc
             {
                 xor RAX, RAX;
                 fstcw cont;
@@ -5453,7 +6345,7 @@ private:
     }
 
     // Set the control register
-    static void setControlState(ControlState newState) @trusted nothrow @nogc
+    static void setControlState(ControlState newState) @trusted
     {
         version (GNU)
         {
@@ -5544,7 +6436,25 @@ private:
     }
 }
 
-version (D_HardFloat) @system unittest
+///
+@safe unittest
+{
+    version (D_HardFloat)
+    {
+        FloatingPointControl fpctrl;
+
+        fpctrl.rounding = FloatingPointControl.roundDown;
+        assert(lrint(1.5) == 1.0);
+
+        fpctrl.rounding = FloatingPointControl.roundUp;
+        assert(lrint(1.4) == 2.0);
+
+        fpctrl.rounding = FloatingPointControl.roundToNearest;
+        assert(lrint(1.5) == 2.0);
+    }
+}
+
+version (D_HardFloat) @safe unittest
 {
     void ensureDefaults()
     {
@@ -5581,12 +6491,12 @@ version (D_HardFloat) @system unittest
     ensureDefaults();
 }
 
-version (D_HardFloat) @system unittest // rounding
+version (D_HardFloat) @safe unittest // rounding
 {
     import std.meta : AliasSeq;
 
-    foreach (T; AliasSeq!(float, double, real))
-    {
+    static foreach (T; AliasSeq!(float, double, real))
+    {{
         FloatingPointControl fpctrl;
 
         fpctrl.rounding = FloatingPointControl.roundUp;
@@ -5618,7 +6528,7 @@ version (D_HardFloat) @system unittest // rounding
 
         assert(u > d);
         assert(z == u);
-    }
+    }}
 }
 
 
@@ -5627,7 +6537,7 @@ version (D_HardFloat) @system unittest // rounding
  * Params:
  *  x = a floating point number.
  * Returns:
- *  $(D true) if $(D_PARAM x) is Nan.
+ *  `true` if $(D_PARAM x) is Nan.
  */
 bool isNaN(X)(X x) @nogc @trusted pure nothrow
 if (isFloatingPoint!(X))
@@ -5681,8 +6591,8 @@ if (isFloatingPoint!(X))
 {
     import std.meta : AliasSeq;
 
-    foreach (T; AliasSeq!(float, double, real))
-    {
+    static foreach (T; AliasSeq!(float, double, real))
+    {{
         // CTFE-able tests
         assert(isNaN(T.init));
         assert(isNaN(-T.init));
@@ -5707,7 +6617,7 @@ if (isFloatingPoint!(X))
         f = cast(T) 53.6;
         assert(!isNaN(f));
         assert(!isNaN(-f));
-    }
+    }}
 }
 
 /*********************************
@@ -5715,7 +6625,7 @@ if (isFloatingPoint!(X))
  * Params:
  *  x = a floating point number.
  * Returns:
- *  $(D true) if $(D_PARAM x) is finite.
+ *  `true` if $(D_PARAM x) is finite.
  */
 bool isFinite(X)(X x) @trusted pure nothrow @nogc
 {
@@ -5758,7 +6668,7 @@ bool isFinite(X)(X x) @trusted pure nothrow @nogc
  * Params:
  *  x = a floating point number.
  * Returns:
- *  $(D true) if $(D_PARAM x) is normalized.
+ *  `true` if $(D_PARAM x) is normalized.
  */
 
 /* Need one for each format because subnormal floats might
@@ -5767,16 +6677,8 @@ bool isFinite(X)(X x) @trusted pure nothrow @nogc
 bool isNormal(X)(X x) @trusted pure nothrow @nogc
 {
     alias F = floatTraits!(X);
-    static if (F.realFormat == RealFormat.ibmExtended)
-    {
-        // doubledouble is normal if the least significant part is normal.
-        return isNormal((cast(double*)&x)[MANTISSA_LSB]);
-    }
-    else
-    {
-        ushort e = F.EXPMASK & (cast(ushort *)&x)[F.EXPPOS_SHORT];
-        return (e != F.EXPMASK && e != 0);
-    }
+    ushort e = F.EXPMASK & (cast(ushort *)&x)[F.EXPPOS_SHORT];
+    return (e != F.EXPMASK && e != 0);
 }
 
 ///
@@ -5808,7 +6710,7 @@ bool isNormal(X)(X x) @trusted pure nothrow @nogc
  * Params:
  *  x = a floating point number.
  * Returns:
- *  $(D true) if $(D_PARAM x) is a denormal number.
+ *  `true` if $(D_PARAM x) is a denormal number.
  */
 bool isSubnormal(X)(X x) @trusted pure nothrow @nogc
 {
@@ -5842,10 +6744,6 @@ bool isSubnormal(X)(X x) @trusted pure nothrow @nogc
 
         return (pe[F.EXPPOS_SHORT] & F.EXPMASK) == 0 && *ps > 0;
     }
-    else static if (F.realFormat == RealFormat.ibmExtended)
-    {
-        return isSubnormal((cast(double*)&x)[MANTISSA_MSB]);
-    }
     else
     {
         static assert(false, "Not implemented for this architecture");
@@ -5857,12 +6755,12 @@ bool isSubnormal(X)(X x) @trusted pure nothrow @nogc
 {
     import std.meta : AliasSeq;
 
-    foreach (T; AliasSeq!(float, double, real))
-    {
+    static foreach (T; AliasSeq!(float, double, real))
+    {{
         T f;
         for (f = 1.0; !isSubnormal(f); f /= 2)
             assert(f != 0);
-    }
+    }}
 }
 
 /*********************************
@@ -5870,7 +6768,7 @@ bool isSubnormal(X)(X x) @trusted pure nothrow @nogc
  * Params:
  *  x = a floating point number.
  * Returns:
- *  $(D true) if $(D_PARAM x) is $(PLUSMN)$(INFIN).
+ *  `true` if $(D_PARAM x) is $(PLUSMN)$(INFIN).
  */
 bool isInfinity(X)(X x) @nogc @trusted pure nothrow
 if (isFloatingPoint!(X))
@@ -5892,11 +6790,6 @@ if (isFloatingPoint!(X))
 
         // On Motorola 68K, infinity can have hidden bit = 1 or 0. On x86, it is always 1.
         return e == F.EXPMASK && (ps & 0x7FFF_FFFF_FFFF_FFFF) == 0;
-    }
-    else static if (F.realFormat == RealFormat.ibmExtended)
-    {
-        return (((cast(ulong *)&x)[MANTISSA_MSB]) & 0x7FFF_FFFF_FFFF_FFFF)
-            == 0x7FF8_0000_0000_0000;
     }
     else static if (F.realFormat == RealFormat.ieeeQuadruple)
     {
@@ -5999,17 +6892,33 @@ bool isIdentical(real x, real y) @trusted pure nothrow @nogc
     {
         return pxs[0] == pys[0];
     }
-    else static if (F.realFormat == RealFormat.ieeeQuadruple
-                 || F.realFormat == RealFormat.ibmExtended)
+    else static if (F.realFormat == RealFormat.ieeeQuadruple)
     {
         return pxs[0] == pys[0] && pxs[1] == pys[1];
     }
-    else
+    else static if (F.realFormat == RealFormat.ieeeExtended)
     {
         ushort* pxe = cast(ushort *)&x;
         ushort* pye = cast(ushort *)&y;
         return pxe[4] == pye[4] && pxs[0] == pys[0];
     }
+    else
+    {
+        assert(0, "isIdentical not implemented");
+    }
+}
+
+///
+@safe @nogc pure nothrow unittest
+{
+    assert( isIdentical(0.0, 0.0));
+    assert( isIdentical(1.0, 1.0));
+    assert( isIdentical(real.infinity, real.infinity));
+    assert( isIdentical(-real.infinity, -real.infinity));
+
+    assert(!isIdentical(0.0, -0.0));
+    assert(!isIdentical(real.nan, -real.nan));
+    assert(!isIdentical(real.infinity, -real.infinity));
 }
 
 /*********************************
@@ -6053,8 +6962,12 @@ int signbit(X)(X x) @nogc @trusted pure nothrow
 }
 
 
-/*********************************
- * Return a value composed of to with from's sign bit.
+/**
+Params:
+    to = the numeric value to use
+    from = the sign value to use
+Returns:
+    a value composed of to with from's sign bit.
  */
 R copysign(R, X)(R to, X from) @trusted pure nothrow @nogc
 if (isFloatingPoint!(R) && isFloatingPoint!(X))
@@ -6069,21 +6982,35 @@ if (isFloatingPoint!(R) && isFloatingPoint!(X))
     return to;
 }
 
-// ditto
+/// ditto
 R copysign(R, X)(X to, R from) @trusted pure nothrow @nogc
 if (isIntegral!(X) && isFloatingPoint!(R))
 {
     return copysign(cast(R) to, from);
 }
 
+///
+@safe pure nothrow @nogc unittest
+{
+    assert(copysign(1.0, 1.0) == 1.0);
+    assert(copysign(1.0, -0.0) == -1.0);
+    assert(copysign(1UL, -1.0) == -1.0);
+    assert(copysign(-1.0, -1.0) == -1.0);
+
+    assert(copysign(real.infinity, -1.0) == -real.infinity);
+    assert(copysign(real.nan, 1.0) is real.nan);
+    assert(copysign(-real.nan, 1.0) is real.nan);
+    assert(copysign(real.nan, -1.0) is -real.nan);
+}
+
 @safe pure nothrow @nogc unittest
 {
     import std.meta : AliasSeq;
 
-    foreach (X; AliasSeq!(float, double, real, int, long))
+    static foreach (X; AliasSeq!(float, double, real, int, long))
     {
-        foreach (Y; AliasSeq!(float, double, real))
-        (){ // avoid slow optimizations for large functions @@@BUG@@@ 2396
+        static foreach (Y; AliasSeq!(float, double, real))
+        {{
             X x = 21;
             Y y = 23.8;
             Y e = void;
@@ -6108,12 +7035,12 @@ if (isIntegral!(X) && isFloatingPoint!(R))
                 e = copysign(X.nan, -y);
                 assert(isNaN(e) && signbit(e));
             }
-        }();
+        }}
     }
 }
 
 /*********************************
-Returns $(D -1) if $(D x < 0), $(D x) if $(D x == 0), $(D 1) if
+Returns `-1` if $(D x < 0), `x` if $(D x == 0), `1` if
 $(D x > 0), and $(NAN) if x==$(NAN).
  */
 F sgn(F)(F x) @safe pure nothrow @nogc
@@ -6212,6 +7139,14 @@ real NaN(ulong payload) @trusted pure nothrow @nogc
     }
 }
 
+///
+@safe @nogc pure nothrow unittest
+{
+    real a = NaN(1_000_000);
+    assert(isNaN(a));
+    assert(getNaNPayload(a) == 1_000_000);
+}
+
 @system pure nothrow @nogc unittest // not @safe because taking address of local.
 {
     static if (floatTraits!(real).realFormat == RealFormat.ieeeDouble)
@@ -6271,6 +7206,14 @@ ulong getNaNPayload(real x) @trusted pure nothrow @nogc
             w |= (m & 0x00FF_FFFF_F800L) << (22 - 11);
             w |= (m & 0x7FF) << 51;
             return w;
+}
+
+///
+@safe @nogc pure nothrow unittest
+{
+    real a = NaN(1_000_000);
+    assert(isNaN(a));
+    assert(getNaNPayload(a) == 1_000_000);
 }
 
 debug(UnitTest)
@@ -6467,6 +7410,13 @@ float nextUp(float x) @trusted pure nothrow @nogc
     return x;
 }
 
+///
+@safe @nogc pure nothrow unittest
+{
+    assert(nextUp(1.0 - 1.0e-6).feqrel(0.999999) > 16);
+    assert(nextUp(1.0 - real.epsilon).feqrel(1.0) > 16);
+}
+
 /**
  * Calculate the next smallest floating point value before x.
  *
@@ -6612,8 +7562,11 @@ T nextafter(T)(const T x, const T y) @safe pure nothrow @nogc
 
 //real nexttoward(real x, real y) { return core.stdc.math.nexttowardl(x, y); }
 
-/*******************************************
+/**
  * Returns the positive difference between x and y.
+ *
+ * Equivalent to `fmax(x-y, 0)`.
+ *
  * Returns:
  *      $(TABLE_SV
  *      $(TR $(TH x, y)       $(TH fdim(x, y)))
@@ -6623,15 +7576,55 @@ T nextafter(T)(const T x, const T y) @safe pure nothrow @nogc
  */
 real fdim(real x, real y) @safe pure nothrow @nogc { return (x > y) ? x - y : +0.0; }
 
-/****************************************
- * Returns the larger of x and y.
- */
-real fmax(real x, real y) @safe pure nothrow @nogc { return x > y ? x : y; }
+///
+@safe pure nothrow @nogc unittest
+{
+    assert(fdim(2.0, 0.0) == 2.0);
+    assert(fdim(-2.0, 0.0) == 0.0);
+    assert(fdim(real.infinity, 2.0) == real.infinity);
+    assert(fdim(real.nan, 2.0) == 0.0);
+    assert(fdim(2.0, real.nan) == 0.0);
+}
 
-/****************************************
- * Returns the smaller of x and y.
+/**
+ * Returns the larger of x and y.
+ *
+ * If one of the arguments is a NaN, the other is returned.
  */
-real fmin(real x, real y) @safe pure nothrow @nogc { return x < y ? x : y; }
+real fmax(real x, real y) @safe pure nothrow @nogc
+{
+    return (y > x || isNaN(x)) ? y : x;
+}
+
+///
+@safe pure nothrow @nogc unittest
+{
+    assert(fmax(0.0, 2.0) == 2.0);
+    assert(fmax(-2.0, 0.0) == 0.0);
+    assert(fmax(real.infinity, 2.0) == real.infinity);
+    assert(fmax(real.nan, 2.0) == 2.0);
+    assert(fmax(2.0, real.nan) == 2.0);
+}
+
+/**
+ * Returns the smaller of x and y.
+ *
+ * If one of the arguments is a NaN, the other is returned.
+ */
+real fmin(real x, real y) @safe pure nothrow @nogc
+{
+    return (y < x || isNaN(x)) ? y : x;
+}
+
+///
+@safe pure nothrow @nogc unittest
+{
+    assert(fmin(0.0, 2.0) == 0.0);
+    assert(fmin(-2.0, 0.0) == -2.0);
+    assert(fmin(real.infinity, 2.0) == 2.0);
+    assert(fmin(real.nan, 2.0) == 2.0);
+    assert(fmin(2.0, real.nan) == 2.0);
+}
 
 /**************************************
  * Returns (x * y) + z, rounding only once according to the
@@ -6641,7 +7634,17 @@ real fmin(real x, real y) @safe pure nothrow @nogc { return x < y ? x : y; }
  */
 real fma(real x, real y, real z) @safe pure nothrow @nogc { return (x * y) + z; }
 
-/*******************************************************************
+///
+@safe pure nothrow @nogc unittest
+{
+    assert(fma(0.0, 2.0, 2.0) == 2.0);
+    assert(fma(2.0, 2.0, 2.0) == 6.0);
+    assert(fma(real.infinity, 2.0, 2.0) == real.infinity);
+    assert(fma(real.nan, 2.0, 2.0) is real.nan);
+    assert(fma(2.0, 2.0, real.nan) is real.nan);
+}
+
+/**
  * Compute the value of x $(SUPERSCRIPT n), where n is an integer
  */
 Unqual!F pow(F, G)(F x, G n) @nogc @trusted pure nothrow
@@ -6692,6 +7695,15 @@ if (isFloatingPoint!(F) && isIntegral!(G))
     return p;
 }
 
+///
+@safe pure nothrow @nogc unittest
+{
+    assert(pow(2.0, 5) == 32.0);
+    assert(pow(1.5, 9).feqrel(38.4433) > 16);
+    assert(pow(real.nan, 2) is real.nan);
+    assert(pow(real.infinity, 2) == real.infinity);
+}
+
 @safe pure nothrow @nogc unittest
 {
     // Make sure it instantiates and works properly on immutable values and
@@ -6722,7 +7734,6 @@ if (isFloatingPoint!(F) && isIntegral!(G))
     // See https://issues.dlang.org/show_bug.cgi?id=5628
     version (X86_64)   enum BUG5628 = false;
     else version (ARM) enum BUG5628 = false;
-    else version (GNU) enum BUG5628 = false;
     else               enum BUG5628 = true;
 
     static if (BUG5628)
@@ -6734,7 +7745,7 @@ if (isFloatingPoint!(F) && isIntegral!(G))
     assert(feqrel(pow(x, neg3),  1 / (x * x * x)) >= real.mant_dig - 1);
 }
 
-@system unittest
+@safe @nogc nothrow unittest
 {
     assert(equalsDigit(pow(2.0L, 10.0L), 1024, 19));
 }
@@ -6809,7 +7820,16 @@ if (isIntegral!I && isFloatingPoint!F)
     return pow(cast(real) x, cast(Unqual!F) y);
 }
 
-/*********************************************
+///
+@safe pure nothrow @nogc unittest
+{
+    assert(pow(2, 5.0) == 32.0);
+    assert(pow(7, 3.0) == 343.0);
+    assert(pow(2, real.nan) is real.nan);
+    assert(pow(2, real.infinity) == real.infinity);
+}
+
+/**
  * Calculates x$(SUPERSCRIPT y).
  *
  * $(TABLE_SV
@@ -6837,7 +7857,7 @@ if (isIntegral!I && isFloatingPoint!F)
  *      $(TD no)        $(TD no) )
  * $(TR $(TD -$(INFIN))      $(TD $(LT) 0.0, not odd integer) $(TD +0.0)
  *      $(TD no)        $(TD no) )
- * $(TR $(TD $(PLUSMN)1.0)   $(TD $(PLUSMN)$(INFIN))          $(TD $(NAN))
+ * $(TR $(TD $(PLUSMN)1.0)   $(TD $(PLUSMN)$(INFIN))          $(TD -$(NAN))
  *      $(TD no)        $(TD yes) )
  * $(TR $(TD $(LT) 0.0)      $(TD finite, nonintegral)        $(TD $(NAN))
  *      $(TD no)        $(TD yes))
@@ -7052,6 +8072,29 @@ if (isFloatingPoint!(F) && isFloatingPoint!(G))
     return impl(x, y);
 }
 
+///
+@safe pure nothrow @nogc unittest
+{
+    assert(pow(1.0, 2.0) == 1.0);
+    assert(pow(0.0, 0.0) == 1.0);
+    assert(pow(1.5, 10.0).feqrel(57.665) > 16);
+
+    // special values
+    assert(pow(1.5, real.infinity) == real.infinity);
+    assert(pow(0.5, real.infinity) == 0.0);
+    assert(pow(1.5, -real.infinity) == 0.0);
+    assert(pow(0.5, -real.infinity) == real.infinity);
+    assert(pow(real.infinity, 1.0) == real.infinity);
+    assert(pow(real.infinity, -1.0) == 0.0);
+    assert(pow(-real.infinity, 1.0) == -real.infinity);
+    assert(pow(-real.infinity, 2.0) == real.infinity);
+    assert(pow(-real.infinity, -1.0) == -0.0);
+    assert(pow(-real.infinity, -2.0) == 0.0);
+    assert(pow(1.0, real.infinity) is -real.nan);
+    assert(pow(0.0, -1.0) == real.infinity);
+    assert(pow(real.nan, 0.0) == 1.0);
+}
+
 @safe pure nothrow @nogc unittest
 {
     // Test all the special values.  These unittests can be run on Windows
@@ -7119,6 +8162,160 @@ if (isFloatingPoint!(F) && isFloatingPoint!(G))
     assert(approxEqual(pow(twoI, three), 8.0));
 }
 
+/** Computes the value of a positive integer `x`, raised to the power `n`, modulo `m`.
+ *
+ *  Params:
+ *      x = base
+ *      n = exponent
+ *      m = modulus
+ *
+ *  Returns:
+ *      `x` to the power `n`, modulo `m`.
+ *      The return type is the largest of `x`'s and `m`'s type.
+ *
+ * The function requires that all values have unsigned types.
+ */
+Unqual!(Largest!(F, H)) powmod(F, G, H)(F x, G n, H m)
+if (isUnsigned!F && isUnsigned!G && isUnsigned!H)
+{
+    import std.meta : AliasSeq;
+
+    alias T = Unqual!(Largest!(F, H));
+    static if (T.sizeof <= 4)
+    {
+        alias DoubleT = AliasSeq!(void, ushort, uint, void, ulong)[T.sizeof];
+    }
+
+    static T mulmod(T a, T b, T c)
+    {
+        static if (T.sizeof == 8)
+        {
+            static T addmod(T a, T b, T c)
+            {
+                b = c - b;
+                if (a >= b)
+                    return a - b;
+                else
+                    return c - b + a;
+            }
+
+            T result = 0, tmp;
+
+            b %= c;
+            while (a > 0)
+            {
+                if (a & 1)
+                    result = addmod(result, b, c);
+
+                a >>= 1;
+                b = addmod(b, b, c);
+            }
+
+            return result;
+        }
+        else
+        {
+            DoubleT result = cast(DoubleT) (cast(DoubleT) a * cast(DoubleT) b);
+            return result % c;
+        }
+    }
+
+    T base = x, result = 1, modulus = m;
+    Unqual!G exponent = n;
+
+    while (exponent > 0)
+    {
+        if (exponent & 1)
+            result = mulmod(result, base, modulus);
+
+        base = mulmod(base, base, modulus);
+        exponent >>= 1;
+    }
+
+    return result;
+}
+
+///
+@safe pure nothrow @nogc unittest
+{
+    assert(powmod(1U, 10U, 3U) == 1);
+    assert(powmod(3U, 2U, 6U) == 3);
+    assert(powmod(5U, 5U, 15U) == 5);
+    assert(powmod(2U, 3U, 5U) == 3);
+    assert(powmod(2U, 4U, 5U) == 1);
+    assert(powmod(2U, 5U, 5U) == 2);
+}
+
+@safe pure nothrow @nogc unittest
+{
+    ulong a = 18446744073709551615u, b = 20u, c = 18446744073709551610u;
+    assert(powmod(a, b, c) == 95367431640625u);
+    a = 100; b = 7919; c = 18446744073709551557u;
+    assert(powmod(a, b, c) == 18223853583554725198u);
+    a = 117; b = 7919; c = 18446744073709551557u;
+    assert(powmod(a, b, c) == 11493139548346411394u);
+    a = 134; b = 7919; c = 18446744073709551557u;
+    assert(powmod(a, b, c) == 10979163786734356774u);
+    a = 151; b = 7919; c = 18446744073709551557u;
+    assert(powmod(a, b, c) == 7023018419737782840u);
+    a = 168; b = 7919; c = 18446744073709551557u;
+    assert(powmod(a, b, c) == 58082701842386811u);
+    a = 185; b = 7919; c = 18446744073709551557u;
+    assert(powmod(a, b, c) == 17423478386299876798u);
+    a = 202; b = 7919; c = 18446744073709551557u;
+    assert(powmod(a, b, c) == 5522733478579799075u);
+    a = 219; b = 7919; c = 18446744073709551557u;
+    assert(powmod(a, b, c) == 15230218982491623487u);
+    a = 236; b = 7919; c = 18446744073709551557u;
+    assert(powmod(a, b, c) == 5198328724976436000u);
+
+    a = 0; b = 7919; c = 18446744073709551557u;
+    assert(powmod(a, b, c) == 0);
+    a = 123; b = 0; c = 18446744073709551557u;
+    assert(powmod(a, b, c) == 1);
+
+    immutable ulong a1 = 253, b1 = 7919, c1 = 18446744073709551557u;
+    assert(powmod(a1, b1, c1) == 3883707345459248860u);
+
+    uint x = 100 ,y = 7919, z = 1844674407u;
+    assert(powmod(x, y, z) == 1613100340u);
+    x = 134; y = 7919; z = 1844674407u;
+    assert(powmod(x, y, z) == 734956622u);
+    x = 151; y = 7919; z = 1844674407u;
+    assert(powmod(x, y, z) == 1738696945u);
+    x = 168; y = 7919; z = 1844674407u;
+    assert(powmod(x, y, z) == 1247580927u);
+    x = 185; y = 7919; z = 1844674407u;
+    assert(powmod(x, y, z) == 1293855176u);
+    x = 202; y = 7919; z = 1844674407u;
+    assert(powmod(x, y, z) == 1566963682u);
+    x = 219; y = 7919; z = 1844674407u;
+    assert(powmod(x, y, z) == 181227807u);
+    x = 236; y = 7919; z = 1844674407u;
+    assert(powmod(x, y, z) == 217988321u);
+    x = 253; y = 7919; z = 1844674407u;
+    assert(powmod(x, y, z) == 1588843243u);
+
+    x = 0; y = 7919; z = 184467u;
+    assert(powmod(x, y, z) == 0);
+    x = 123; y = 0; z = 1844674u;
+    assert(powmod(x, y, z) == 1);
+
+    immutable ubyte x1 = 117;
+    immutable uint y1 = 7919;
+    immutable uint z1 = 1844674407u;
+    auto res = powmod(x1, y1, z1);
+    assert(is(typeof(res) == uint));
+    assert(res == 9479781u);
+
+    immutable ushort x2 = 123;
+    immutable uint y2 = 203;
+    immutable ubyte z2 = 113;
+    auto res2 = powmod(x2, y2, z2);
+    assert(is(typeof(res2) == ushort));
+    assert(res2 == 42u);
+}
+
 /**************************************
  * To what precision is x equal to y?
  *
@@ -7140,27 +8337,11 @@ if (isFloatingPoint!(X))
     /* Public Domain. Author: Don Clugston, 18 Aug 2005.
      */
     alias F = floatTraits!(X);
-    static if (F.realFormat == RealFormat.ibmExtended)
+    static if (F.realFormat == RealFormat.ieeeSingle
+            || F.realFormat == RealFormat.ieeeDouble
+            || F.realFormat == RealFormat.ieeeExtended
+            || F.realFormat == RealFormat.ieeeQuadruple)
     {
-        if (cast(double*)(&x)[MANTISSA_MSB] == cast(double*)(&y)[MANTISSA_MSB])
-        {
-            return double.mant_dig
-            + feqrel(cast(double*)(&x)[MANTISSA_LSB],
-                    cast(double*)(&y)[MANTISSA_LSB]);
-        }
-        else
-        {
-            return feqrel(cast(double*)(&x)[MANTISSA_MSB],
-                    cast(double*)(&y)[MANTISSA_MSB]);
-        }
-    }
-    else
-    {
-        static assert(F.realFormat == RealFormat.ieeeSingle
-                    || F.realFormat == RealFormat.ieeeDouble
-                    || F.realFormat == RealFormat.ieeeExtended
-                    || F.realFormat == RealFormat.ieeeQuadruple);
-
         if (x == y)
             return X.mant_dig; // ensure diff != 0, cope with INF.
 
@@ -7204,6 +8385,26 @@ if (isFloatingPoint!(X))
             return 1;
         } else return 0;
     }
+    else
+    {
+        static assert(false, "Not implemented for this architecture");
+    }
+}
+
+///
+@safe pure unittest
+{
+    assert(feqrel(2.0, 2.0) == 53);
+    assert(feqrel(2.0f, 2.0f) == 24);
+    assert(feqrel(2.0, double.nan) == 0);
+
+    // Test that numbers are within n digits of each
+    // other by testing if feqrel > n * log2(10)
+
+    // five digits
+    assert(feqrel(2.0, 2.00001) > 16);
+    // ten digits
+    assert(feqrel(2.0, 2.00000000001) > 33);
 }
 
 @safe pure nothrow @nogc unittest
@@ -7287,7 +8488,7 @@ in
     assert(signbit(x) == signbit(y));
     assert(x == x && y == y);
 }
-body
+do
 {
     // Runtime behaviour for contract violation:
     // If signs are opposite, or one is a NaN, return 0.
@@ -7421,7 +8622,7 @@ in
 {
     assert(A.length > 0);
 }
-body
+do
 {
     static if (is(Unqual!T2 == real))
     {
@@ -7431,6 +8632,20 @@ body
     {
         return polyImplBase(x, A);
     }
+}
+
+/// ditto
+Unqual!(CommonType!(T1, T2)) poly(T1, T2, int N)(T1 x, ref const T2[N] A) @safe pure nothrow @nogc
+if (isFloatingPoint!T1 && isFloatingPoint!T2 && N > 0 && N <= 10)
+{
+    // statically unrolled version for up to 10 coefficients
+    typeof(return) r = A[N - 1];
+    static foreach (i; 1 .. N)
+    {
+        r *= x;
+        r += A[N - 1 - i];
+    }
+    return r;
 }
 
 ///
@@ -7669,7 +8884,8 @@ private real polyImpl(real x, in real[] A) @trusted pure nothrow @nogc
         lhs = First item to compare.
         rhs = Second item to compare.
         maxRelDiff = Maximum allowable difference relative to `rhs`.
-        maxAbsDiff = Maximum absolute difference.
+        Defaults to `1e-2`.
+        maxAbsDiff = Maximum absolute difference. Defaults to `1e-5`.
 
    Returns:
        `true` if the two items are approximately equal under either criterium.
@@ -7679,6 +8895,9 @@ private real polyImpl(real x, in real[] A) @trusted pure nothrow @nogc
        `approxEqual` returns `true` if and only if the ranges have the same
        number of elements and if `approxEqual` evaluates to `true` for each
        pair of elements.
+
+    See_Also:
+        Use $(LREF feqrel) to get the number of equal bits in the mantissa.
  */
 bool approxEqual(T, U, V)(T lhs, U rhs, V maxRelDiff, V maxAbsDiff = 1e-5)
 {
@@ -7748,9 +8967,7 @@ bool approxEqual(T, U, V)(T lhs, U rhs, V maxRelDiff, V maxAbsDiff = 1e-5)
     }
 }
 
-/**
-   Returns $(D approxEqual(lhs, rhs, 1e-2, 1e-5)).
- */
+/// ditto
 bool approxEqual(T, U)(T lhs, U rhs)
 {
     return approxEqual(lhs, rhs, 1e-2, 1e-5);
@@ -7850,9 +9067,12 @@ bool approxEqual(T, U)(T lhs, U rhs)
 
     // Verify correct behavior for large inputs
     assert(!isNaN(tan(0x1p63)));
-    assert(!isNaN(tan(0x1p300L)));
     assert(!isNaN(tan(-0x1p63)));
-    assert(!isNaN(tan(-0x1p300L)));
+    static if (real.mant_dig >= 64)
+    {
+        assert(!isNaN(tan(0x1p300L)));
+        assert(!isNaN(tan(-0x1p300L)));
+    }
 }
 
 @safe pure nothrow unittest
@@ -7890,8 +9110,8 @@ bool approxEqual(T, U)(T lhs, U rhs)
  * )
  *
  * Returns:
- *      negative value if $(D x) precedes $(D y) in the order specified above;
- *      0 if $(D x) and $(D y) are identical, and positive value otherwise.
+ *      negative value if `x` precedes `y` in the order specified above;
+ *      0 if `x` and `y` are identical, and positive value otherwise.
  *
  * See_Also:
  *      $(MYREF isIdentical)
@@ -8074,8 +9294,8 @@ if (isFloatingPoint!T)
 @safe unittest
 {
     import std.meta : AliasSeq;
-    foreach (T; AliasSeq!(float, double, real))
-    {
+    static foreach (T; AliasSeq!(float, double, real))
+    {{
         T[] values = [-cast(T) NaN(20), -cast(T) NaN(10), -T.nan, -T.infinity,
                       -T.max, -T.max / 2, T(-16.0), T(-1.0).nextDown,
                       T(-1.0), T(-1.0).nextUp,
@@ -8099,7 +9319,7 @@ if (isFloatingPoint!T)
             }
             assert(cmp(x, x) == 0);
         }
-    }
+    }}
 }
 
 private enum PowType
@@ -8149,7 +9369,7 @@ private T powFloatingPointImpl(PowType type, T)(T x)
 }
 
 /**
- * Gives the next power of two after $(D val). `T` can be any built-in
+ * Gives the next power of two after `val`. `T` can be any built-in
  * numerical type.
  *
  * If the operation would lead to an over/underflow, this function will
@@ -8159,7 +9379,7 @@ private T powFloatingPointImpl(PowType type, T)(T x)
  *     val = any number
  *
  * Returns:
- *     the next power of two after $(D val)
+ *     the next power of two after `val`
  */
 T nextPow2(T)(const T val)
 if (isIntegral!T)
@@ -8239,8 +9459,8 @@ if (isFloatingPoint!T)
 {
     import std.meta : AliasSeq;
 
-    foreach (T; AliasSeq!(float, double, real))
-    {
+    static foreach (T; AliasSeq!(float, double, real))
+    {{
         enum T subNormal = T.min_normal / 2;
 
         static if (subNormal) assert(nextPow2(subNormal) == T.min_normal);
@@ -8264,7 +9484,7 @@ if (isFloatingPoint!T)
 
         assert(nextPow2(T.infinity) == T.infinity);
         assert(nextPow2(T.init).isNaN);
-    }
+    }}
 }
 
 @safe @nogc pure nothrow unittest // Issue 15973
@@ -8277,14 +9497,14 @@ if (isFloatingPoint!T)
 }
 
 /**
- * Gives the last power of two before $(D val). $(T) can be any built-in
+ * Gives the last power of two before `val`. $(T) can be any built-in
  * numerical type.
  *
  * Params:
  *     val = any number
  *
  * Returns:
- *     the last power of two before $(D val)
+ *     the last power of two before `val`
  */
 T truncPow2(T)(const T val)
 if (isIntegral!T)
@@ -8369,7 +9589,7 @@ if (isFloatingPoint!T)
 {
     import std.meta : AliasSeq;
 
-    foreach (T; AliasSeq!(float, double, real))
+    static foreach (T; AliasSeq!(float, double, real))
     {
         assert(truncPow2(T(0.0)) == 0.0);
 
@@ -8465,26 +9685,26 @@ if (isNumeric!X)
     immutable smallP7 = pow(7.0L, -35);
     immutable bigP7 = pow(7.0L, 30);
 
-    foreach (X; AliasSeq!(float, double, real))
-    {
+    static foreach (X; AliasSeq!(float, double, real))
+    {{
         immutable min_sub = X.min_normal * X.epsilon;
 
-        foreach (x; AliasSeq!(smallP2, min_sub, X.min_normal, .25L, 0.5L, 1.0L,
-                              2.0L, 8.0L, pow(2.0L, X.max_exp - 1), bigP2))
+        foreach (x; [smallP2, min_sub, X.min_normal, .25L, 0.5L, 1.0L,
+                              2.0L, 8.0L, pow(2.0L, X.max_exp - 1), bigP2])
         {
             assert( isPowerOf2(cast(X) x));
             assert(!isPowerOf2(cast(X)-x));
         }
 
-        foreach (x; AliasSeq!(0.0L, 3 * min_sub, smallP7, 0.1L, 1337.0L, bigP7, X.max, real.nan, real.infinity))
+        foreach (x; [0.0L, 3 * min_sub, smallP7, 0.1L, 1337.0L, bigP7, X.max, real.nan, real.infinity])
         {
             assert(!isPowerOf2(cast(X) x));
             assert(!isPowerOf2(cast(X)-x));
         }
-    }
+    }}
 
-    foreach (X; AliasSeq!(byte, ubyte, short, ushort, int, uint, long, ulong))
-    {
+    static foreach (X; AliasSeq!(byte, ubyte, short, ushort, int, uint, long, ulong))
+    {{
         foreach (x; [1, 2, 4, 8, (X.max >>> 1) + 1])
         {
             assert( isPowerOf2(cast(X) x));
@@ -8494,5 +9714,5 @@ if (isNumeric!X)
 
         foreach (x; [0, 3, 5, 13, 77, X.min, X.max])
             assert(!isPowerOf2(cast(X) x));
-    }
+    }}
 }

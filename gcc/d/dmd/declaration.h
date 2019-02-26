@@ -12,27 +12,23 @@
 
 #include "dsymbol.h"
 #include "mtype.h"
-#include "objc.h"
+#include "tokens.h"
 
 class Expression;
 class Statement;
 class LabelDsymbol;
 class Initializer;
-class Module;
 class ForeachStatement;
+struct Ensure
+{
+    Identifier *id;
+    Statement *ensure;
+};
 class FuncDeclaration;
-class ExpInitializer;
 class StructDeclaration;
-struct InterState;
 struct CompiledCtfeFunction;
 struct ObjcSelector;
 struct IntRange;
-
-enum LINK;
-enum TOK;
-enum MATCH;
-enum PURE;
-enum PINLINE;
 
 #define STCundefined    0LL
 #define STCstatic       1LL
@@ -90,25 +86,7 @@ enum PINLINE;
 #define STCmaybescope    0x1000000000000LL // parameter might be 'scope'
 #define STCscopeinferred 0x2000000000000LL // 'scope' has been inferred and should not be part of mangling
 #define STCfuture        0x4000000000000LL // introducing new base class function
-#define STClocal         0x8000000000000LL // do not forward (see ddmd.dsymbol.ForwardingScopeDsymbol).
-
-const StorageClass STCStorageClass = (STCauto | STCscope | STCstatic | STCextern | STCconst | STCfinal |
-    STCabstract | STCsynchronized | STCdeprecated | STCfuture | STCoverride | STClazy | STCalias |
-    STCout | STCin |
-    STCmanifest | STCimmutable | STCshared | STCwild | STCnothrow | STCnogc | STCpure | STCref | STCtls |
-    STCgshared | STCproperty | STCsafe | STCtrusted | STCsystem | STCdisable | STClocal);
-
-struct Match
-{
-    int count;                  // number of matches found
-    MATCH last;                 // match level of lastf
-    FuncDeclaration *lastf;     // last matching function we found
-    FuncDeclaration *nextf;     // current matching function
-    FuncDeclaration *anyf;      // pick a func, any func, to use for error recovery
-};
-
-void functionResolve(Match *m, Dsymbol *fd, Loc loc, Scope *sc, Objects *tiargs, Type *tthis, Expressions *fargs);
-int overloadApply(Dsymbol *fstart, void *param, int (*fp)(void *, Dsymbol *));
+#define STClocal         0x8000000000000LL // do not forward (see dmd.dsymbol.ForwardingScopeDsymbol).
 
 void ObjectNotFound(Identifier *id);
 
@@ -123,41 +101,38 @@ public:
     Prot protection;
     LINK linkage;
     int inuse;                  // used to detect cycles
-    const char *mangleOverride;      // overridden symbol with pragma(mangle, "...")
+    DArray<const char> mangleOverride;      // overridden symbol with pragma(mangle, "...")
 
-    Declaration(Identifier *id);
-    void semantic(Scope *sc);
     const char *kind() const;
-    d_uns64 size(Loc loc);
-    int checkModify(Loc loc, Scope *sc, Type *t, Expression *e1, int flag);
+    d_uns64 size(const Loc &loc);
 
     Dsymbol *search(const Loc &loc, Identifier *ident, int flags = SearchLocalsOnly);
 
-    bool isStatic() { return (storage_class & STCstatic) != 0; }
+    bool isStatic() const { return (storage_class & STCstatic) != 0; }
     virtual bool isDelete();
     virtual bool isDataseg();
     virtual bool isThreadlocal();
     virtual bool isCodeseg() const;
-    bool isCtorinit()     { return (storage_class & STCctorinit) != 0; }
-    bool isFinal()        { return (storage_class & STCfinal) != 0; }
-    bool isAbstract()     { return (storage_class & STCabstract) != 0; }
-    bool isConst()        { return (storage_class & STCconst) != 0; }
-    bool isImmutable()    { return (storage_class & STCimmutable) != 0; }
-    bool isWild()         { return (storage_class & STCwild) != 0; }
-    bool isAuto()         { return (storage_class & STCauto) != 0; }
-    bool isScope()        { return (storage_class & STCscope) != 0; }
-    bool isSynchronized() { return (storage_class & STCsynchronized) != 0; }
-    bool isParameter()    { return (storage_class & STCparameter) != 0; }
-    bool isDeprecated()   { return (storage_class & STCdeprecated) != 0; }
-    bool isOverride()     { return (storage_class & STCoverride) != 0; }
-    bool isResult()       { return (storage_class & STCresult) != 0; }
-    bool isField()        { return (storage_class & STCfield) != 0; }
+    bool isCtorinit() const     { return (storage_class & STCctorinit) != 0; }
+    bool isFinal() const        { return (storage_class & STCfinal) != 0; }
+    virtual bool isAbstract()   { return (storage_class & STCabstract) != 0; }
+    bool isConst() const        { return (storage_class & STCconst) != 0; }
+    bool isImmutable() const    { return (storage_class & STCimmutable) != 0; }
+    bool isWild() const         { return (storage_class & STCwild) != 0; }
+    bool isAuto() const         { return (storage_class & STCauto) != 0; }
+    bool isScope() const        { return (storage_class & STCscope) != 0; }
+    bool isSynchronized() const { return (storage_class & STCsynchronized) != 0; }
+    bool isParameter() const    { return (storage_class & STCparameter) != 0; }
+    bool isDeprecated()         { return (storage_class & STCdeprecated) != 0; }
+    bool isOverride() const     { return (storage_class & STCoverride) != 0; }
+    bool isResult() const       { return (storage_class & STCresult) != 0; }
+    bool isField() const        { return (storage_class & STCfield) != 0; }
 
-    bool isIn()    { return (storage_class & STCin) != 0; }
-    bool isOut()   { return (storage_class & STCout) != 0; }
-    bool isRef()   { return (storage_class & STCref) != 0; }
+    bool isIn()  const  { return (storage_class & STCin) != 0; }
+    bool isOut() const  { return (storage_class & STCout) != 0; }
+    bool isRef() const  { return (storage_class & STCref) != 0; }
 
-    bool isFuture() { return (storage_class & STCfuture) != 0; }
+    bool isFuture() const { return (storage_class & STCfuture) != 0; }
 
     Prot prot();
 
@@ -175,7 +150,6 @@ public:
 
     TypeTuple *tupletype;       // !=NULL if this is a type tuple
 
-    TupleDeclaration(Loc loc, Identifier *ident, Objects *objects);
     Dsymbol *syntaxCopy(Dsymbol *);
     const char *kind() const;
     Type *getType();
@@ -195,12 +169,8 @@ public:
     Dsymbol *overnext;          // next in overload list
     Dsymbol *_import;           // !=NULL if unresolved internal alias for selective import
 
-    AliasDeclaration(Loc loc, Identifier *ident, Type *type);
-    AliasDeclaration(Loc loc, Identifier *ident, Dsymbol *s);
     static AliasDeclaration *create(Loc loc, Identifier *id, Type *type);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
-    void aliasSemantic(Scope *sc);
     bool overloadInsert(Dsymbol *s);
     const char *kind() const;
     Type *getType();
@@ -221,9 +191,7 @@ public:
     Dsymbol *aliassym;
     bool hasOverloads;
 
-    OverDeclaration(Identifier *ident, Dsymbol *s, bool hasOverloads = true);
     const char *kind() const;
-    void semantic(Scope *sc);
     bool equals(RootObject *o);
     bool overloadInsert(Dsymbol *s);
 
@@ -244,9 +212,10 @@ public:
     unsigned offset;
     unsigned sequenceNumber;     // order the variables are declared
     FuncDeclarations nestedrefs; // referenced by these lexically nested functions
-    bool isargptr;              // if parameter that _argptr points to
     structalign_t alignment;
+    bool isargptr;              // if parameter that _argptr points to
     bool ctorinit;              // it has been initialized in a ctor
+    bool iscatchvar;            // this is the exception object variable in catch() clause
     bool onstack;               // it is a class that was allocated on the stack
     bool mynew;                 // it is a class new'd with custom operator new
     int canassign;              // it can be assigned to
@@ -264,11 +233,10 @@ public:
     Expression *edtor;          // if !=NULL, does the destruction of the variable
     IntRange *range;            // if !NULL, the variable is known to be within the range
 
-    VarDeclaration(Loc loc, Type *t, Identifier *id, Initializer *init);
+    VarDeclarations *maybes;    // STCmaybescope variables that are assigned to this STCmaybescope variable
+
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
     void setFieldOffset(AggregateDeclaration *ad, unsigned *poffset, bool isunion);
-    void semantic2(Scope *sc);
     const char *kind() const;
     AggregateDeclaration *isThis();
     bool needThis();
@@ -286,7 +254,6 @@ public:
     Expression *getConstInitializer(bool needFullType = true);
     Expression *expandInitializer(Loc loc);
     void checkCtorConstInit();
-    bool checkNestedReference(Scope *sc, Loc loc);
     Dsymbol *toAlias();
     // Eliminate need for dynamic_cast
     VarDeclaration *isVarDeclaration() { return (VarDeclaration *)this; }
@@ -302,8 +269,6 @@ class SymbolDeclaration : public Declaration
 public:
     StructDeclaration *dsym;
 
-    SymbolDeclaration(Loc loc, StructDeclaration *dsym);
-
     // Eliminate need for dynamic_cast
     SymbolDeclaration *isSymbolDeclaration() { return (SymbolDeclaration *)this; }
     void accept(Visitor *v) { v->visit(this); }
@@ -314,10 +279,8 @@ class TypeInfoDeclaration : public VarDeclaration
 public:
     Type *tinfo;
 
-    TypeInfoDeclaration(Type *tinfo);
     static TypeInfoDeclaration *create(Type *tinfo);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
     const char *toChars();
 
     TypeInfoDeclaration *isTypeInfoDeclaration() { return this; }
@@ -327,7 +290,6 @@ public:
 class TypeInfoStructDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoStructDeclaration(Type *tinfo);
     static TypeInfoStructDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -336,7 +298,6 @@ public:
 class TypeInfoClassDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoClassDeclaration(Type *tinfo);
     static TypeInfoClassDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -345,7 +306,6 @@ public:
 class TypeInfoInterfaceDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoInterfaceDeclaration(Type *tinfo);
     static TypeInfoInterfaceDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -354,7 +314,6 @@ public:
 class TypeInfoPointerDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoPointerDeclaration(Type *tinfo);
     static TypeInfoPointerDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -363,7 +322,6 @@ public:
 class TypeInfoArrayDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoArrayDeclaration(Type *tinfo);
     static TypeInfoArrayDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -372,7 +330,6 @@ public:
 class TypeInfoStaticArrayDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoStaticArrayDeclaration(Type *tinfo);
     static TypeInfoStaticArrayDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -381,7 +338,6 @@ public:
 class TypeInfoAssociativeArrayDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoAssociativeArrayDeclaration(Type *tinfo);
     static TypeInfoAssociativeArrayDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -390,7 +346,6 @@ public:
 class TypeInfoEnumDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoEnumDeclaration(Type *tinfo);
     static TypeInfoEnumDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -399,7 +354,6 @@ public:
 class TypeInfoFunctionDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoFunctionDeclaration(Type *tinfo);
     static TypeInfoFunctionDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -408,7 +362,6 @@ public:
 class TypeInfoDelegateDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoDelegateDeclaration(Type *tinfo);
     static TypeInfoDelegateDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -417,7 +370,6 @@ public:
 class TypeInfoTupleDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoTupleDeclaration(Type *tinfo);
     static TypeInfoTupleDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -426,7 +378,6 @@ public:
 class TypeInfoConstDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoConstDeclaration(Type *tinfo);
     static TypeInfoConstDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -435,7 +386,6 @@ public:
 class TypeInfoInvariantDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoInvariantDeclaration(Type *tinfo);
     static TypeInfoInvariantDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -444,7 +394,6 @@ public:
 class TypeInfoSharedDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoSharedDeclaration(Type *tinfo);
     static TypeInfoSharedDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -453,7 +402,6 @@ public:
 class TypeInfoWildDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoWildDeclaration(Type *tinfo);
     static TypeInfoWildDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -462,7 +410,6 @@ public:
 class TypeInfoVectorDeclaration : public TypeInfoDeclaration
 {
 public:
-    TypeInfoVectorDeclaration(Type *tinfo);
     static TypeInfoVectorDeclaration *create(Type *tinfo);
 
     void accept(Visitor *v) { v->visit(this); }
@@ -473,7 +420,6 @@ public:
 class ThisDeclaration : public VarDeclaration
 {
 public:
-    ThisDeclaration(Loc loc, Type *t);
     Dsymbol *syntaxCopy(Dsymbol *);
     ThisDeclaration *isThisDeclaration() { return this; }
     void accept(Visitor *v) { v->visit(this); }
@@ -502,20 +448,14 @@ typedef Expression *(*builtin_fp)(Loc loc, FuncDeclaration *fd, Expressions *arg
 void add_builtin(const char *mangle, builtin_fp fp);
 void builtin_init();
 
-#define FUNCFLAGpurityInprocess    1    // working on determining purity
-#define FUNCFLAGsafetyInprocess    2    // working on determining safety
-#define FUNCFLAGnothrowInprocess   4    // working on determining nothrow
-#define FUNCFLAGnogcInprocess      8    // working on determining @nogc
-#define FUNCFLAGreturnInprocess 0x10    // working on inferring 'return' for parameters
-#define FUNCFLAGinlineScanned   0x20    // function has been scanned for inline possibilities
-#define FUNCFLAGinferScope      0x40    // infer 'scope' for parameters
-
 class FuncDeclaration : public Declaration
 {
 public:
     Types *fthrows;                     // Array of Type's of exceptions (not used)
-    Statement *frequire;
-    Statement *fensure;
+    Statements *frequires;              // in contracts
+    Ensures *fensures;                  // out contracts
+    Statement *frequire;                // lowered in contract
+    Statement *fensure;                 // lowered out contract
     Statement *fbody;
 
     FuncDeclarations foverrides;        // functions this function overrides
@@ -524,8 +464,7 @@ public:
 
     const char *mangleString;           // mangled symbol created from mangleExact()
 
-    Identifier *outId;                  // identifier for out statement
-    VarDeclaration *vresult;            // variable corresponding to outId
+    VarDeclaration *vresult;            // result variable for out contracts
     LabelDsymbol *returnLabel;          // where the return goes
 
     // used to prevent symbols in different
@@ -551,6 +490,8 @@ public:
     CompiledCtfeFunction *ctfeCode;     // Compiled code for interpreter
     int inlineNest;                     // !=0 if nested inline
     bool isArrayOp;                     // true if array operation
+    bool eh_none;                       /// true if no exception unwinding is needed
+
     // true if errors in semantic3 this function's frame ptr
     bool semantic3Errors;
     ForeachStatement *fes;              // if foreach body, this is the foreach
@@ -597,15 +538,10 @@ public:
 
     unsigned flags;                     // FUNCFLAGxxxxx
 
-    FuncDeclaration(Loc loc, Loc endloc, Identifier *id, StorageClass storage_class, Type *type);
-    static FuncDeclaration *create(Loc loc, Loc endloc, Identifier *id, StorageClass storage_class, Type *type);
+    static FuncDeclaration *create(const Loc &loc, const Loc &endloc, Identifier *id, StorageClass storage_class, Type *type);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
-    void semantic2(Scope *sc);
-    void semantic3(Scope *sc);
     bool functionSemantic();
     bool functionSemantic3();
-    bool checkForwardRef(Loc loc);
     // called from semantic3
     VarDeclaration *declareThis(Scope *sc, AggregateDeclaration *ad);
     bool equals(RootObject *o);
@@ -615,22 +551,23 @@ public:
     BaseClass *overrideInterface();
     bool overloadInsert(Dsymbol *s);
     FuncDeclaration *overloadExactMatch(Type *t);
-    FuncDeclaration *overloadModMatch(Loc loc, Type *tthis, bool &hasOverloads);
+    FuncDeclaration *overloadModMatch(const Loc &loc, Type *tthis, bool &hasOverloads);
     TemplateDeclaration *findTemplateDeclRoot();
     bool inUnittest();
     MATCH leastAsSpecialized(FuncDeclaration *g);
     LabelDsymbol *searchLabel(Identifier *ident);
-    int getLevel(Loc loc, Scope *sc, FuncDeclaration *fd); // lexical nesting level difference
+    int getLevel(const Loc &loc, Scope *sc, FuncDeclaration *fd); // lexical nesting level difference
     const char *toPrettyChars(bool QualifyTypes = false);
     const char *toFullSignature();  // for diagnostics, e.g. 'int foo(int x, int y) pure'
-    bool isMain();
-    bool isCMain();
-    bool isWinMain();
-    bool isDllMain();
+    bool isMain() const;
+    bool isCMain() const;
+    bool isWinMain() const;
+    bool isDllMain() const;
     bool isExport() const;
     bool isImportedSymbol() const;
     bool isCodeseg() const;
     bool isOverloadable();
+    bool isAbstract();
     PURE isPure();
     PURE isPureBypassingInference();
     bool setImpure();
@@ -643,22 +580,20 @@ public:
     bool isNogcBypassingInference();
     bool setGC();
 
-    void printGCUsage(Loc loc, const char *warn);
+    void printGCUsage(const Loc &loc, const char *warn);
     bool isolateReturn();
     bool parametersIntersect(Type *t);
     virtual bool isNested();
     AggregateDeclaration *isThis();
     bool needThis();
     bool isVirtualMethod();
-    virtual bool isVirtual();
-    virtual bool isFinalFunc();
+    virtual bool isVirtual() const;
+    bool isFinalFunc() const;
     virtual bool addPreInvariant();
     virtual bool addPostInvariant();
     const char *kind() const;
     FuncDeclaration *isUnique();
-    bool checkNestedReference(Scope *sc, Loc loc);
     bool needsClosure();
-    bool checkClosure();
     bool hasNestedFrameRefs();
     void buildResultVar(Scope *sc, Type *tret);
     Statement *mergeFrequire(Statement *);
@@ -667,7 +602,6 @@ public:
 
     static FuncDeclaration *genCfunc(Parameters *args, Type *treturn, const char *name, StorageClass stc=0);
     static FuncDeclaration *genCfunc(Parameters *args, Type *treturn, Identifier *id, StorageClass stc=0);
-    void checkDmain();
 
     FuncDeclaration *isFuncDeclaration() { return this; }
 
@@ -675,19 +609,11 @@ public:
     void accept(Visitor *v) { v->visit(this); }
 };
 
-FuncDeclaration *resolveFuncCall(Loc loc, Scope *sc, Dsymbol *s,
-        Objects *tiargs,
-        Type *tthis,
-        Expressions *arguments,
-        int flags = 0);
-
 class FuncAliasDeclaration : public FuncDeclaration
 {
 public:
     FuncDeclaration *funcalias;
     bool hasOverloads;
-
-    FuncAliasDeclaration(Identifier *ident, FuncDeclaration *funcalias, bool hasOverloads = true);
 
     FuncAliasDeclaration *isFuncAliasDeclaration() { return this; }
     const char *kind() const;
@@ -705,12 +631,10 @@ public:
     // backend
     bool deferToObj;
 
-    FuncLiteralDeclaration(Loc loc, Loc endloc, Type *type, TOK tok,
-        ForeachStatement *fes, Identifier *id = NULL);
     Dsymbol *syntaxCopy(Dsymbol *);
     bool isNested();
     AggregateDeclaration *isThis();
-    bool isVirtual();
+    bool isVirtual() const;
     bool addPreInvariant();
     bool addPostInvariant();
 
@@ -725,12 +649,10 @@ public:
 class CtorDeclaration : public FuncDeclaration
 {
 public:
-    CtorDeclaration(Loc loc, Loc endloc, StorageClass stc, Type *type);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
     const char *kind() const;
     const char *toChars();
-    bool isVirtual();
+    bool isVirtual() const;
     bool addPreInvariant();
     bool addPostInvariant();
 
@@ -741,10 +663,8 @@ public:
 class PostBlitDeclaration : public FuncDeclaration
 {
 public:
-    PostBlitDeclaration(Loc loc, Loc endloc, StorageClass stc, Identifier *id);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
-    bool isVirtual();
+    bool isVirtual() const;
     bool addPreInvariant();
     bool addPostInvariant();
     bool overloadInsert(Dsymbol *s);
@@ -756,13 +676,10 @@ public:
 class DtorDeclaration : public FuncDeclaration
 {
 public:
-    DtorDeclaration(Loc loc, Loc endloc);
-    DtorDeclaration(Loc loc, Loc endloc, StorageClass stc, Identifier *id);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
     const char *kind() const;
     const char *toChars();
-    bool isVirtual();
+    bool isVirtual() const;
     bool addPreInvariant();
     bool addPostInvariant();
     bool overloadInsert(Dsymbol *s);
@@ -774,12 +691,9 @@ public:
 class StaticCtorDeclaration : public FuncDeclaration
 {
 public:
-    StaticCtorDeclaration(Loc loc, Loc endloc, StorageClass stc);
-    StaticCtorDeclaration(Loc loc, Loc endloc, const char *name, StorageClass stc);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
     AggregateDeclaration *isThis();
-    bool isVirtual();
+    bool isVirtual() const;
     bool addPreInvariant();
     bool addPostInvariant();
     bool hasStaticCtorOrDtor();
@@ -791,7 +705,6 @@ public:
 class SharedStaticCtorDeclaration : public StaticCtorDeclaration
 {
 public:
-    SharedStaticCtorDeclaration(Loc loc, Loc endloc, StorageClass stc);
     Dsymbol *syntaxCopy(Dsymbol *);
 
     SharedStaticCtorDeclaration *isSharedStaticCtorDeclaration() { return this; }
@@ -803,12 +716,9 @@ class StaticDtorDeclaration : public FuncDeclaration
 public:
     VarDeclaration *vgate;      // 'gate' variable
 
-    StaticDtorDeclaration(Loc loc, Loc endloc, StorageClass stc);
-    StaticDtorDeclaration(Loc loc, Loc endloc, const char *name, StorageClass stc);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
     AggregateDeclaration *isThis();
-    bool isVirtual();
+    bool isVirtual() const;
     bool hasStaticCtorOrDtor();
     bool addPreInvariant();
     bool addPostInvariant();
@@ -820,7 +730,6 @@ public:
 class SharedStaticDtorDeclaration : public StaticDtorDeclaration
 {
 public:
-    SharedStaticDtorDeclaration(Loc loc, Loc endloc, StorageClass stc);
     Dsymbol *syntaxCopy(Dsymbol *);
 
     SharedStaticDtorDeclaration *isSharedStaticDtorDeclaration() { return this; }
@@ -830,10 +739,8 @@ public:
 class InvariantDeclaration : public FuncDeclaration
 {
 public:
-    InvariantDeclaration(Loc loc, Loc endloc, StorageClass stc, Identifier *id = NULL);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
-    bool isVirtual();
+    bool isVirtual() const;
     bool addPreInvariant();
     bool addPostInvariant();
 
@@ -849,11 +756,9 @@ public:
     // toObjFile() these nested functions after this one
     FuncDeclarations deferredNested;
 
-    UnitTestDeclaration(Loc loc, Loc endloc, StorageClass stc, char *codedoc);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
     AggregateDeclaration *isThis();
-    bool isVirtual();
+    bool isVirtual() const;
     bool addPreInvariant();
     bool addPostInvariant();
 
@@ -867,11 +772,9 @@ public:
     Parameters *parameters;
     int varargs;
 
-    NewDeclaration(Loc loc, Loc endloc, StorageClass stc, Parameters *arguments, int varargs);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
     const char *kind() const;
-    bool isVirtual();
+    bool isVirtual() const;
     bool addPreInvariant();
     bool addPostInvariant();
 
@@ -885,12 +788,10 @@ class DeleteDeclaration : public FuncDeclaration
 public:
     Parameters *parameters;
 
-    DeleteDeclaration(Loc loc, Loc endloc, StorageClass stc, Parameters *arguments);
     Dsymbol *syntaxCopy(Dsymbol *);
-    void semantic(Scope *sc);
     const char *kind() const;
     bool isDelete();
-    bool isVirtual();
+    bool isVirtual() const;
     bool addPreInvariant();
     bool addPostInvariant();
 

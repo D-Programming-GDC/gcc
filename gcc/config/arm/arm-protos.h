@@ -381,6 +381,7 @@ extern void arm_cpu_cpp_builtins (struct cpp_reader *);
 
 /* Defined in arm-d.c  */
 extern void arm_d_target_versions (void);
+extern const char *arm_d_float_abi_type (void);
 
 extern bool arm_is_constant_pool_ref (rtx);
 

@@ -3,14 +3,14 @@
  * This module provides functions to uniform calculating hash values for different types
  *
  * Copyright: Copyright Igor Stepanov 2013-2013.
- * License:   $(WEB www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
+ * License:   $(HTTP www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
  * Authors:   Igor Stepanov
  * Source: $(DRUNTIMESRC core/internal/_hash.d)
  */
 module core.internal.hash;
 
 import core.internal.convert;
-import core.internal.traits : allSatisfy;
+import core.internal.traits : allSatisfy, Unconst;
 
 // If true ensure that positive zero and negative zero have the same hash.
 // Historically typeid(float).getHash did this but hashOf(float) did not.
@@ -57,6 +57,18 @@ private enum isFinalClassWithAddressBasedHash(T) = __traits(isFinalClass, T)
     static assert(!isFinalClassWithAddressBasedHash!C3);
 }
 
+private template isCppClassWithoutHash(T)
+{
+    static if (!is(T == class) && !is(T == interface))
+        enum isCppClassWithoutHash = false;
+    else
+    {
+        import core.internal.traits : Unqual;
+        enum bool isCppClassWithoutHash = __traits(getLinkage, T) == "C++"
+            && !is(Unqual!T : Object) && !hasCallableToHash!T;
+    }
+}
+
 /+
 Is it valid to calculate a hash code for T based on the bits of its
 representation? Always false for interfaces, dynamic arrays, and
@@ -80,11 +92,11 @@ private template canBitwiseHash(T)
         enum canBitwiseHash = true;
     else static if (is(T == class))
     {
-        enum canBitwiseHash = isFinalClassWithAddressBasedHash!T;
+        enum canBitwiseHash = isFinalClassWithAddressBasedHash!T || isCppClassWithoutHash!T;
     }
     else static if (is(T == interface))
     {
-        enum canBitwiseHash = false;
+        enum canBitwiseHash = isCppClassWithoutHash!T;
     }
     else static if (is(T == struct))
     {
@@ -493,7 +505,7 @@ private enum _hashOfStruct =
 q{
     enum bool isChained = is(typeof(seed) : size_t);
     static if (!isChained) enum size_t seed = 0;
-    static if (hasCallableToHash!T) //CTFE depends on toHash()
+    static if (hasCallableToHash!(typeof(val))) //CTFE depends on toHash()
     {
         static if (isChained)
             return hashOf(cast(size_t) val.toHash(), seed);
@@ -504,7 +516,15 @@ q{
     {
         static if (__traits(hasMember, T, "toHash") && is(typeof(T.toHash) == function))
         {
-            pragma(msg, "Warning: struct "~__traits(identifier, T)~" has method toHash, however it cannot be called with "~T.stringof~" this.");
+            // TODO: in the future maybe this should be changed to a static
+            // assert(0), because if there's a `toHash` the programmer probably
+            // expected it to be called and a compilation failure here will
+            // expose a bug in his code.
+            //   In the future we also might want to disallow non-const toHash
+            // altogether.
+            pragma(msg, "Warning: struct "~__traits(identifier, T)
+                ~" has method toHash, however it cannot be called with "
+                ~typeof(val).stringof~" this.");
         }
 
         static if (T.tupleof.length == 0)
@@ -513,13 +533,12 @@ q{
         }
         else static if ((is(T == struct) && !canBitwiseHash!T) || T.tupleof.length == 1)
         {
-            size_t h = void;
-            static if (isChained) h = seed;
-            foreach (i, F; typeof(val.tupleof))
+            static if (isChained) size_t h = seed;
+            static foreach (i, F; typeof(val.tupleof))
             {
                 static if (__traits(isStaticArray, F))
                 {
-                    static if (i == 0 && !isChained) h = 0;
+                    static if (i == 0 && !isChained) size_t h = 0;
                     static if (F.sizeof > 0 && canBitwiseHash!F)
                         // May use smallBytesHash instead of bytesHash.
                         h = bytesHashWithExactSizeAndAlignment!F(toUbyte(val.tupleof[i]), h);
@@ -534,7 +553,7 @@ q{
                     static if (hasCallableToHash!F)
                     {
                         static if (i == 0 && !isChained)
-                            h = val.tupleof[i].toHash();
+                            size_t h = val.tupleof[i].toHash();
                         else
                             h = hashOf(cast(size_t) val.tupleof[i].toHash(), h);
                     }
@@ -542,21 +561,21 @@ q{
                     {
                         // Handle the single member case separately to avoid unnecessarily using bytesHash.
                         static if (i == 0 && !isChained)
-                            h = hashOf(val.tupleof[i].tupleof[0]);
+                            size_t h = hashOf(val.tupleof[i].tupleof[0]);
                         else
                             h = hashOf(val.tupleof[i].tupleof[0], h);
                     }
                     else static if (canBitwiseHash!F)
                     {
                         // May use smallBytesHash instead of bytesHash.
-                        static if (i == 0 && !isChained) h = 0;
+                        static if (i == 0 && !isChained) size_t h = 0;
                         h = bytesHashWithExactSizeAndAlignment!F(toUbyte(val.tupleof[i]), h);
                     }
                     else
                     {
                         // Nothing special happening.
                         static if (i == 0 && !isChained)
-                            h = hashOf(val.tupleof[i]);
+                            size_t h = hashOf(val.tupleof[i]);
                         else
                             h = hashOf(val.tupleof[i], h);
                     }
@@ -565,7 +584,7 @@ q{
                 {
                     // Nothing special happening.
                     static if (i == 0 && !isChained)
-                        h = hashOf(val.tupleof[i]);
+                        size_t h = hashOf(val.tupleof[i]);
                     else
                         h = hashOf(val.tupleof[i], h);
                 }
@@ -592,6 +611,7 @@ q{
 //struct or union hash
 size_t hashOf(T)(scope const auto ref T val, size_t seed = 0)
 if (!is(T == enum) && (is(T == struct) || is(T == union))
+    && !is(T == const) && !is(T == immutable)
     && canBitwiseHash!T)
 {
     mixin(_hashOfStruct);
@@ -609,6 +629,15 @@ if (!is(T == enum) && (is(T == struct) || is(T == union))
 size_t hashOf(T)(auto ref T val, size_t seed)
 if (!is(T == enum) && (is(T == struct) || is(T == union))
     && !canBitwiseHash!T)
+{
+    mixin(_hashOfStruct);
+}
+
+//struct or union hash - https://issues.dlang.org/show_bug.cgi?id=19332 (support might be removed in future)
+size_t hashOf(T)(scope auto ref T val, size_t seed = 0)
+if (!is(T == enum) && (is(T == struct) || is(T == union))
+    && (is(T == const) || is(T == immutable))
+    && canBitwiseHash!T && !canBitwiseHash!(Unconst!T))
 {
     mixin(_hashOfStruct);
 }
