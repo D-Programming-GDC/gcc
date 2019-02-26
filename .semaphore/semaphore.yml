@@ -1,0 +1,23 @@
+version: v1.0
+name: GDC Semaphore 2.0 test pipeline
+agent:
+  machine:
+    type: e1-standard-8
+    os_image: ubuntu1804
+
+blocks:
+  - name: "GDC"
+    task:
+      jobs:
+      - name: "Testsuite"
+        commands:
+          - checkout --use-cache
+          - ./buildci.sh setup
+          - ./buildci.sh build
+          - ./buildci.sh testsuite
+      - name: "Unit Tests"
+        commands:
+          - checkout --use-cache
+          - ./buildci.sh setup
+          - ./buildci.sh build
+          - ./buildci.sh unittests
