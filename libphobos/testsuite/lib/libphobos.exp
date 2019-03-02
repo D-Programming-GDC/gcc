@@ -149,6 +149,11 @@ proc libphobos_init { args } {
 	append ld_library_path ":${blddir}/src/.libs"
     }
 
+    if [file isdirectory "${blddir}/../libgcc/shlib"] {
+        append ld_library_path ":${blddir}/../libgcc/shlib"
+    }
+
+
     set_ld_library_path_env_vars
 
     libphobos_maybe_build_wrapper "${objdir}/testglue.o"

@@ -154,6 +154,9 @@ proc gdc_link_flags { paths } {
 	    append flags "-L${gccpath}/libstdc++-v3/src/.libs "
 	    append ld_library_path ":${gccpath}/libstdc++-v3/src/.libs"
 	}
+	if [file isdirectory "${gccpath}/libgcc/shlib"] {
+	    append ld_library_path ":${gccpath}/libgcc/shlib"
+	}
 	append ld_library_path [gcc-set-multilib-library-path $GDC_UNDER_TEST]
     } else {
 	global tool_root_dir
