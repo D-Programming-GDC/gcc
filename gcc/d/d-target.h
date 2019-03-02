@@ -28,7 +28,16 @@
 /* Each target can provide their own.  */
 extern struct gcc_targetdm targetdm;
 
-/* Used by target to add predefined version idenditiers.  */
+/* Used by target to add predefined version identifiers.  */
 extern void d_add_builtin_version (const char *);
+
+/* Used by target to emit ModuleInfo references to minfo section.  */
+extern tree emit_minfo_section (void *decl, tree minfo);
+
+/* Used by target to register minfo section with runtime.  */
+extern void register_minfo_section ();
+
+/* Default implementation to register minfo section with runtime.  */
+extern void d_register_module_default (void *module_decl, tree minfo);
 
 #endif /* GCC_D_TARGET_H  */

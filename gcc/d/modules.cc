@@ -35,7 +35,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stringpool.h"
 
 #include "d-tree.h"
-
+#include "d-target.h"
 
 /* D generates module information to inform the runtime library which modules
    need some kind of special handling.  All `static this()', `static ~this()',
@@ -393,12 +393,13 @@ build_dso_registry_var (const char * name, tree type)
 }
 
 /* Place a reference to the ModuleInfo symbol MINFO for DECL into the
-   `minfo' section.  Then create the global ctors/dtors to call the
-   _d_dso_registry function if necessary.  */
+   `minfo' section. Used by the d_register_module target hook.  */
 
-static void
-register_moduleinfo (Module *decl, tree minfo)
+tree
+emit_minfo_section (void *vdecl, tree minfo)
 {
+  Module *decl = (Module *) vdecl;
+
   gcc_assert (targetm_common.have_named_sections);
 
   /* Build the ModuleInfo reference, this is done once for every Module.  */
@@ -417,6 +418,15 @@ register_moduleinfo (Module *decl, tree minfo)
   d_pushdecl (mref);
   rest_of_decl_compilation (mref, 1, 0);
 
+  return mref;
+}
+
+/* Create the global ctors/dtors to call the _d_dso_registry function
+   an register the minfo section.  */
+
+void
+register_minfo_section ()
+{
   /* Only for the first D module being emitted do we need to generate a static
      constructor and destructor for.  These are only required once per shared
      library, so it's safe to emit them only once per object file.  */
@@ -451,6 +461,15 @@ register_moduleinfo (Module *decl, tree minfo)
   vec_safe_push (static_dtor_list, dso_dtor);
 
   first_module = false;
+}
+
+/* Implement TARGET_D_REGISTER_MODULE using a named minfo section.  */
+
+void
+d_register_module_default (void *module_decl, tree minfo)
+{
+  emit_minfo_section (module_decl, minfo);
+  register_minfo_section ();
 }
 
 /* Convenience function for layout_moduleinfo_fields.  Adds a field of TYPE to
@@ -691,7 +710,7 @@ layout_moduleinfo (Module *decl)
   d_finish_decl (minfo);
 
   /* Register the module against druntime.  */
-  register_moduleinfo (decl, minfo);
+  targetdm.d_register_module ((void *) decl, minfo);
 }
 
 /* Send the Module AST class DECL to GCC back-end.  */
