@@ -56,5 +56,13 @@ implement pthreads would return @code{sizeof(pthread_mutex_t)}.",
  unsigned, (void),
  hook_uint_void_0)
 
+/* Return information about system ABI. */
+DEFHOOK
+(d_system_linkage,
+ "Return information about the system ABI used. This information is used\n\
+to implement the @code{version(System)} statement.",
+ LINKAGE, (void),
+ d_system_linkage_default)
+
 /* Close the 'struct gcc_targetdm' definition.  */
 HOOK_VECTOR_END (C90_EMPTY_HACK)

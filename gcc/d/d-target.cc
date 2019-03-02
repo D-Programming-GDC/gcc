@@ -390,5 +390,16 @@ Target::cppParameterType (Parameter *arg)
 LINK
 Target::systemLinkage (void)
 {
-  return LINKc;
+  if (targetdm.d_system_linkage() == LINKAGE_WINDOWS)
+    return LINKwindows;
+  else
+    return LINKc;
+}
+
+/* Implement TARGET_D_SYSTEM_LINKAGE default.  */
+
+LINKAGE
+d_system_linkage_default ()
+{
+  return LINKAGE_C;
 }
