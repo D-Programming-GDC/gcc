@@ -52,6 +52,8 @@ struct __emutls_array
 
 void *__emutls_get_address (struct __emutls_object *);
 void __emutls_register_common (struct __emutls_object *, word, word, void *);
+typedef void (*iterate_callback)(void* mem, pointer size, void *user);
+void __emutls_iterate_memory (iterate_callback cb, void *user);
 
 #ifdef __GTHREADS
 #ifdef __GTHREAD_MUTEX_INIT
@@ -62,10 +64,111 @@ static __gthread_mutex_t emutls_mutex;
 static __gthread_key_t emutls_key;
 static pointer emutls_size;
 
+static struct __emutls_array *emutls_arrays;
+
+static void
+emutls_array_register (struct __emutls_array *arr)
+{
+  __gthread_mutex_lock (&emutls_mutex);
+
+  if (emutls_arrays == NULL)
+    {
+      emutls_arrays = calloc (32 + 1, sizeof (void *));
+      emutls_arrays->size = 32;
+    }
+
+  // Try to write to an empty slot
+  pointer slot_index = 0;
+  for (; slot_index < emutls_arrays->size; slot_index++)
+    {
+      if (emutls_arrays->data[slot_index] == NULL)
+	{
+	  emutls_arrays->data[slot_index] = (void *) arr;
+	  break;
+	}
+    }
+  // No empty slot?
+  if (slot_index == emutls_arrays->size)
+    {
+      emutls_arrays = realloc (emutls_arrays, (slot_index + 2) * sizeof (void *));
+      if (emutls_arrays == NULL)
+	abort ();
+      emutls_arrays->size = slot_index + 1;
+      emutls_arrays->data[slot_index] = (void *) arr;
+    }
+
+  __gthread_mutex_unlock (&emutls_mutex);
+}
+
+static void
+emutls_array_update (struct __emutls_array *old, struct __emutls_array *updated)
+{
+  if (updated == old)
+    return;
+
+  __gthread_mutex_lock (&emutls_mutex);
+
+  for (pointer slot_index = 0; slot_index < emutls_arrays->size; slot_index++)
+    {
+      if (emutls_arrays->data[slot_index] == (void *) old)
+        emutls_arrays->data[slot_index] = (void *) updated;
+    }
+
+  __gthread_mutex_unlock (&emutls_mutex);
+}
+
+static void
+emutls_array_unregister (struct __emutls_array *arr)
+{
+  __gthread_mutex_lock (&emutls_mutex);
+
+  for (pointer slot_index = 0; slot_index < emutls_arrays->size; slot_index++)
+    {
+      if (emutls_arrays->data[slot_index] == (void *) arr)
+        emutls_arrays->data[slot_index] = NULL;
+    }
+
+  __gthread_mutex_unlock (&emutls_mutex);
+}
+
+static void
+emutls_array_iterate (struct __emutls_array *arr, iterate_callback cb, void *user)
+{
+  if (arr == NULL)
+    return;
+
+  for (pointer i = 0; i < arr->size; i++)
+    {
+      void *ptr = arr->data[i];
+      if (ptr)
+	{
+	  pointer size = ((pointer*) ptr)[-2];
+	  cb (ptr, size, user);
+	}
+    }
+}
+
+void
+__emutls_iterate_memory (iterate_callback cb, void *user)
+{
+  __gthread_mutex_lock (&emutls_mutex);
+  if (emutls_arrays == NULL)
+    return;
+
+  for (pointer slot_index = 0; slot_index < emutls_arrays->size; slot_index++)
+    {
+      struct __emutls_array *arr = (struct __emutls_array *) emutls_arrays->data[slot_index];
+      emutls_array_iterate (arr, cb, user);
+    }
+
+  __gthread_mutex_unlock (&emutls_mutex);
+}
+
 static void
 emutls_destroy (void *ptr)
 {
   struct __emutls_array *arr = ptr;
+  emutls_array_unregister (arr);
   pointer size = arr->size;
   pointer i;
 
@@ -99,19 +202,21 @@ emutls_alloc (struct __emutls_object *obj)
      emutls_destroy accordingly.  */
   if (obj->align <= sizeof (void *))
     {
-      ptr = malloc (obj->size + sizeof (void *));
+      ptr = malloc (obj->size + 2 * sizeof (void *));
       if (ptr == NULL)
 	abort ();
-      ((void **) ptr)[0] = ptr;
-      ret = ptr + sizeof (void *);
+      ((pointer *) ptr)[0] = obj->size;
+      ((void **) ptr)[1] = ptr;
+      ret = ptr + 2 * sizeof (void *);
     }
   else
     {
-      ptr = malloc (obj->size + sizeof (void *) + obj->align - 1);
+      ptr = malloc (obj->size + 2 * sizeof (void *) + obj->align - 1);
       if (ptr == NULL)
 	abort ();
-      ret = (void *) (((pointer) (ptr + sizeof (void *) + obj->align - 1))
+      ret = (void *) (((pointer) (ptr + 2 * sizeof (void *) + obj->align - 1))
 		      & ~(pointer)(obj->align - 1));
+      ((pointer *) ret)[-2] = obj->size;
       ((void **) ret)[-1] = ptr;
     }
 
@@ -161,9 +266,11 @@ __emutls_get_address (struct __emutls_object *obj)
 	abort ();
       arr->size = size;
       __gthread_setspecific (emutls_key, (void *) arr);
+      emutls_array_register (arr);
     }
   else if (__builtin_expect (offset > arr->size, 0))
     {
+      struct __emutls_array *orig_arr = arr;
       pointer orig_size = arr->size;
       pointer size = orig_size * 2;
       if (offset > size)
@@ -175,6 +282,7 @@ __emutls_get_address (struct __emutls_object *obj)
       memset (arr->data + orig_size, 0,
 	      (size - orig_size) * sizeof (void *));
       __gthread_setspecific (emutls_key, (void *) arr);
+      emutls_array_update (orig_arr, arr);
     }
 
   void *ret = arr->data[offset - 1];

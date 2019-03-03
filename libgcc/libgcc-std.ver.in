@@ -1944,3 +1944,8 @@ GCC_7.0.0 {
   __PFX__divmoddi4
   __PFX__divmodti4
 }
+
+%inherit GCC_9.0.0 GCC_7.0.0
+GCC_9.0.0 {
+  __emutls_iterate_memory
+}
