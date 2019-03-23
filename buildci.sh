@@ -30,6 +30,7 @@ environment() {
     # project_dir:              directory of checked out sources.
     # cache_dir:                tarballs of downloaded dependencies cached
     #                           between builds.
+    # log_dir:                  where to save testsuite logs to upload them
     # build_host:               host triplet that build is ran from.
     # build_host_canonical:     canonical version of host triplet.
     # build_target:             target triplet of the compiler to build.
@@ -46,6 +47,8 @@ environment() {
         fi;
         project_dir=${SEMAPHORE_PROJECT_DIR}
         cache_dir=${SEMAPHORE_CACHE_DIR}
+        log_dir=${PWD}/logs
+        mkdir -p ${log_dir}
         cache restore $SEMAPHORE_PROJECT_NAME-deps
         build_host=$($CC -dumpmachine)
         build_host_canonical=$(/usr/share/misc/config.sub ${build_host})
@@ -55,6 +58,8 @@ environment() {
         build_bootstrap="disable"
     elif [ "${BUILDKITE}" = "true" ]; then
         project_dir=${PWD}
+        log_dir=${PWD}/logs
+        mkdir -p ${log_dir}
         cache_dir=${BUILDKITE_CACHE_DIR}
         build_host=$($CC -dumpmachine)
         build_host_canonical=$(/usr/share/misc/config.sub ${build_host})
@@ -263,6 +268,9 @@ testsuite() {
     make check-gcc RUNTESTFLAGS="help.exp"
     make ${make_flags} check-gcc-d RUNTESTFLAGS="${build_test_flags}"
 
+    # Upload testsuite results
+    save_logs
+
     # For now, be lenient towards any failures, just report on them.
     summary
 }
@@ -272,9 +280,11 @@ unittests() {
     if [ "${build_supports_phobos}" = "yes" ]; then
         cd ${project_dir}/build
         if ! make ${make_flags} -C ${build_target_phobos} check RUNTESTFLAGS="${build_test_flags}"; then
+            save_logs
             echo "== Unittest has failures =="
             exit 1
         fi
+        save_logs
     fi
 }
 
@@ -346,6 +356,16 @@ summary() {
         { next; }
         ' | sed "s/\([\`\$\\\\]\)/\\\\\\1/g"
     fi
+}
+
+save_logs() {
+    cd ${project_dir}/build
+    test -d ./gcc/testsuite/gdc && find ./gcc/testsuite/gdc \
+        \( -name \*.sum -o -name \*.log \) -exec cp --parents \{\} ${log_dir} \;
+    test -d ./gcc/testsuite/gcc && find ./gcc/testsuite/gcc \
+        \( -name \*.sum -o -name \*.log \) -exec cp --parents \{\} ${log_dir} \;
+    find ./*/libphobos/testsuite \( -name \*.sum -o -name \*.log \) \
+        -exec cp --parents \{\} ${log_dir} \;
 }
 
 ## Run a single build task or all at once.
