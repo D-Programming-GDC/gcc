@@ -55,4 +55,10 @@
 #undef tolower
 #define tolower(c) TOLOWER(c)
 
+/* We do not include direct.h as it conflicts with system.h.  */
+#ifdef _WIN32
+#undef _mkdir
+#define _mkdir(p) mkdir(p, 0)
+#endif
+
 #endif  /* GCC_D_SYSTEM_H  */
