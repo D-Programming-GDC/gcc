@@ -33,6 +33,7 @@ version (CRuntime_Glibc) enum SharedELF = true;
 else version (CRuntime_Musl) enum SharedELF = true;
 else version (FreeBSD) enum SharedELF = true;
 else version (NetBSD) enum SharedELF = true;
+else version (OpenBSD) enum SharedELF = true;
 else version (DragonFlyBSD) enum SharedELF = true;
 else version (CRuntime_UClibc) enum SharedELF = true;
 else version (Solaris) enum SharedELF = true;
@@ -62,6 +63,12 @@ else version (NetBSD)
     import core.sys.netbsd.dlfcn;
     import core.sys.netbsd.sys.elf;
     import core.sys.netbsd.sys.link_elf;
+}
+else version (OpenBSD)
+{
+    import core.sys.openbsd.dlfcn;
+    import core.sys.openbsd.sys.elf;
+    import core.sys.openbsd.sys.link_elf;
 }
 else version (DragonFlyBSD)
 {
@@ -134,11 +141,6 @@ struct DSO
         return _moduleGroup;
     }
 
-    @property immutable(FuncTable)[] ehTables() const nothrow @nogc
-    {
-        return null;
-    }
-
     @property inout(void[])[] gcRanges() inout nothrow @nogc
     {
         return _gcRanges[];
@@ -180,6 +182,7 @@ __gshared bool _isRuntimeInitialized;
 version (FreeBSD) private __gshared void* dummy_ref;
 version (DragonFlyBSD) private __gshared void* dummy_ref;
 version (NetBSD) private __gshared void* dummy_ref;
+version (OpenBSD) private __gshared void* dummy_ref;
 version (Solaris) private __gshared void* dummy_ref;
 
 /****
@@ -192,6 +195,7 @@ void initSections() nothrow @nogc
     version (FreeBSD) dummy_ref = &_d_dso_registry;
     version (DragonFlyBSD) dummy_ref = &_d_dso_registry;
     version (NetBSD) dummy_ref = &_d_dso_registry;
+    version (OpenBSD) dummy_ref = &_d_dso_registry;
     version (Solaris) dummy_ref = &_d_dso_registry;
 }
 
@@ -714,19 +718,21 @@ version (Shared)
 @nogc nothrow:
     link_map* linkMapForHandle(void* handle)
     {
-        link_map* map;
-        const success = dlinfo(handle, RTLD_DI_LINKMAP, &map) == 0;
-        safeAssert(success, "Failed to get DSO info.");
-        return map;
+        static if (__traits(compiles, RTLD_DI_LINKMAP))
+        {
+            link_map* map;
+            const success = dlinfo(handle, RTLD_DI_LINKMAP, &map) == 0;
+            safeAssert(success, "Failed to get DSO info.");
+            return map;
+        }
+        else version (OpenBSD)
+        {
+            safeAssert(handle !is null, "Failed to get DSO info.");
+            return cast(link_map*)handle;
+        }
+        else
+            static assert(0, "unimplemented");
     }
-
-     link_map* exeLinkMap(link_map* map)
-     {
-         safeAssert(map !is null, "Invalid link_map.");
-         while (map.l_prev !is null)
-             map = map.l_prev;
-         return map;
-     }
 
     DSO* dsoForHandle(void* handle)
     {
@@ -792,6 +798,8 @@ version (Shared)
                     strtab = cast(const(char)*)(info.dlpi_addr + dyn.d_un.d_ptr); // relocate
                 else version (NetBSD)
                     strtab = cast(const(char)*)(info.dlpi_addr + dyn.d_un.d_ptr); // relocate
+                else version (OpenBSD)
+                    strtab = cast(const(char)*)(info.dlpi_addr + dyn.d_un.d_ptr); // relocate
                 else version (DragonFlyBSD)
                     strtab = cast(const(char)*)(info.dlpi_addr + dyn.d_un.d_ptr); // relocate
                 else version (Solaris)
@@ -821,9 +829,21 @@ version (Shared)
 
     void* handleForName(const char* name)
     {
-        auto handle = .dlopen(name, RTLD_NOLOAD | RTLD_LAZY);
-        version (Solaris) { }
-        else if (handle !is null) .dlclose(handle); // drop reference count
+        version (Solaris) enum refCounted = false;
+        else version (OpenBSD) enum refCounted = false;
+        else enum refCounted = true;
+
+        static if (__traits(compiles, RTLD_NOLOAD))
+            enum flags = (RTLD_NOLOAD | RTLD_LAZY);
+        else
+            enum flags = RTLD_LAZY;
+
+        auto handle = .dlopen(name, flags);
+        static if (refCounted)
+        {
+            if (handle !is null)
+                .dlclose(handle); // drop reference count
+        }
         return handle;
     }
 }
@@ -917,6 +937,7 @@ bool findDSOInfoForAddr(in void* addr, dl_phdr_info* result=null) nothrow @nogc
 {
     version (linux)        enum IterateManually = true;
     else version (NetBSD)  enum IterateManually = true;
+    else version (OpenBSD) enum IterateManually = true;
     else version (Solaris) enum IterateManually = true;
     else                   enum IterateManually = false;
 
@@ -974,29 +995,6 @@ bool findSegmentForAddr(in ref dl_phdr_info info, in void* addr, ElfW!"Phdr"* re
         }
     }
     return false;
-}
-
-version (linux) import core.sys.linux.errno : program_invocation_name;
-// should be in core.sys.freebsd.stdlib
-version (FreeBSD) extern(C) const(char)* getprogname() nothrow @nogc;
-version (DragonFlyBSD) extern(C) const(char)* getprogname() nothrow @nogc;
-version (NetBSD) extern(C) const(char)* getprogname() nothrow @nogc;
-version (Solaris) extern(C) const(char)* getprogname() nothrow @nogc;
-
-@property const(char)* progname() nothrow @nogc
-{
-    version (linux) return program_invocation_name;
-    version (FreeBSD) return getprogname();
-    version (DragonFlyBSD) return getprogname();
-    version (NetBSD) return getprogname();
-    version (Solaris) return getprogname();
-}
-
-const(char)[] dsoName(const char* dlpi_name) nothrow @nogc
-{
-    // the main executable doesn't have a name in its dlpi_name field
-    const char* p = dlpi_name[0] != 0 ? dlpi_name : progname;
-    return p[0 .. strlen(p)];
 }
 
 /**************************

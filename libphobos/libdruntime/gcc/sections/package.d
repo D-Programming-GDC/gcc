@@ -32,6 +32,8 @@ else version (FreeBSD)
     public import gcc.sections.elf_shared;
 else version (NetBSD)
     public import gcc.sections.elf_shared;
+else version (OpenBSD)
+    public import gcc.sections.elf_shared;
 else version (DragonFlyBSD)
     public import gcc.sections.elf_shared;
 else version (Solaris)
