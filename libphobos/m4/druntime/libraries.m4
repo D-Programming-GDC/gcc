@@ -245,3 +245,16 @@ AC_DEFUN([DRUNTIME_LIBRARIES_CLIB],
   AC_SUBST(DCFG_HAVE_QSORT_R)
   AC_LANG_POP([C])
 ])
+
+# DRUNTIME_LIBRARIES_SOCKET
+# -------------------------
+# Autodetect and add ws2_32 library to LIBS if necessary.
+AC_DEFUN([DRUNTIME_LIBRARIES_SOCKET],
+[
+  AC_REQUIRE([DRUNTIME_OS_DETECT])
+  case "$druntime_cv_target_os" in
+    mingw*)
+      LIBS="-lws2_32 $LIBS"
+      ;;
+  esac
+])
