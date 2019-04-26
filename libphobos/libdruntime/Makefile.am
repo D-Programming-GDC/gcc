@@ -71,6 +71,7 @@ if DRUNTIME_OS_LINUX
 endif
 if DRUNTIME_OS_MINGW
     DRUNTIME_SOURCES_CONFIGURED += $(DRUNTIME_DSOURCES_WINDOWS)
+    DRUNTIME_SOURCES_CONFIGURED += $(DRUNTIME_CSOURCES_WINDOWS)
 endif
 if DRUNTIME_OS_SOLARIS
     DRUNTIME_SOURCES_CONFIGURED += $(DRUNTIME_DSOURCES_SOLARIS)
@@ -287,6 +288,8 @@ DRUNTIME_DSOURCES_SOLARIS = core/sys/solaris/dlfcn.d \
 	core/sys/solaris/sys/link.d core/sys/solaris/sys/priocntl.d \
 	core/sys/solaris/sys/procset.d core/sys/solaris/sys/types.d \
 	core/sys/solaris/time.d
+
+DRUNTIME_CSOURCES_WINDOWS = gcc/msvc.c gcc/msvc_math.c
 
 DRUNTIME_DSOURCES_WINDOWS = core/sys/windows/accctrl.d \
 	core/sys/windows/aclapi.d core/sys/windows/aclui.d \
