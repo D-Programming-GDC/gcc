@@ -11979,6 +11979,32 @@ CC="$lt_save_CC"
 
 
 
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for target OS" >&5
+$as_echo_n "checking for target OS... " >&6; }
+if ${druntime_cv_target_os+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  druntime_cv_target_os=`echo $target_os | sed 's/^\([A-Za-z_]+\)/\1/'`
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $druntime_cv_target_os" >&5
+$as_echo "$druntime_cv_target_os" >&6; }
+    if test -z "$druntime_cv_target_os"; then :
+  as_fn_error $? "can't detect target OS" "$LINENO" 5
+fi
+
+
+
+
+  case "$druntime_cv_target_os" in
+    mingw*)
+      { $as_echo "$as_me:${as_lineno-$LINENO}: Shared phobos libraries are not supported for windows targets. Disabled." >&5
+$as_echo "$as_me: Shared phobos libraries are not supported for windows targets. Disabled." >&6;}
+      enable_shared=no
+      enable_static=yes
+      ;;
+  esac
+
+
 
 
   gdc_save_DFLAGS=$GDCFLAGS
@@ -14104,20 +14130,6 @@ fi
 
 
 
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for target OS" >&5
-$as_echo_n "checking for target OS... " >&6; }
-if ${druntime_cv_target_os+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  druntime_cv_target_os=`echo $target_os | sed 's/^\([A-Za-z_]+\)/\1/'`
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $druntime_cv_target_os" >&5
-$as_echo "$druntime_cv_target_os" >&6; }
-    if test -z "$druntime_cv_target_os"; then :
-  as_fn_error $? "can't detect target OS" "$LINENO" 5
-fi
-
-
 
   # Check whether --enable-unix was given.
 if test "${enable_unix+set}" = set; then :
@@ -14496,16 +14508,21 @@ if test "$ac_res" != no; then :
 fi
 
 
-  enable_thread_lib=yes
-  # Check whether --enable-thread-lib was given.
+
+  case "$druntime_cv_target_os" in
+    mingw*)
+      ;;
+    *)
+      enable_thread_lib=yes
+      # Check whether --enable-thread-lib was given.
 if test "${enable_thread_lib+set}" = set; then :
   enableval=$enable_thread_lib;
 fi
 
 
-  if test "x$enable_thread_lib" = "xyes"; then :
+      if test "x$enable_thread_lib" = "xyes"; then :
 
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing pthread_create" >&5
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing pthread_create" >&5
 $as_echo_n "checking for library containing pthread_create... " >&6; }
 if ${ac_cv_search_pthread_create+:} false; then :
   $as_echo_n "(cached) " >&6
@@ -14554,16 +14571,16 @@ fi
 
 else
 
-    if test "x$enable_thread_lib" = "xno"; then :
+        if test "x$enable_thread_lib" = "xno"; then :
 
-      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for thread library" >&5
+          { $as_echo "$as_me:${as_lineno-$LINENO}: checking for thread library" >&5
 $as_echo_n "checking for thread library... " >&6; }
-      { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
+          { $as_echo "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
 $as_echo "disabled" >&6; }
 
 else
 
-      as_ac_Lib=`$as_echo "ac_cv_lib_$enable_thread_lib''_pthread_create" | $as_tr_sh`
+          as_ac_Lib=`$as_echo "ac_cv_lib_$enable_thread_lib''_pthread_create" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pthread_create in -l$enable_thread_lib" >&5
 $as_echo_n "checking for pthread_create in -l$enable_thread_lib... " >&6; }
 if eval \${$as_ac_Lib+:} false; then :
@@ -14600,7 +14617,7 @@ _ACEOF
 
 else
 
-        as_fn_error $? "Thread library not found" "$LINENO" 5
+            as_fn_error $? "Thread library not found" "$LINENO" 5
 
 fi
 
@@ -14608,6 +14625,8 @@ fi
 fi
 
 fi
+      ;;
+  esac
 
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing cosf" >&5
 $as_echo_n "checking for library containing cosf... " >&6; }
@@ -15233,6 +15252,14 @@ ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
+
+
+
+  case "$druntime_cv_target_os" in
+    mingw*)
+      LIBS="-lws2_32 $LIBS"
+      ;;
+  esac
 
 
 

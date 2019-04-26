@@ -120,7 +120,8 @@ target_triplet = @target@
 @DRUNTIME_OS_NETBSD_TRUE@am__append_8 = $(DRUNTIME_DSOURCES_NETBSD)
 @DRUNTIME_OS_OPENBSD_TRUE@am__append_9 = $(DRUNTIME_DSOURCES_OPENBSD)
 @DRUNTIME_OS_LINUX_TRUE@am__append_10 = $(DRUNTIME_DSOURCES_LINUX)
-@DRUNTIME_OS_MINGW_TRUE@am__append_11 = $(DRUNTIME_DSOURCES_WINDOWS)
+@DRUNTIME_OS_MINGW_TRUE@am__append_11 = $(DRUNTIME_DSOURCES_WINDOWS) \
+@DRUNTIME_OS_MINGW_TRUE@	$(DRUNTIME_CSOURCES_WINDOWS)
 @DRUNTIME_OS_SOLARIS_TRUE@am__append_12 = $(DRUNTIME_DSOURCES_SOLARIS)
 # CPU specific sources
 @DRUNTIME_CPU_AARCH64_TRUE@am__append_13 = config/aarch64/switchcontext.S
@@ -206,7 +207,7 @@ am__objects_1 = core/atomic.lo core/attribute.lo core/bitop.lo \
 	gcc/builtins.lo gcc/deh.lo gcc/emutls.lo gcc/gthread.lo \
 	gcc/sections/android.lo gcc/sections/elf_shared.lo \
 	gcc/sections/osx.lo gcc/sections/package.lo \
-	gcc/sections/win32.lo gcc/sections/win64.lo gcc/unwind/arm.lo \
+	gcc/sections/windows.lo gcc/unwind/arm.lo \
 	gcc/unwind/arm_common.lo gcc/unwind/c6x.lo \
 	gcc/unwind/generic.lo gcc/unwind/package.lo gcc/unwind/pe.lo \
 	object.lo rt/aApply.lo rt/aApplyR.lo rt/aaA.lo rt/adi.lo \
@@ -417,8 +418,11 @@ am__objects_23 = core/sys/windows/accctrl.lo \
 	core/sys/windows/winspool.lo core/sys/windows/winsvc.lo \
 	core/sys/windows/winuser.lo core/sys/windows/winver.lo \
 	core/sys/windows/wtsapi32.lo core/sys/windows/wtypes.lo
-@DRUNTIME_OS_MINGW_TRUE@am__objects_24 = $(am__objects_23)
-am__objects_25 = core/sys/solaris/dlfcn.lo core/sys/solaris/elf.lo \
+am__objects_24 = gcc/libgdruntime_la-msvc.lo \
+	gcc/libgdruntime_la-msvc_math.lo
+@DRUNTIME_OS_MINGW_TRUE@am__objects_25 = $(am__objects_23) \
+@DRUNTIME_OS_MINGW_TRUE@	$(am__objects_24)
+am__objects_26 = core/sys/solaris/dlfcn.lo core/sys/solaris/elf.lo \
 	core/sys/solaris/execinfo.lo core/sys/solaris/libelf.lo \
 	core/sys/solaris/link.lo core/sys/solaris/sys/elf.lo \
 	core/sys/solaris/sys/elf_386.lo \
@@ -429,25 +433,25 @@ am__objects_25 = core/sys/solaris/dlfcn.lo core/sys/solaris/elf.lo \
 	core/sys/solaris/sys/priocntl.lo \
 	core/sys/solaris/sys/procset.lo core/sys/solaris/sys/types.lo \
 	core/sys/solaris/time.lo
-@DRUNTIME_OS_SOLARIS_TRUE@am__objects_26 = $(am__objects_25)
-@DRUNTIME_CPU_AARCH64_TRUE@am__objects_27 = config/aarch64/libgdruntime_la-switchcontext.lo
-@DRUNTIME_CPU_ARM_TRUE@am__objects_28 = config/arm/libgdruntime_la-switchcontext.lo
-@DRUNTIME_CPU_MIPS_TRUE@am__objects_29 = config/mips/libgdruntime_la-switchcontext.lo
-@DRUNTIME_CPU_POWERPC_TRUE@am__objects_30 = config/powerpc/libgdruntime_la-switchcontext.lo
-@DRUNTIME_CPU_POWERPC64_TRUE@am__objects_31 = config/powerpc64/libgdruntime_la-callwithstack.lo
-@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_TRUE@am__objects_32 = config/mingw/libgdruntime_la-switchcontext.lo
-@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_FALSE@am__objects_33 = config/x86/libgdruntime_la-switchcontext.lo
-am__objects_34 = $(am__objects_4) $(am__objects_6) $(am__objects_8) \
+@DRUNTIME_OS_SOLARIS_TRUE@am__objects_27 = $(am__objects_26)
+@DRUNTIME_CPU_AARCH64_TRUE@am__objects_28 = config/aarch64/libgdruntime_la-switchcontext.lo
+@DRUNTIME_CPU_ARM_TRUE@am__objects_29 = config/arm/libgdruntime_la-switchcontext.lo
+@DRUNTIME_CPU_MIPS_TRUE@am__objects_30 = config/mips/libgdruntime_la-switchcontext.lo
+@DRUNTIME_CPU_POWERPC_TRUE@am__objects_31 = config/powerpc/libgdruntime_la-switchcontext.lo
+@DRUNTIME_CPU_POWERPC64_TRUE@am__objects_32 = config/powerpc64/libgdruntime_la-callwithstack.lo
+@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_TRUE@am__objects_33 = config/mingw/libgdruntime_la-switchcontext.lo
+@DRUNTIME_CPU_X86_TRUE@@DRUNTIME_OS_MINGW_FALSE@am__objects_34 = config/x86/libgdruntime_la-switchcontext.lo
+am__objects_35 = $(am__objects_4) $(am__objects_6) $(am__objects_8) \
 	$(am__objects_10) $(am__objects_12) $(am__objects_14) \
 	$(am__objects_16) $(am__objects_18) $(am__objects_20) \
-	$(am__objects_22) $(am__objects_24) $(am__objects_26) \
-	$(am__objects_27) $(am__objects_28) $(am__objects_29) \
-	$(am__objects_30) $(am__objects_31) $(am__objects_32) \
-	$(am__objects_33)
-am__objects_35 = gcc/config.lo gcc/libbacktrace.lo
-am__objects_36 = $(am__objects_1) $(am__objects_2) $(am__objects_34) \
-	$(am__objects_35)
-am_libgdruntime_la_OBJECTS = $(am__objects_36)
+	$(am__objects_22) $(am__objects_25) $(am__objects_27) \
+	$(am__objects_28) $(am__objects_29) $(am__objects_30) \
+	$(am__objects_31) $(am__objects_32) $(am__objects_33) \
+	$(am__objects_34)
+am__objects_36 = gcc/config.lo gcc/libbacktrace.lo
+am__objects_37 = $(am__objects_1) $(am__objects_2) $(am__objects_35) \
+	$(am__objects_36)
+am_libgdruntime_la_OBJECTS = $(am__objects_37)
 libgdruntime_la_OBJECTS = $(am_libgdruntime_la_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -759,7 +763,7 @@ DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	core/vararg.d gcc/attribute.d gcc/backtrace.d gcc/builtins.d gcc/deh.d \
 	gcc/emutls.d gcc/gthread.d gcc/sections/android.d \
 	gcc/sections/elf_shared.d gcc/sections/osx.d \
-	gcc/sections/package.d gcc/sections/win32.d gcc/sections/win64.d \
+	gcc/sections/package.d gcc/sections/windows.d \
 	gcc/unwind/arm.d gcc/unwind/arm_common.d gcc/unwind/c6x.d \
 	gcc/unwind/generic.d gcc/unwind/package.d gcc/unwind/pe.d object.d \
 	rt/aApply.d rt/aApplyR.d rt/aaA.d rt/adi.d rt/arrayassign.d \
@@ -882,6 +886,7 @@ DRUNTIME_DSOURCES_SOLARIS = core/sys/solaris/dlfcn.d \
 	core/sys/solaris/sys/procset.d core/sys/solaris/sys/types.d \
 	core/sys/solaris/time.d
 
+DRUNTIME_CSOURCES_WINDOWS = gcc/msvc.c gcc/msvc_math.c
 DRUNTIME_DSOURCES_WINDOWS = core/sys/windows/accctrl.d \
 	core/sys/windows/aclapi.d core/sys/windows/aclui.d \
 	core/sys/windows/basetsd.d core/sys/windows/basetyps.d \
@@ -1114,8 +1119,7 @@ gcc/sections/android.lo: gcc/sections/$(am__dirstamp)
 gcc/sections/elf_shared.lo: gcc/sections/$(am__dirstamp)
 gcc/sections/osx.lo: gcc/sections/$(am__dirstamp)
 gcc/sections/package.lo: gcc/sections/$(am__dirstamp)
-gcc/sections/win32.lo: gcc/sections/$(am__dirstamp)
-gcc/sections/win64.lo: gcc/sections/$(am__dirstamp)
+gcc/sections/windows.lo: gcc/sections/$(am__dirstamp)
 gcc/unwind/$(am__dirstamp):
 	@$(MKDIR_P) gcc/unwind
 	@: > gcc/unwind/$(am__dirstamp)
@@ -1625,6 +1629,8 @@ core/sys/windows/winuser.lo: core/sys/windows/$(am__dirstamp)
 core/sys/windows/winver.lo: core/sys/windows/$(am__dirstamp)
 core/sys/windows/wtsapi32.lo: core/sys/windows/$(am__dirstamp)
 core/sys/windows/wtypes.lo: core/sys/windows/$(am__dirstamp)
+gcc/libgdruntime_la-msvc.lo: gcc/$(am__dirstamp)
+gcc/libgdruntime_la-msvc_math.lo: gcc/$(am__dirstamp)
 core/sys/solaris/$(am__dirstamp):
 	@$(MKDIR_P) core/sys/solaris
 	@: > core/sys/solaris/$(am__dirstamp)
@@ -1836,6 +1842,12 @@ config/x86/libgdruntime_la-switchcontext.lo: config/x86/switchcontext.S
 
 core/stdc/libgdruntime_la-errno_.lo: core/stdc/errno_.c
 	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgdruntime_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o core/stdc/libgdruntime_la-errno_.lo `test -f 'core/stdc/errno_.c' || echo '$(srcdir)/'`core/stdc/errno_.c
+
+gcc/libgdruntime_la-msvc.lo: gcc/msvc.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgdruntime_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o gcc/libgdruntime_la-msvc.lo `test -f 'gcc/msvc.c' || echo '$(srcdir)/'`gcc/msvc.c
+
+gcc/libgdruntime_la-msvc_math.lo: gcc/msvc_math.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgdruntime_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o gcc/libgdruntime_la-msvc_math.lo `test -f 'gcc/msvc_math.c' || echo '$(srcdir)/'`gcc/msvc_math.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
