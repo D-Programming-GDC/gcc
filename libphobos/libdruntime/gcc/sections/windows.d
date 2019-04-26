@@ -20,7 +20,7 @@
 // see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 // <http://www.gnu.org/licenses/>.
 
-module gcc.sections.win64;
+module gcc.sections.windows;
 
 version (CRuntime_Microsoft):
 
@@ -51,14 +51,6 @@ struct SectionGroup
         return _moduleGroup;
     }
 
-    version (Win64)
-    @property immutable(FuncTable)[] ehTables() const nothrow @nogc
-    {
-        auto pbeg = cast(immutable(FuncTable)*)&_deh_beg;
-        auto pend = cast(immutable(FuncTable)*)&_deh_end;
-        return pbeg[0 .. pend - pbeg];
-    }
-
     @property inout(void[])[] gcRanges() inout nothrow @nogc
     {
         return _gcRanges[];
@@ -83,7 +75,10 @@ void initSections() nothrow @nogc
     import rt.sections;
     conservative = !scanDataSegPrecisely();
 
-    if (conservative)
+    version (GNU)
+        enum preciseGCSupport = false;
+
+    if (!preciseGCSupport || conservative)
     {
         _sections._gcRanges = (cast(void[]*) malloc((void[]).sizeof))[0..1];
         _sections._gcRanges[0] = dataSection;
@@ -120,45 +115,12 @@ void finiSections() nothrow @nogc
 
 void[] initTLSRanges() nothrow @nogc
 {
-    void* pbeg;
-    void* pend;
-    // with VS2017 15.3.1, the linker no longer puts TLS segments into a
-    //  separate image section. That way _tls_start and _tls_end no
-    //  longer generate offsets into .tls, but DATA.
-    // Use the TEB entry to find the start of TLS instead and read the
-    //  length from the TLS directory
-    version (D_InlineAsm_X86)
+    version (GNU_EMUTLS)
     {
-        asm @nogc nothrow
-        {
-            mov EAX, _tls_index;
-            mov ECX, FS:[0x2C];     // _tls_array
-            mov EAX, [ECX+4*EAX];
-            mov pbeg, EAX;
-            add EAX, [_tls_used+4]; // end
-            sub EAX, [_tls_used+0]; // start
-            mov pend, EAX;
-        }
-    }
-    else version (D_InlineAsm_X86_64)
-    {
-        asm @nogc nothrow
-        {
-            xor RAX, RAX;
-            mov EAX, _tls_index;
-            mov RCX, 0x58;
-            mov RCX, GS:[RCX];      // _tls_array (immediate value causes fixup)
-            mov RAX, [RCX+8*RAX];
-            mov pbeg, RAX;
-            add RAX, [_tls_used+8]; // end
-            sub RAX, [_tls_used+0]; // start
-            mov pend, RAX;
-        }
+        return [];
     }
     else
         static assert(false, "Architecture not supported.");
-
-    return pbeg[0 .. pend - pbeg];
 }
 
 void finiTLSRanges(void[] rng) nothrow @nogc
@@ -167,24 +129,23 @@ void finiTLSRanges(void[] rng) nothrow @nogc
 
 void scanTLSRanges(void[] rng, scope void delegate(void* pbeg, void* pend) nothrow dg) nothrow
 {
-    if (conservative)
+    version (GNU_EMUTLS)
     {
-        dg(rng.ptr, rng.ptr + rng.length);
+        import gcc.emutls;
+        _d_emutls_scan(dg);
     }
     else
     {
-        for (auto p = &_TP_beg; p < &_TP_end; )
-        {
-            uint beg = *p++;
-            uint end = beg + cast(uint)((void*).sizeof);
-            while (p < &_TP_end && *p == end)
-            {
-                end += (void*).sizeof;
-                p++;
-            }
-            dg(rng.ptr + beg, rng.ptr + end);
-        }
+        static assert(false, "Architecture not supported.");
     }
+}
+
+/*
+ * Currently unused. As this is called by the compiler, we
+ * still have to provide a dummy function here.
+ */
+extern(C) void _d_dso_registry(void* data)
+{
 }
 
 private:
@@ -192,8 +153,8 @@ __gshared SectionGroup _sections;
 
 extern(C)
 {
-    extern __gshared void* _minfo_beg;
-    extern __gshared void* _minfo_end;
+    extern __gshared void* __start_minfo;
+    extern __gshared void* __stop_minfo;
 }
 
 immutable(ModuleInfo*)[] getModuleInfos() nothrow @nogc
@@ -204,7 +165,8 @@ out (result)
 }
 body
 {
-    auto m = (cast(immutable(ModuleInfo*)*)&_minfo_beg)[1 .. &_minfo_end - &_minfo_beg];
+    // The binutils __start symbol address is a valid ModuleInfo entry
+    auto m = (cast(immutable(ModuleInfo*)*)&__start_minfo)[0 .. &__stop_minfo - &__start_minfo];
     /* Because of alignment inserted by the linker, various null pointers
      * are there. We need to filter them out.
      */

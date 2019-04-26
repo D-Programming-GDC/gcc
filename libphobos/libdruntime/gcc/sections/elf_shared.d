@@ -130,11 +130,6 @@ struct DSO
         return _moduleGroup;
     }
 
-    @property immutable(FuncTable)[] ehTables() const nothrow @nogc
-    {
-        return null;
-    }
-
     @property inout(void[])[] gcRanges() inout nothrow @nogc
     {
         return _gcRanges[];
