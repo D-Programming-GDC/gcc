@@ -23,6 +23,12 @@
 #define DEFHOOK_UNDOC DEFHOOK
 #define HOOKSTRUCT(FRAGMENT) FRAGMENT
 
+enum LINKAGE
+{
+    LINKAGE_C,
+    LINKAGE_WINDOWS
+};
+
 #include "d-target.def"
 
 /* Each target can provide their own.  */
@@ -30,5 +36,8 @@ extern struct gcc_targetdm targetdm;
 
 /* Used by target to add predefined version idenditiers.  */
 extern void d_add_builtin_version (const char *);
+
+/* Default implementation to determine extern(System) linkage.  */
+LINKAGE d_system_linkage_default ();
 
 #endif /* GCC_D_TARGET_H  */

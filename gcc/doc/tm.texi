@@ -10747,6 +10747,11 @@ would return the @code{sizeof(CRITICAL_SECTION)}, while other platforms that
 implement pthreads would return @code{sizeof(pthread_mutex_t)}.
 @end deftypefn
 
+@deftypefn {D Target Hook} LINKAGE TARGET_D_SYSTEM_LINKAGE (void)
+Return information about the system ABI used. This information is used
+to implement the @code{version(System)} statement.
+@end deftypefn
+
 @node Named Address Spaces
 @section Adding support for named address spaces
 @cindex named address spaces

@@ -51,10 +51,24 @@ winnt_d_critsec_size (void)
     return 24;
 }
 
+/* Implement TARGET_D_SYSTEM_LINKAGE for Windows targets.  */
+
+LINKAGE
+winnt_d_system_linkage ()
+{
+  if (DEFAULT_ABI == MS_ABI)
+    return LINKAGE_WINDOWS;
+  else
+    return LINKAGE_C;
+}
+
 #undef TARGET_D_OS_VERSIONS
 #define TARGET_D_OS_VERSIONS winnt_d_os_builtins
 
 #undef TARGET_D_CRITSEC_SIZE
 #define TARGET_D_CRITSEC_SIZE winnt_d_critsec_size
+
+#undef TARGET_D_SYSTEM_LINKAGE
+#define TARGET_D_SYSTEM_LINKAGE winnt_d_system_linkage
 
 struct gcc_targetdm targetdm = TARGETDM_INITIALIZER;
