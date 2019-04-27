@@ -38,10 +38,8 @@ else version (Solaris)
     public import gcc.sections.elf_shared;
 else version (OSX)
     public import gcc.sections.osx;
-else version (CRuntime_DigitalMars)
-    public import gcc.sections.win32;
 else version (CRuntime_Microsoft)
-    public import gcc.sections.win64;
+    public import gcc.sections.windows;
 else version (CRuntime_Bionic)
     public import gcc.sections.android;
 else

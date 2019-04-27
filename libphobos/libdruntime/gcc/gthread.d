@@ -86,6 +86,8 @@ else static if (GNU_Thread_Model == ThreadModel.Single)
 }
 else static if (GNU_Thread_Model == ThreadModel.Win32)
 {
+    import core.stdc.config, core.sys.windows.windows;
+
     struct __gthread_once_t
     {
         INT done;
