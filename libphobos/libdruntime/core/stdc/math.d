@@ -1834,8 +1834,16 @@ version (CRuntime_Microsoft) // fully supported since MSVCRT 12 (VS 2013) only
     private float  _hypotf(float x, float y);
     ///
     extern(D) double hypot(double x, double y) { return _hypot(x, y); }
-    ///
-    extern(D) float  hypotf(float x, float y)  { return _hypotf(x, y); }
+    version (MinGW)
+    {
+        ///
+        extern(D) float  hypotf(float x, float y)  { return _hypot(x, y); }
+    }
+    else
+    {
+        ///
+        extern(D) float  hypotf(float x, float y)  { return _hypotf(x, y); }
+    }
     ///
     extern(D) real   hypotl(real x, real y)    { return _hypot(cast(double) x, cast(double) y); }
 

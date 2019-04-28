@@ -140,17 +140,13 @@ version (DIGITAL_MARS_STDIO)
 }
 else version (MICROSOFT_STDIO)
 {
+    nothrow:
+    @nogc:
     extern (C)
     {
         /* **
          * Microsoft under-the-hood C I/O functions
          */
-      nothrow:
-      @nogc:
-        int _fputc_nolock(int, _iobuf*);
-        int _fputwc_nolock(int, _iobuf*);
-        int _fgetc_nolock(_iobuf*);
-        int _fgetwc_nolock(_iobuf*);
         void _lock_file(FILE*);
         void _unlock_file(FILE*);
         int _setmode(int, int);
@@ -159,6 +155,33 @@ else version (MICROSOFT_STDIO)
         int _fseeki64(FILE*, long, int);
         long _ftelli64(FILE*);
     }
+
+    version (MinGW)
+    {
+        int _fputc_nolock(int c, _iobuf* fp) { return fputc(c, cast(shared) fp); }
+        int _fputwc_nolock(int c, _iobuf* fp)
+        {
+            import core.stdc.wchar_ : fputwc;
+            return fputwc(cast(wchar_t)c, cast(shared) fp);
+        }
+        int _fgetc_nolock(_iobuf* fp) { return fgetc(cast(shared) fp); }
+        int _fgetwc_nolock(_iobuf* fp)
+        {
+            import core.stdc.wchar_ : fgetwc;
+            return fgetwc(cast(shared) fp);
+        }
+    }
+    else
+    {
+        extern (C)
+        {
+            int _fputc_nolock(int, _iobuf*);
+            int _fputwc_nolock(int, _iobuf*);
+            int _fgetc_nolock(_iobuf*);
+            int _fgetwc_nolock(_iobuf*);
+        }
+    }
+
     alias FPUTC = _fputc_nolock;
     alias FPUTWC = _fputwc_nolock;
     alias FGETC = _fgetc_nolock;
@@ -173,7 +196,7 @@ else version (MICROSOFT_STDIO)
     enum
     {
         _O_RDONLY = 0x0000,
-        _O_APPEND = 0x0004,
+        _O_APPEND = 0x0008,
         _O_TEXT   = 0x4000,
         _O_BINARY = 0x8000,
     }
@@ -211,7 +234,6 @@ else version (GENERIC_IO)
 {
     nothrow:
     @nogc:
-
     extern (C)
     {
         void flockfile(FILE*);
