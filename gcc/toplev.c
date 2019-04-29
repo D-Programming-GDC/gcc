@@ -1481,11 +1481,15 @@ process_options (void)
       flag_var_tracking_uninit = 0;
     }
 
-  /* The debug hooks are used to implement -fdump-go-spec because it
-     gives a simple and stable API for all the information we need to
-     dump.  */
+  /* The debug hooks are used to implement -fdump-go-spec and -fdump-d-spec
+     because it gives a simple and stable API for all the information we need
+     to dump.  */
   if (flag_dump_go_spec != NULL)
     debug_hooks = dump_go_spec_init (flag_dump_go_spec, debug_hooks);
+
+  if (flag_dump_d_spec != NULL)
+    debug_hooks = dump_d_spec_init (flag_dump_d_spec, debug_hooks);
+
 
   /* If the user specifically requested variable tracking with tagging
      uninitialized variables, we need to turn on variable tracking.

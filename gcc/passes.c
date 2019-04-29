@@ -273,7 +273,7 @@ rest_of_decl_compilation (tree decl,
 	     which are not visible in finalize_compilation_unit()
 	     while iterating with FOR_EACH_*_FUNCTION through the
 	     symbol table.  */
-	  || (flag_dump_go_spec != NULL
+	  || ((flag_dump_go_spec != NULL || flag_dump_d_spec != NULL)
 	      && !DECL_SAVED_TREE (decl)
 	      && DECL_STRUCT_FUNCTION (decl) == NULL))
 

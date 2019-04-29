@@ -1316,6 +1316,7 @@ OBJS = \
 	cprop.o \
 	cse.o \
 	cselib.o \
+	d-dump-spec.o \
 	data-streamer.o \
 	data-streamer-in.o \
 	data-streamer-out.o \
@@ -2678,6 +2679,7 @@ GTFILES = $(CPPLIB_H) $(srcdir)/input.h $(srcdir)/coretypes.h \
   $(srcdir)/internal-fn.h \
   $(srcdir)/calls.c \
   $(srcdir)/omp-general.h \
+  $(srcdir)/d-dump-spec.cc \
   @all_gtfiles@
 
 # Compute the list of GT header files from the corresponding C sources,

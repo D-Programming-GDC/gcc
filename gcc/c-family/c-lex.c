@@ -89,7 +89,7 @@ init_c_lex (void)
   if ((debug_info_level == DINFO_LEVEL_VERBOSE
        && (write_symbols == DWARF2_DEBUG
 	   || write_symbols == VMS_AND_DWARF2_DEBUG))
-      || flag_dump_go_spec != NULL)
+      || flag_dump_go_spec != NULL || flag_dump_d_spec != NULL)
     {
       cb->define = cb_define;
       cb->undef = cb_undef;

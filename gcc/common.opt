@@ -1426,6 +1426,10 @@ fdump-
 Common Joined RejectNegative Var(common_deferred_options) Defer
 -fdump-<type>	Dump various compiler internals to a file.
 
+fdump-d-spec=
+Common RejectNegative Joined Var(flag_dump_d_spec)
+-fdump-d-spec=filename	Write all declarations to file as D code.
+
 fdump-final-insns
 Driver RejectNegative
 
