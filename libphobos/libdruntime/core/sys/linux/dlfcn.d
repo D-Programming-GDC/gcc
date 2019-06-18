@@ -10,27 +10,11 @@ extern (C):
 nothrow:
 @nogc:
 
-version (ARM)     version = ARM_Any;
-version (AArch64) version = ARM_Any;
-version (HPPA)    version = HPPA_Any;
-version (MIPS32)  version = MIPS_Any;
-version (MIPS64)  version = MIPS_Any;
-version (PPC)     version = PPC_Any;
-version (PPC64)   version = PPC_Any;
-version (RISCV32) version = RISCV_Any;
-version (RISCV64) version = RISCV_Any;
-version (S390)    version = IBMZ_Any;
-version (SPARC)   version = SPARC_Any;
-version (SPARC64) version = SPARC_Any;
-version (SystemZ) version = IBMZ_Any;
-version (X86)     version = X86_Any;
-version (X86_64)  version = X86_Any;
-
 public import core.sys.posix.dlfcn;
 import core.sys.linux.config;
 
 // <bits/dlfcn.h>
-version (X86_Any)
+version (X86)
 {
     // http://sourceware.org/git/?p=glibc.git;a=blob;f=bits/dlfcn.h
     // enum RTLD_LAZY = 0x00001; // POSIX
@@ -54,16 +38,16 @@ version (X86_Any)
         void _dl_mcount_wrapper_check(void* __selfpc);
     }
 }
-else version (HPPA_Any)
+else version (X86_64)
 {
-    // http://sourceware.org/git/?p=glibc.git;a=blob;f=ports/sysdeps/hppa/bits/dlfcn.h
-    // enum RTLD_LAZY = 0x0001; // POSIX
-    // enum RTLD_NOW = 0x0002; // POSIX
+    // http://sourceware.org/git/?p=glibc.git;a=blob;f=bits/dlfcn.h
+    // enum RTLD_LAZY = 0x00001; // POSIX
+    // enum RTLD_NOW = 0x00002; // POSIX
     enum RTLD_BINDING_MASK = 0x3;
     enum RTLD_NOLOAD = 0x00004;
     enum RTLD_DEEPBIND = 0x00008;
 
-    // enum RTLD_GLOBAL = 0x0004; // POSIX
+    // enum RTLD_GLOBAL = 0x00100; // POSIX
     // enum RTLD_LOCAL = 0; // POSIX
     enum RTLD_NODELETE = 0x01000;
 
@@ -78,7 +62,7 @@ else version (HPPA_Any)
         void _dl_mcount_wrapper_check(void* __selfpc);
     }
 }
-else version (MIPS_Any)
+else version (MIPS32)
 {
     // http://sourceware.org/git/?p=glibc.git;a=blob;f=ports/sysdeps/mips/bits/dlfcn.h
     // enum RTLD_LAZY = 0x0001; // POSIX
@@ -102,7 +86,31 @@ else version (MIPS_Any)
         void _dl_mcount_wrapper_check(void* __selfpc);
     }
 }
-else version (PPC_Any)
+else version (MIPS64)
+{
+    // http://sourceware.org/git/?p=glibc.git;a=blob;f=ports/sysdeps/mips/bits/dlfcn.h
+    // enum RTLD_LAZY = 0x0001; // POSIX
+    // enum RTLD_NOW = 0x0002; // POSIX
+    enum RTLD_BINDING_MASK = 0x3;
+    enum RTLD_NOLOAD = 0x00008;
+    enum RTLD_DEEPBIND = 0x00010;
+
+    // enum RTLD_GLOBAL = 0x0004; // POSIX
+    // enum RTLD_LOCAL = 0; // POSIX
+    enum RTLD_NODELETE = 0x01000;
+
+    static if (__USE_GNU)
+    {
+        RT DL_CALL_FCT(RT, Args...)(RT function(Args) fctp, auto ref Args args)
+        {
+            _dl_mcount_wrapper_check(cast(void*)fctp);
+            return fctp(args);
+        }
+
+        void _dl_mcount_wrapper_check(void* __selfpc);
+    }
+}
+else version (PPC)
 {
     // http://sourceware.org/git/?p=glibc.git;a=blob;f=bits/dlfcn.h
     // enum RTLD_LAZY = 0x0001; // POSIX
@@ -126,7 +134,7 @@ else version (PPC_Any)
         void _dl_mcount_wrapper_check(void* __selfpc);
     }
 }
-else version (ARM_Any)
+else version (PPC64)
 {
     // http://sourceware.org/git/?p=glibc.git;a=blob;f=bits/dlfcn.h
     // enum RTLD_LAZY = 0x0001; // POSIX
@@ -150,7 +158,7 @@ else version (ARM_Any)
         void _dl_mcount_wrapper_check(void* __selfpc);
     }
 }
-else version (RISCV_Any)
+else version (ARM)
 {
     // http://sourceware.org/git/?p=glibc.git;a=blob;f=bits/dlfcn.h
     // enum RTLD_LAZY = 0x0001; // POSIX
@@ -174,7 +182,7 @@ else version (RISCV_Any)
         void _dl_mcount_wrapper_check(void* __selfpc);
     }
 }
-else version (SPARC_Any)
+else version (AArch64)
 {
     // http://sourceware.org/git/?p=glibc.git;a=blob;f=bits/dlfcn.h
     // enum RTLD_LAZY = 0x0001; // POSIX
@@ -198,7 +206,31 @@ else version (SPARC_Any)
         void _dl_mcount_wrapper_check(void* __selfpc);
     }
 }
-else version (IBMZ_Any)
+else version (SPARC64)
+{
+    // http://sourceware.org/git/?p=glibc.git;a=blob;f=bits/dlfcn.h
+    // enum RTLD_LAZY = 0x0001; // POSIX
+    // enum RTLD_NOW = 0x0002; // POSIX
+    enum RTLD_BINDING_MASK = 0x3;
+    enum RTLD_NOLOAD = 0x00004;
+    enum RTLD_DEEPBIND = 0x00008;
+
+    // enum RTLD_GLOBAL = 0x00100; // POSIX
+    // enum RTLD_LOCAL = 0; // POSIX
+    enum RTLD_NODELETE = 0x01000;
+
+    static if (__USE_GNU)
+    {
+        RT DL_CALL_FCT(RT, Args...)(RT function(Args) fctp, auto ref Args args)
+        {
+            _dl_mcount_wrapper_check(cast(void*)fctp);
+            return fctp(args);
+        }
+
+        void _dl_mcount_wrapper_check(void* __selfpc);
+    }
+}
+else version (SystemZ)
 {
     // http://sourceware.org/git/?p=glibc.git;a=blob;f=bits/dlfcn.h
     // enum RTLD_LAZY = 0x0001; // POSIX

@@ -22,7 +22,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "dmd/declaration.h"
 #include "dmd/identifier.h"
 #include "dmd/mangle.h"
-#include "dmd/mangle.h"
 #include "dmd/module.h"
 #include "dmd/template.h"
 

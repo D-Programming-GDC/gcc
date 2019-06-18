@@ -97,11 +97,14 @@ fail_compilation/reserved_version.d(196): Error: version identifier `D_Version2`
 fail_compilation/reserved_version.d(197): Error: version identifier `D_NoBoundsChecks` is reserved and cannot be set
 fail_compilation/reserved_version.d(200): Error: version identifier `all` is reserved and cannot be set
 fail_compilation/reserved_version.d(201): Error: version identifier `none` is reserved and cannot be set
-fail_compilation/reserved_version.d(202): Error: version identifier `CppRuntime_Clang` is reserved and cannot be set
-fail_compilation/reserved_version.d(203): Error: version identifier `CppRuntime_DigitalMars` is reserved and cannot be set
-fail_compilation/reserved_version.d(204): Error: version identifier `CppRuntime_Gcc` is reserved and cannot be set
-fail_compilation/reserved_version.d(205): Error: version identifier `CppRuntime_Microsoft` is reserved and cannot be set
-fail_compilation/reserved_version.d(206): Error: version identifier `CppRuntime_Sun` is reserved and cannot be set
+fail_compilation/reserved_version.d(202): Error: version identifier `AsmJS` is reserved and cannot be set
+fail_compilation/reserved_version.d(203): Error: version identifier `Emscripten` is reserved and cannot be set
+fail_compilation/reserved_version.d(204): Error: version identifier `WebAssembly` is reserved and cannot be set
+fail_compilation/reserved_version.d(205): Error: version identifier `CppRuntime_Clang` is reserved and cannot be set
+fail_compilation/reserved_version.d(206): Error: version identifier `CppRuntime_DigitalMars` is reserved and cannot be set
+fail_compilation/reserved_version.d(207): Error: version identifier `CppRuntime_Gcc` is reserved and cannot be set
+fail_compilation/reserved_version.d(208): Error: version identifier `CppRuntime_Microsoft` is reserved and cannot be set
+fail_compilation/reserved_version.d(209): Error: version identifier `CppRuntime_Sun` is reserved and cannot be set
 ---
 */
 
@@ -205,6 +208,9 @@ version = D_NoBoundsChecks;
 //version = assert;
 version = all;
 version = none;
+version = AsmJS;
+version = Emscripten;
+version = WebAssembly;
 version = CppRuntime_Clang;
 version = CppRuntime_DigitalMars;
 version = CppRuntime_Gcc;

@@ -31,6 +31,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dmd/target.h"
 
 #include "tree.h"
+#include "options.h"
 #include "fold-const.h"
 #include "diagnostic.h"
 #include "stringpool.h"
@@ -210,7 +211,8 @@ make_frontend_typeinfo (Identifier *ident, ClassDeclaration *base = NULL)
   ClassDeclaration *tinfo = ClassDeclaration::create (loc, ident, NULL, NULL,
 						      true);
   tinfo->parent = object_module;
-  tinfo->semantic (object_module->_scope);
+  tinfo->members = new Dsymbols;
+  dsymbolSemantic (tinfo, object_module->_scope);
   tinfo->baseClass = base;
   /* This is a compiler generated class, and shouldn't be mistaken for being
      the type declared in the runtime library.  */
@@ -373,7 +375,6 @@ class TypeInfoVisitor : public Visitor
 			   size_int (len), build_address (decl));
     this->layout_field (value);
   }
-
 
   /* Write out the __vptr and __monitor fields of class CD.  */
 
@@ -826,7 +827,7 @@ public:
 	this->layout_field (base);
 
 	/* void *destructor;  */
-	tree dtor = (cd->dtor) ? build_address (get_symbol_decl (cd->dtor))
+	tree dtor = (cd->tidtor) ? build_address (get_symbol_decl (cd->tidtor))
 	  : null_pointer_node;
 	this->layout_field (dtor);
 
@@ -836,7 +837,7 @@ public:
 	this->layout_field (inv);
 
 	/* ClassFlags m_flags;  */
-	ClassFlags::Type flags = ClassFlags::hasOffTi;
+	int flags = ClassFlags::hasOffTi;
 	if (cd->isCOMclass ())
 	  flags |= ClassFlags::isCOMclass;
 
@@ -902,6 +903,8 @@ public:
 	  this->layout_field (build_expr (cd->getRTInfo, true));
 	else if (!(flags & ClassFlags::noPointers))
 	  this->layout_field (size_one_node);
+	else
+	  this->layout_field (null_pointer_node);
       }
     else
       {
@@ -928,7 +931,7 @@ public:
 	this->layout_field (null_pointer_node);
 
 	/* ClassFlags m_flags;  */
-	ClassFlags::Type flags = ClassFlags::hasOffTi;
+	int flags = ClassFlags::hasOffTi;
 	flags |= ClassFlags::hasTypeInfo;
 	if (cd->isCOMinterface ())
 	  flags |= ClassFlags::isCOMclass;
@@ -1063,13 +1066,13 @@ public:
       this->layout_field (null_pointer_node);
 
     /* StructFlags m_flags;  */
-    StructFlags::Type m_flags = 0;
+    int m_flags = StructFlags::none;
     if (ti->hasPointers ())
       m_flags |= StructFlags::hasPointers;
     this->layout_field (build_integer_cst (m_flags, d_uint_type));
 
     /* void function(void*) xdtor;  */
-    tree dtor = (sd->dtor) ? build_address (get_symbol_decl (sd->dtor))
+    tree dtor = (sd->tidtor) ? build_address (get_symbol_decl (sd->tidtor))
       : null_pointer_node;
     this->layout_field (dtor);
 

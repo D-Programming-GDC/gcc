@@ -43,65 +43,16 @@ along with GCC; see the file COPYING3.  If not see
 /* Implements the Global interface defined by the frontend.
    Used for managing the state of the current compilation.  */
 
-Global global;
-
 void
 Global::_init (void)
 {
-  this->mars_ext = "d";
-  this->hdr_ext  = "di";
-  this->doc_ext  = "html";
-  this->ddoc_ext = "ddoc";
-  this->json_ext = "json";
   this->obj_ext = "o";
 
   this->run_noext = true;
   this->version = "v"
 #include "verstr.h"
     ;
-
-  this->stdmsg = stderr;
-  this->errorLimit = flag_max_errors;
 }
-
-/* Start gagging. Return the current number of gagged errors.  */
-
-unsigned
-Global::startGagging (void)
-{
-  this->gag++;
-  return this->gaggedErrors;
-}
-
-/* End gagging, restoring the old gagged state.  Return true if errors
-   occured while gagged.  */
-
-bool
-Global::endGagging (unsigned oldGagged)
-{
-  bool anyErrs = (this->gaggedErrors != oldGagged);
-  this->gag--;
-
-  /* Restore the original state of gagged errors; set total errors
-     to be original errors + new ungagged errors.  */
-  this->errors -= (this->gaggedErrors - oldGagged);
-  this->gaggedErrors = oldGagged;
-
-  return anyErrs;
-}
-
-/* Increment the error count to record that an error has occured in the
-   current context.  An error message may or may not have been printed.  */
-
-void
-Global::increaseErrorCount (void)
-{
-  if (gag)
-    this->gaggedErrors++;
-
-  this->errors++;
-}
-
 
 /* Implements the Loc interface defined by the frontend.
    Used for keeping track of current file/line position in code.  */
@@ -129,18 +80,6 @@ Loc::toChars (void) const
     }
 
   return buf.extractString ();
-}
-
-bool
-Loc::equals (const Loc& loc)
-{
-  if (this->linnum != loc.linnum || this->charnum != loc.charnum)
-    return false;
-
-  if (!FileName::equals (this->filename, loc.filename))
-    return false;
-
-  return true;
 }
 
 
@@ -432,9 +371,9 @@ Compiler::genCmain (Scope *sc)
     {
       m->importedFrom = m;
       m->importAll (NULL);
-      m->semantic (NULL);
-      m->semantic2 (NULL);
-      m->semantic3 (NULL);
+      dsymbolSemantic (m, NULL);
+      semantic2 (m, NULL);
+      semantic3 (m, NULL);
       d_add_entrypoint_module (m, sc->_module);
     }
 
@@ -554,19 +493,17 @@ Compiler::loadModule (Module *m)
     }
 }
 
-/* Implements back-end specific interfaces used by the frontend.  */
+/* A callback function that is called once an imported module is parsed.
+   If the callback returns true, then it tells the front-end that the
+   driver intends on compiling the import.  */
 
-/* Determine return style of function - whether in registers or through a
-   hidden pointer to the caller's stack.  */
-
-RET
-retStyle (TypeFunction *)
+bool
+Compiler::onImport (Module *)
 {
-  /* Need the backend type to determine this, but this is called from the
-     frontend before semantic processing is finished.  An accurate value
-     is not currently needed anyway.  */
-  return RETstack;
+  return false;
 }
+
+/* Implements back-end specific interfaces used by the frontend.  */
 
 /* Determine if function FD is a builtin one that we can evaluate in CTFE.  */
 
@@ -649,12 +586,4 @@ getTypeInfoType (Loc loc, Type *type, Scope *sc)
   gcc_assert (type->ty != Terror);
   create_typeinfo (type, sc ? sc->_module->importedFrom : NULL);
   return type->vtinfo->type;
-}
-
-/* Return an inlined copy of a default argument for a function parameter.  */
-
-Expression *
-inlineCopy (Expression *e, Scope *)
-{
-  return e->copy ();
 }

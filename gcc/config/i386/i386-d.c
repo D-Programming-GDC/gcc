@@ -42,3 +42,14 @@ ix86_d_target_versions (void)
   else
     d_add_builtin_version ("D_SoftFloat");
 }
+
+/* Implement TARGET_D_FLOAT_ABI_TYPE for x86 targets.  */
+
+const char *
+ix86_d_float_abi_type (void)
+{
+  if (! (TARGET_80387 || TARGET_FLOAT_RETURNS_IN_80387))
+    return "soft";
+
+  return "hard";
+}

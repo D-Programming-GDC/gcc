@@ -148,9 +148,10 @@ DRUNTIME_CSOURCES = core/stdc/errno_.c
 DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	core/checkedint.d core/cpuid.d core/demangle.d core/exception.d \
 	core/internal/abort.d core/internal/arrayop.d core/internal/convert.d \
-	core/internal/hash.d core/internal/spinlock.d core/internal/string.d \
-	core/internal/traits.d core/math.d core/memory.d core/runtime.d \
-	core/simd.d core/stdc/assert_.d core/stdc/complex.d core/stdc/config.d \
+	core/internal/hash.d core/internal/parseoptions.d \
+	core/internal/spinlock.d core/internal/string.d core/internal/traits.d \
+	core/math.d core/memory.d core/runtime.d core/simd.d \
+	core/stdc/assert_.d core/stdc/complex.d core/stdc/config.d \
 	core/stdc/ctype.d core/stdc/errno.d core/stdc/fenv.d \
 	core/stdc/float_.d core/stdc/inttypes.d core/stdc/limits.d \
 	core/stdc/locale.d core/stdc/math.d core/stdc/signal.d \
@@ -168,8 +169,8 @@ DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	gcc/unwind/package.d gcc/unwind/pe.d object.d rt/aApply.d rt/aApplyR.d \
 	rt/aaA.d rt/adi.d rt/arrayassign.d rt/arraycast.d rt/arraycat.d \
 	rt/cast_.d rt/config.d rt/critical_.d rt/deh.d rt/dmain2.d \
-	rt/invariant.d rt/lifetime.d rt/memory.d rt/minfo.d rt/monitor_.d \
-	rt/obj.d rt/qsort.d rt/sections.d rt/switch_.d rt/tlsgc.d \
+	rt/ehalloc.d rt/invariant.d rt/lifetime.d rt/memory.d rt/minfo.d \
+	rt/monitor_.d rt/obj.d rt/qsort.d rt/sections.d rt/tlsgc.d \
 	rt/typeinfo/ti_Acdouble.d rt/typeinfo/ti_Acfloat.d \
 	rt/typeinfo/ti_Acreal.d rt/typeinfo/ti_Adouble.d \
 	rt/typeinfo/ti_Afloat.d rt/typeinfo/ti_Ag.d rt/typeinfo/ti_Aint.d \
@@ -192,10 +193,8 @@ DRUNTIME_DSOURCES_STDCXX = core/stdcpp/exception.d \
 	core/stdcpp/typeinfo.d
 
 DRUNTIME_DSOURCES_GC = gc/bits.d gc/config.d gc/gcinterface.d \
-	gc/impl/conservative/gc.d gc/impl/manual/gc.d gc/os.d gc/pooltable.d \
-	gc/proxy.d
-
-DRUNTIME_DSOURCES_GCSTUB = gcstub/gc.d
+	gc/impl/conservative/gc.d gc/impl/manual/gc.d gc/impl/proto/gc.d \
+	gc/os.d gc/pooltable.d gc/proxy.d
 
 DRUNTIME_DSOURCES_BIONIC = core/sys/bionic/fcntl.d \
 	core/sys/bionic/string.d core/sys/bionic/unistd.d
@@ -262,6 +261,14 @@ DRUNTIME_DSOURCES_OPENBSD = core/sys/openbsd/dlfcn.d \
 	core/sys/openbsd/sys/elf64.d core/sys/openbsd/sys/elf_common.d \
 	core/sys/openbsd/sys/link_elf.d core/sys/openbsd/sys/mman.d \
 	core/sys/openbsd/time.d
+
+DRUNTIME_DSOURCES_OSX = core/sys/osx/execinfo.d \
+	core/sys/osx/mach/dyld.d core/sys/osx/mach/getsect.d \
+	core/sys/osx/mach/kern_return.d core/sys/osx/mach/loader.d \
+	core/sys/osx/mach/port.d core/sys/osx/mach/semaphore.d \
+	core/sys/osx/mach/thread_act.d core/sys/osx/pthread.d \
+	core/sys/osx/sys/cdefs.d core/sys/osx/sys/event.d \
+	core/sys/osx/sys/mman.d
 
 DRUNTIME_DSOURCES_POSIX = core/sys/posix/aio.d \
 	core/sys/posix/arpa/inet.d core/sys/posix/config.d \

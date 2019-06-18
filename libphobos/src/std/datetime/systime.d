@@ -1,19 +1,82 @@
 // Written in the D programming language
 
 /++
+
+$(SCRIPT inhibitQuickIndex = 1;)
+$(BOOKTABLE,
+$(TR $(TH Category) $(TH Functions))
+$(TR $(TD Types) $(TD
+    $(LREF Clock)
+    $(LREF SysTime)
+    $(LREF DosFileTime)
+))
+$(TR $(TD Conversion) $(TD
+    $(LREF parseRFC822DateTime)
+    $(LREF DosFileTimeToSysTime)
+    $(LREF FILETIMEToStdTime)
+    $(LREF FILETIMEToSysTime)
+    $(LREF stdTimeToFILETIME)
+    $(LREF stdTimeToUnixTime)
+    $(LREF SYSTEMTIMEToSysTime)
+    $(LREF SysTimeToDosFileTime)
+    $(LREF SysTimeToFILETIME)
+    $(LREF SysTimeToSYSTEMTIME)
+    $(LREF unixTimeToStdTime)
+))
+)
+
     License:   $(HTTP www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
-    Authors:   Jonathan M Davis
-    Source:    $(PHOBOSSRC std/datetime/_systime.d)
+    Authors:   $(HTTP jmdavisprog.com, Jonathan M Davis)
+    Source:    $(PHOBOSSRC std/datetime/systime.d)
 +/
 module std.datetime.systime;
 
-import core.time;
-import std.datetime.date;
-import std.datetime.timezone;
+/// Get the current time as a $(LREF SysTime)
+@safe unittest
+{
+    import std.datetime.timezone : LocalTime;
+    SysTime today = Clock.currTime();
+    assert(today.timezone is LocalTime());
+}
+
+/// Construct a $(LREF SysTime) from a ISO time string
+@safe unittest
+{
+    import std.datetime.date : DateTime;
+    import std.datetime.timezone : UTC;
+
+    auto st = SysTime.fromISOExtString("2018-01-01T10:30:00Z");
+    assert(st == SysTime(DateTime(2018, 1, 1, 10, 30, 0), UTC()));
+}
+
+/// Make a specific point in time in the New York timezone
+@safe unittest
+{
+    import core.time : hours;
+    import std.datetime.date : DateTime;
+    import std.datetime.timezone : SimpleTimeZone;
+
+    auto ny = SysTime(
+        DateTime(2018, 1, 1, 10, 30, 0),
+        new immutable SimpleTimeZone(-5.hours, "America/New_York")
+    );
+
+    // ISO standard time strings
+    assert(ny.toISOString() == "20180101T103000-05:00");
+    assert(ny.toISOExtString() == "2018-01-01T10:30:00-05:00");
+}
+
+// Note: reconsider using specific imports below after
+// https://issues.dlang.org/show_bug.cgi?id=17630 has been fixed
+import core.time;// : ClockType, convert, dur, Duration, seconds, TimeException;
+import std.datetime.date;// : _monthNames, AllowDayOverflow, CmpTimeUnits, Date,
+    //DateTime, DateTimeException, DayOfWeek, enforceValid, getDayOfWeek, maxDay,
+    //Month, splitUnitsFromHNSecs, TimeOfDay, validTimeUnits, yearIsLeapYear;
+import std.datetime.timezone;// : LocalTime, SimpleTimeZone, TimeZone, UTC;
 import std.exception : enforce;
 import std.format : format;
 import std.range.primitives;
-import std.traits : isIntegral, isSigned, isSomeString, Unqual;
+import std.traits : isIntegral, isSigned, isSomeString, Unqual, isNarrowString;
 
 version (Windows)
 {
@@ -69,7 +132,7 @@ public:
     @safe unittest
     {
         import std.format : format;
-        import std.stdio : writefln;
+        import core.time;
         assert(currTime().timezone is LocalTime());
         assert(currTime(UTC()).timezone is UTC());
 
@@ -92,14 +155,13 @@ public:
         assert(abs(norm1 - norm2) <= seconds(2));
 
         import std.meta : AliasSeq;
-        foreach (ct; AliasSeq!(ClockType.coarse, ClockType.precise, ClockType.second))
-        {
-            scope(failure) writefln("ClockType.%s", ct);
+        static foreach (ct; AliasSeq!(ClockType.coarse, ClockType.precise, ClockType.second))
+        {{
             auto value1 = Clock.currTime!ct;
             auto value2 = Clock.currTime!ct(UTC());
-            assert(value1 <= value2, format("%s %s", value1, value2));
-            assert(abs(value1 - value2) <= seconds(2));
-        }
+            assert(value1 <= value2, format("%s %s (ClockType: %s)", value1, value2, ct));
+            assert(abs(value1 - value2) <= seconds(2), format("ClockType.%s", ct));
+        }}
     }
 
 
@@ -259,7 +321,6 @@ public:
         import std.format : format;
         import std.math : abs;
         import std.meta : AliasSeq;
-        import std.stdio : writefln;
         enum limit = convert!("seconds", "hnsecs")(2);
 
         auto norm1 = Clock.currStdTime;
@@ -267,14 +328,13 @@ public:
         assert(norm1 <= norm2, format("%s %s", norm1, norm2));
         assert(abs(norm1 - norm2) <= limit);
 
-        foreach (ct; AliasSeq!(ClockType.coarse, ClockType.precise, ClockType.second))
-        {
-            scope(failure) writefln("ClockType.%s", ct);
+        static foreach (ct; AliasSeq!(ClockType.coarse, ClockType.precise, ClockType.second))
+        {{
             auto value1 = Clock.currStdTime!ct;
             auto value2 = Clock.currStdTime!ct;
-            assert(value1 <= value2, format("%s %s", value1, value2));
+            assert(value1 <= value2, format("%s %s (ClockType: %s)", value1, value2, ct));
             assert(abs(value1 - value2) <= limit);
-        }
+        }}
     }
 
 
@@ -283,12 +343,20 @@ private:
     @disable this() {}
 }
 
+/// Get the current time as a $(LREF SysTime)
+@safe unittest
+{
+    import std.datetime.timezone : LocalTime;
+    SysTime today = Clock.currTime();
+    assert(today.timezone is LocalTime());
+}
+
 
 /++
-    $(D SysTime) is the type used to get the current time from the
+    `SysTime` is the type used to get the current time from the
     system or doing anything that involves time zones. Unlike
     $(REF DateTime,std,datetime,date), the time zone is an integral part of
-    $(D SysTime) (though for local time applications, time zones can be ignored
+    `SysTime` (though for local time applications, time zones can be ignored
     and it will work, since it defaults to using the local time zone). It holds
     its internal time in std time (hnsecs since midnight, January 1st, 1 A.D.
     UTC), so it interfaces well with the system time. However, that means that,
@@ -298,37 +366,37 @@ private:
 
     For calendar-based operations that don't
     care about time zones, then $(REF DateTime,std,datetime,date) would be
-    the type to use. For system time, use $(D SysTime).
+    the type to use. For system time, use `SysTime`.
 
-    $(LREF Clock.currTime) will return the current time as a $(D SysTime).
-    To convert a $(D SysTime) to a $(REF Date,std,datetime,date) or
+    $(LREF Clock.currTime) will return the current time as a `SysTime`.
+    To convert a `SysTime` to a $(REF Date,std,datetime,date) or
     $(REF DateTime,std,datetime,date), simply cast it. To convert a
     $(REF Date,std,datetime,date) or $(REF DateTime,std,datetime,date) to a
-    $(D SysTime), use $(D SysTime)'s constructor, and pass in the ntended time
+    `SysTime`, use `SysTime`'s constructor, and pass in the ntended time
     zone with it (or don't pass in a $(REF TimeZone,std,datetime,timezone), and
     the local time zone will be used). Be aware, however, that converting from a
-    $(REF DateTime,std,datetime,date) to a $(D SysTime) will not necessarily
+    $(REF DateTime,std,datetime,date) to a `SysTime` will not necessarily
     be 100% accurate due to DST (one hour of the year doesn't exist and another
     occurs twice). To not risk any conversion errors, keep times as
-    $(D SysTime)s. Aside from DST though, there shouldn't be any conversion
+    `SysTime`s. Aside from DST though, there shouldn't be any conversion
     problems.
 
     For using time zones other than local time or UTC, use
     $(REF PosixTimeZone,std,datetime,timezone) on Posix systems (or on Windows,
     if providing the TZ Database files), and use
     $(REF WindowsTimeZone,std,datetime,timezone) on Windows systems. The time in
-    $(D SysTime) is kept internally in hnsecs from midnight, January 1st, 1 A.D.
+    `SysTime` is kept internally in hnsecs from midnight, January 1st, 1 A.D.
     UTC. Conversion error cannot happen when changing the time zone of a
-    $(D SysTime). $(REF LocalTime,std,datetime,timezone) is the
+    `SysTime`. $(REF LocalTime,std,datetime,timezone) is the
     $(REF TimeZone,std,datetime,timezone) class which represents the local time,
-    and $(D UTC) is the $(REF TimeZone,std,datetime,timezone) class which
-    represents UTC. $(D SysTime) uses $(REF LocalTime,std,datetime,timezone) if
+    and `UTC` is the $(REF TimeZone,std,datetime,timezone) class which
+    represents UTC. `SysTime` uses $(REF LocalTime,std,datetime,timezone) if
     no $(REF TimeZone,std,datetime,timezone) is provided. For more details on
     time zones, see the documentation for $(REF TimeZone,std,datetime,timezone),
     $(REF PosixTimeZone,std,datetime,timezone), and
     $(REF WindowsTimeZone,std,datetime,timezone).
 
-    $(D SysTime)'s range is from approximately 29,000 B.C. to approximately
+    `SysTime`'s range is from approximately 29,000 B.C. to approximately
     29,000 A.D.
   +/
 struct SysTime
@@ -351,7 +419,7 @@ public:
                        given $(REF DateTime,std,datetime,date) is assumed to
                        be in the given time zone.
       +/
-    this(in DateTime dateTime, immutable TimeZone tz = null) @safe nothrow
+    this(DateTime dateTime, immutable TimeZone tz = null) @safe nothrow
     {
         try
             this(dateTime, Duration.zero, tz);
@@ -378,6 +446,11 @@ public:
         test(DateTime(1, 1, 1, 0, 0, 0), new immutable SimpleTimeZone(dur!"minutes"(-60)), 36_000_000_000L);
         test(DateTime(1, 1, 1, 0, 0, 0), new immutable SimpleTimeZone(Duration.zero), 0);
         test(DateTime(1, 1, 1, 0, 0, 0), new immutable SimpleTimeZone(dur!"minutes"(60)), -36_000_000_000L);
+
+        static void testScope(scope ref DateTime dt) @safe
+        {
+            auto st = SysTime(dt);
+        }
     }
 
     /++
@@ -394,10 +467,10 @@ public:
                        be in the given time zone.
 
         Throws:
-            $(REF DateTimeException,std,datetime,date) if $(D fracSecs) is negative or if it's
+            $(REF DateTimeException,std,datetime,date) if `fracSecs` is negative or if it's
             greater than or equal to one second.
       +/
-    this(in DateTime dateTime, in Duration fracSecs, immutable TimeZone tz = null) @safe
+    this(DateTime dateTime, Duration fracSecs, immutable TimeZone tz = null) @safe
     {
         enforce(fracSecs >= Duration.zero, new DateTimeException("A SysTime cannot have negative fractional seconds."));
         enforce(fracSecs < seconds(1), new DateTimeException("Fractional seconds must be less than one second."));
@@ -414,6 +487,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         static void test(DateTime dt, Duration fracSecs, immutable TimeZone tz, long expected)
         {
             auto sysTime = SysTime(dt, fracSecs, tz);
@@ -434,6 +508,11 @@ public:
 
         assertThrown!DateTimeException(SysTime(DateTime.init, hnsecs(-1), UTC()));
         assertThrown!DateTimeException(SysTime(DateTime.init, seconds(1), UTC()));
+
+        static void testScope(scope ref DateTime dt, scope ref Duration d) @safe
+        {
+            auto st = SysTime(dt, d);
+        }
     }
 
     /++
@@ -448,7 +527,7 @@ public:
                    given $(REF Date,std,datetime,date) is assumed to be in the
                    given time zone.
       +/
-    this(in Date date, immutable TimeZone tz = null) @safe nothrow
+    this(Date date, immutable TimeZone tz = null) @safe nothrow
     {
         _timezone = tz is null ? LocalTime() : tz;
 
@@ -476,6 +555,11 @@ public:
         test(Date(1, 1, 1), UTC(), 0);
         test(Date(1, 1, 2), UTC(), 864000000000);
         test(Date(0, 12, 31), UTC(), -864000000000);
+
+        static void testScope(scope ref Date d) @safe
+        {
+            auto st = SysTime(d);
+        }
     }
 
     /++
@@ -518,27 +602,36 @@ public:
         }
     }
 
+
     /++
         Params:
             rhs = The $(LREF SysTime) to assign to this one.
+
+        Returns: The `this` of this `SysTime`.
       +/
-    ref SysTime opAssign(const ref SysTime rhs) return @safe pure nothrow
+    ref SysTime opAssign()(auto ref const(SysTime) rhs) return @safe pure nothrow scope
     {
         _stdTime = rhs._stdTime;
         _timezone = rhs._timezone;
         return this;
     }
 
-    /++
-        Params:
-            rhs = The $(LREF SysTime) to assign to this one.
-      +/
-    ref SysTime opAssign(SysTime rhs) scope return @safe pure nothrow
+    @safe unittest
     {
-        _stdTime = rhs._stdTime;
-        _timezone = rhs._timezone;
-        return this;
+        SysTime st;
+        st = SysTime(DateTime(2012, 12, 21, 1, 2, 3), UTC());
+        assert(st == SysTime(DateTime(2012, 12, 21, 1, 2, 3), UTC()));
+
+        const other = SysTime(DateTime(19, 1, 7, 13, 14, 15), LocalTime());
+        st = other;
+        assert(st == other);
+
+        static void testScope(scope ref SysTime left, const scope SysTime right) @safe
+        {
+            left = right;
+        }
     }
+
 
     /++
         Checks for equality between this $(LREF SysTime) and the given
@@ -547,13 +640,7 @@ public:
         Note that the time zone is ignored. Only the internal
         std times (which are in UTC) are compared.
      +/
-    bool opEquals(const SysTime rhs) @safe const pure nothrow
-    {
-        return opEquals(rhs);
-    }
-
-    /// ditto
-    bool opEquals(const ref SysTime rhs) @safe const pure nothrow
+    bool opEquals()(auto ref const(SysTime) rhs) @safe const pure nothrow scope
     {
         return _stdTime == rhs._stdTime;
     }
@@ -589,17 +676,24 @@ public:
 
         auto st = SysTime(DateTime(1999, 7, 6, 12, 33, 30));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 33, 30));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 33, 30));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 33, 30));
         assert(st == st);
         assert(st == cst);
-        //assert(st == ist);
+        assert(st == ist);
         assert(cst == st);
         assert(cst == cst);
-        //assert(cst == ist);
-        //assert(ist == st);
-        //assert(ist == cst);
-        //assert(ist == ist);
+        assert(cst == ist);
+        assert(ist == st);
+        assert(ist == cst);
+        assert(ist == ist);
+
+        static void testScope(scope ref SysTime left, const scope SysTime right) @safe
+        {
+            assert(left == right);
+            assert(right == left);
+        }
     }
+
 
     /++
         Compares this $(LREF SysTime) with the given $(LREF SysTime).
@@ -613,7 +707,7 @@ public:
             $(TR $(TD this &gt; rhs) $(TD &gt; 0))
             )
      +/
-    int opCmp(in SysTime rhs) @safe const pure nothrow
+    int opCmp()(auto ref const(SysTime) rhs) @safe const pure nothrow scope
     {
         if (_stdTime < rhs._stdTime)
             return -1;
@@ -677,22 +771,29 @@ public:
 
         auto st = SysTime(DateTime(1999, 7, 6, 12, 33, 30));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 33, 30));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 33, 30));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 33, 30));
         assert(st.opCmp(st) == 0);
         assert(st.opCmp(cst) == 0);
-        //assert(st.opCmp(ist) == 0);
+        assert(st.opCmp(ist) == 0);
         assert(cst.opCmp(st) == 0);
         assert(cst.opCmp(cst) == 0);
-        //assert(cst.opCmp(ist) == 0);
-        //assert(ist.opCmp(st) == 0);
-        //assert(ist.opCmp(cst) == 0);
-        //assert(ist.opCmp(ist) == 0);
+        assert(cst.opCmp(ist) == 0);
+        assert(ist.opCmp(st) == 0);
+        assert(ist.opCmp(cst) == 0);
+        assert(ist.opCmp(ist) == 0);
+
+        static void testScope(scope ref SysTime left, const scope SysTime right) @safe
+        {
+            assert(left < right);
+            assert(right > left);
+        }
     }
 
-    /**
-     * Returns: A hash of the $(LREF SysTime)
-     */
-    size_t toHash() const @nogc pure nothrow @safe
+
+    /++
+        Returns: A hash of the $(LREF SysTime).
+     +/
+    size_t toHash() const @nogc pure nothrow @safe scope
     {
         static if (is(size_t == ulong))
             return _stdTime;
@@ -729,13 +830,19 @@ public:
         immutable zone = new SimpleTimeZone(dur!"minutes"(60));
         assert(SysTime(DateTime(2000, 1, 1, 1), zone).toHash == SysTime(DateTime(2000, 1, 1), UTC()).toHash);
         assert(SysTime(DateTime(2000, 1, 1), zone).toHash != SysTime(DateTime(2000, 1, 1), UTC()).toHash);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.toHash();
+        }
     }
+
 
     /++
         Year of the Gregorian Calendar. Positive numbers are A.D. Non-positive
         are B.C.
      +/
-    @property short year() @safe const nothrow
+    @property short year() @safe const nothrow scope
     {
         return (cast(Date) this).year;
     }
@@ -769,9 +876,14 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.year == 1999);
-        //assert(ist.year == 1999);
+        assert(ist.year == 1999);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.year;
+        }
     }
 
     /++
@@ -785,7 +897,7 @@ public:
             $(REF DateTimeException,std,datetime,date) if the new year is not
             a leap year and the resulting date would be on February 29th.
      +/
-    @property void year(int year) @safe
+    @property void year(int year) @safe scope
     {
         auto hnsecs = adjTime;
         auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
@@ -817,7 +929,7 @@ public:
     {
         import std.range : chain;
 
-        static void test(SysTime st, int year, in SysTime expected)
+        static void test(SysTime st, int year, SysTime expected)
         {
             st.year = year;
             assert(st == expected);
@@ -857,18 +969,23 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.year = 7));
-        //static assert(!__traits(compiles, ist.year = 7));
+        static assert(!__traits(compiles, ist.year = 7));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.year = 42;
+        }
     }
 
     /++
         Year B.C. of the Gregorian Calendar counting year 0 as 1 B.C.
 
         Throws:
-            $(REF DateTimeException,std,datetime,date) if $(D isAD) is true.
+            $(REF DateTimeException,std,datetime,date) if `isAD` is true.
      +/
-    @property ushort yearBC() @safe const
+    @property ushort yearBC() @safe const scope
     {
         return (cast(Date) this).yearBC;
     }
@@ -898,11 +1015,16 @@ public:
 
         auto st = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         st.year = 12;
         assert(st.year == 12);
         static assert(!__traits(compiles, cst.year = 12));
-        //static assert(!__traits(compiles, ist.year = 12));
+        static assert(!__traits(compiles, ist.year = 12));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.yearBC;
+        }
     }
 
 
@@ -916,7 +1038,7 @@ public:
             $(REF DateTimeException,std,datetime,date) if a non-positive value
             is given.
      +/
-    @property void yearBC(int year) @safe
+    @property void yearBC(int year) @safe scope
     {
         auto hnsecs = adjTime;
         auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
@@ -947,7 +1069,7 @@ public:
     @safe unittest
     {
         import std.range : chain;
-        static void test(SysTime st, int year, in SysTime expected)
+        static void test(SysTime st, int year, SysTime expected)
         {
             st.yearBC = year;
             assert(st == expected, format("SysTime: %s", st));
@@ -994,17 +1116,23 @@ public:
 
         auto st = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         st.yearBC = 12;
         assert(st.yearBC == 12);
         static assert(!__traits(compiles, cst.yearBC = 12));
-        //static assert(!__traits(compiles, ist.yearBC = 12));
+        static assert(!__traits(compiles, ist.yearBC = 12));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.yearBC = 42;
+        }
     }
+
 
     /++
         Month of a Gregorian Year.
      +/
-    @property Month month() @safe const nothrow
+    @property Month month() @safe const nothrow scope
     {
         return (cast(Date) this).month;
     }
@@ -1049,9 +1177,14 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.month == 7);
-        //assert(ist.month == 7);
+        assert(ist.month == 7);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.month;
+        }
     }
 
 
@@ -1065,7 +1198,7 @@ public:
             $(REF DateTimeException,std,datetime,date) if the given month is
             not a valid month.
      +/
-    @property void month(Month month) @safe
+    @property void month(Month month) @safe scope
     {
         auto hnsecs = adjTime;
         auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
@@ -1088,7 +1221,7 @@ public:
         import std.algorithm.iteration : filter;
         import std.range : chain;
 
-        static void test(SysTime st, Month month, in SysTime expected)
+        static void test(SysTime st, Month month, SysTime expected)
         {
             st.month = cast(Month) month;
             assert(st == expected);
@@ -1157,15 +1290,20 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        static assert(!__traits(compiles, cst.month = 12));
-        //static assert(!__traits(compiles, ist.month = 12));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        static assert(!__traits(compiles, cst.month = Month.dec));
+        static assert(!__traits(compiles, ist.month = Month.dec));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.month = Month.dec;
+        }
     }
 
     /++
         Day of a Gregorian Month.
      +/
-    @property ubyte day() @safe const nothrow
+    @property ubyte day() @safe const nothrow scope
     {
         return (cast(Date) this).day;
     }
@@ -1211,9 +1349,14 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
          assert(cst.day == 6);
-        //assert(ist.day == 6);
+        assert(ist.day == 6);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.day;
+        }
     }
 
 
@@ -1227,7 +1370,7 @@ public:
             $(REF DateTimeException,std,datetime,date) if the given day is not
             a valid day of the current month.
      +/
-    @property void day(int day) @safe
+    @property void day(int day) @safe scope
     {
         auto hnsecs = adjTime;
         auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
@@ -1311,16 +1454,21 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.day = 27));
-        //static assert(!__traits(compiles, ist.day = 27));
+        static assert(!__traits(compiles, ist.day = 27));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.day = 12;
+        }
     }
 
 
     /++
         Hours past midnight.
      +/
-    @property ubyte hour() @safe const nothrow
+    @property ubyte hour() @safe const nothrow scope
     {
         auto hnsecs = adjTime;
         auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
@@ -1370,9 +1518,14 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.hour == 12);
-        //assert(ist.hour == 12);
+        assert(ist.hour == 12);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.hour;
+        }
     }
 
 
@@ -1386,7 +1539,7 @@ public:
             $(REF DateTimeException,std,datetime,date) if the given hour are
             not a valid hour of the day.
      +/
-    @property void hour(int hour) @safe
+    @property void hour(int hour) @safe scope
     {
         enforceValid!"hours"(hour);
 
@@ -1429,16 +1582,21 @@ public:
         assertThrown!DateTimeException(st.hour = 60);
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.hour = 27));
-        //static assert(!__traits(compiles, ist.hour = 27));
+        static assert(!__traits(compiles, ist.hour = 27));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.hour = 12;
+        }
     }
 
 
     /++
         Minutes past the current hour.
      +/
-    @property ubyte minute() @safe const nothrow
+    @property ubyte minute() @safe const nothrow scope
     {
         auto hnsecs = adjTime;
         auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
@@ -1490,9 +1648,14 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.minute == 30);
-        //assert(ist.minute == 30);
+        assert(ist.minute == 30);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.minute;
+        }
     }
 
 
@@ -1506,7 +1669,7 @@ public:
             $(REF DateTimeException,std,datetime,date) if the given minute are
             not a valid minute of an hour.
      +/
-    @property void minute(int minute) @safe
+    @property void minute(int minute) @safe scope
     {
         enforceValid!"minutes"(minute);
 
@@ -1552,16 +1715,21 @@ public:
         assertThrown!DateTimeException(st.minute = 60);
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.minute = 27));
-        //static assert(!__traits(compiles, ist.minute = 27));
+        static assert(!__traits(compiles, ist.minute = 27));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.minute = 12;
+        }
     }
 
 
     /++
         Seconds past the current minute.
      +/
-    @property ubyte second() @safe const nothrow
+    @property ubyte second() @safe const nothrow scope
     {
         auto hnsecs = adjTime;
         auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
@@ -1614,9 +1782,14 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.second == 33);
-        //assert(ist.second == 33);
+        assert(ist.second == 33);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.second;
+        }
     }
 
 
@@ -1630,7 +1803,7 @@ public:
             $(REF DateTimeException,std,datetime,date) if the given second are
             not a valid second of a minute.
      +/
-    @property void second(int second) @safe
+    @property void second(int second) @safe scope
     {
         enforceValid!"seconds"(second);
 
@@ -1678,9 +1851,14 @@ public:
         assertThrown!DateTimeException(st.second = 60);
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.seconds = 27));
-        //static assert(!__traits(compiles, ist.seconds = 27));
+        static assert(!__traits(compiles, ist.seconds = 27));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.second = 12;
+        }
     }
 
 
@@ -1688,7 +1866,7 @@ public:
         Fractional seconds past the second (i.e. the portion of a
         $(LREF SysTime) which is less than a second).
      +/
-    @property Duration fracSecs() @safe const nothrow
+    @property Duration fracSecs() @safe const nothrow scope
     {
         auto hnsecs = removeUnitsFromHNSecs!"days"(adjTime);
 
@@ -1717,6 +1895,7 @@ public:
     @safe unittest
     {
         import std.range : chain;
+        import core.time;
 
         assert(SysTime(0, UTC()).fracSecs == Duration.zero);
         assert(SysTime(1, UTC()).fracSecs == hnsecs(1));
@@ -1745,9 +1924,14 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.fracSecs == Duration.zero);
-        //assert(ist.fracSecs == Duration.zero);
+        assert(ist.fracSecs == Duration.zero);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.fracSecs;
+        }
     }
 
 
@@ -1763,7 +1947,7 @@ public:
             $(REF DateTimeException,std,datetime,date) if the given duration
             is negative or if it's greater than or equal to one second.
      +/
-    @property void fracSecs(Duration fracSecs) @safe
+    @property void fracSecs(Duration fracSecs) @safe scope
     {
         enforce(fracSecs >= Duration.zero, new DateTimeException("A SysTime cannot have negative fractional seconds."));
         enforce(fracSecs < seconds(1), new DateTimeException("Fractional seconds must be less than one second."));
@@ -1810,6 +1994,7 @@ public:
     @safe unittest
     {
         import std.range : chain;
+        import core.time;
 
         foreach (fracSec; testFracSecs)
         {
@@ -1827,9 +2012,14 @@ public:
         assertThrown!DateTimeException(st.fracSecs = seconds(1));
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.fracSecs = msecs(7)));
-        //static assert(!__traits(compiles, ist.fracSecs = msecs(7)));
+        static assert(!__traits(compiles, ist.fracSecs = msecs(7)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.fracSecs = Duration.zero;
+        }
     }
 
 
@@ -1837,13 +2027,14 @@ public:
         The total hnsecs from midnight, January 1st, 1 A.D. UTC. This is the
         internal representation of $(LREF SysTime).
      +/
-    @property long stdTime() @safe const pure nothrow
+    @property long stdTime() @safe const pure nothrow scope
     {
         return _stdTime;
     }
 
     @safe unittest
     {
+        import core.time;
         assert(SysTime(0).stdTime == 0);
         assert(SysTime(1).stdTime == 1);
         assert(SysTime(-1).stdTime == -1);
@@ -1851,9 +2042,14 @@ public:
         assert(SysTime(DateTime(1970, 1, 1, 0, 0, 0), UTC()).stdTime == 621_355_968_000_000_000L);
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.stdTime > 0);
-        //assert(ist.stdTime > 0);
+        assert(ist.stdTime > 0);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.stdTime;
+        }
     }
 
 
@@ -1864,14 +2060,15 @@ public:
         Params:
             stdTime = The number of hnsecs since January 1st, 1 A.D. UTC.
      +/
-    @property void stdTime(long stdTime) @safe pure nothrow
+    @property void stdTime(long stdTime) @safe pure nothrow scope
     {
         _stdTime = stdTime;
     }
 
     @safe unittest
     {
-        static void test(long stdTime, in SysTime expected, size_t line = __LINE__)
+        import core.time;
+        static void test(long stdTime, SysTime expected, size_t line = __LINE__)
         {
             auto st = SysTime(0, UTC());
             st.stdTime = stdTime;
@@ -1885,9 +2082,14 @@ public:
         test(621_355_968_000_000_000L, SysTime(DateTime(1970, 1, 1, 0, 0, 0), UTC()));
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.stdTime = 27));
-        //static assert(!__traits(compiles, ist.stdTime = 27));
+        static assert(!__traits(compiles, ist.stdTime = 27));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.stdTime = 42;
+        }
     }
 
 
@@ -1898,9 +2100,20 @@ public:
         hours - adjust the time to this $(LREF SysTime)'s time zone before
         returning.
       +/
-    @property immutable(TimeZone) timezone() @safe const pure nothrow
+    @property immutable(TimeZone) timezone() @safe const pure nothrow scope
     {
         return _timezone;
+    }
+
+    @safe unittest
+    {
+        assert(SysTime.init.timezone is InitTimeZone());
+        assert(SysTime(DateTime.init, UTC()).timezone is UTC());
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.timezone;
+        }
     }
 
 
@@ -1915,7 +2128,7 @@ public:
             timezone = The $(REF _TimeZone,std,datetime,_timezone) to set this
                        $(LREF SysTime)'s time zone to.
       +/
-    @property void timezone(immutable TimeZone timezone) @safe pure nothrow
+    @property void timezone(immutable TimeZone timezone) @safe pure nothrow scope
     {
         if (timezone is null)
             _timezone = LocalTime();
@@ -1923,14 +2136,40 @@ public:
             _timezone = timezone;
     }
 
+    @safe unittest
+    {
+        SysTime st;
+        st.timezone = null;
+        assert(st.timezone is LocalTime());
+        st.timezone = UTC();
+        assert(st.timezone is UTC());
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.timezone = UTC();
+        }
+    }
+
 
     /++
         Returns whether DST is in effect for this $(LREF SysTime).
       +/
-    @property bool dstInEffect() @safe const nothrow
+    @property bool dstInEffect() @safe const nothrow scope
     {
         return _timezone.dstInEffect(_stdTime);
-        // This function's unit testing is done in the time zone classes.
+    }
+
+    // This function's full unit testing is done in the time zone classes, but
+    // this verifies that SysTime.init works correctly, since historically, it
+    // has segfaulted due to a null _timezone.
+    @safe unittest
+    {
+        assert(!SysTime.init.dstInEffect);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.dstInEffect;
+        }
     }
 
 
@@ -1938,9 +2177,22 @@ public:
         Returns what the offset from UTC is for this $(LREF SysTime).
         It includes the DST offset in effect at that time (if any).
       +/
-    @property Duration utcOffset() @safe const nothrow
+    @property Duration utcOffset() @safe const nothrow scope
     {
         return _timezone.utcOffsetAt(_stdTime);
+    }
+
+    // This function's full unit testing is done in the time zone classes, but
+    // this verifies that SysTime.init works correctly, since historically, it
+    // has segfaulted due to a null _timezone.
+    @safe unittest
+    {
+        assert(SysTime.init.utcOffset == Duration.zero);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.utcOffset;
+        }
     }
 
 
@@ -1948,13 +2200,14 @@ public:
         Returns a $(LREF SysTime) with the same std time as this one, but with
         $(REF LocalTime,std,datetime,timezone) as its time zone.
       +/
-    SysTime toLocalTime() @safe const pure nothrow
+    SysTime toLocalTime() @safe const pure nothrow scope
     {
         return SysTime(_stdTime, LocalTime());
     }
 
     @safe unittest
     {
+        import core.time;
         {
             auto sysTime = SysTime(DateTime(1982, 1, 4, 8, 59, 7), hnsecs(27));
             assert(sysTime == sysTime.toLocalTime());
@@ -1973,26 +2226,37 @@ public:
             assert(sysTime.toLocalTime().timezone !is UTC());
             assert(sysTime.toLocalTime().timezone !is stz);
         }
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.toLocalTime();
+        }
     }
 
 
     /++
         Returns a $(LREF SysTime) with the same std time as this one, but with
-        $(D UTC) as its time zone.
+        `UTC` as its time zone.
       +/
-    SysTime toUTC() @safe const pure nothrow
+    SysTime toUTC() @safe const pure nothrow scope
     {
         return SysTime(_stdTime, UTC());
     }
 
     @safe unittest
     {
+        import core.time;
         auto sysTime = SysTime(DateTime(1982, 1, 4, 8, 59, 7), hnsecs(27));
         assert(sysTime == sysTime.toUTC());
         assert(sysTime._stdTime == sysTime.toUTC()._stdTime);
         assert(sysTime.toUTC().timezone is UTC());
         assert(sysTime.toUTC().timezone !is LocalTime());
         assert(sysTime.toUTC().timezone !is sysTime.timezone);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.toUTC();
+        }
     }
 
 
@@ -2000,7 +2264,7 @@ public:
         Returns a $(LREF SysTime) with the same std time as this one, but with
         given time zone as its time zone.
       +/
-    SysTime toOtherTZ(immutable TimeZone tz) @safe const pure nothrow
+    SysTime toOtherTZ(immutable TimeZone tz) @safe const pure nothrow scope
     {
         if (tz is null)
             return SysTime(_stdTime, LocalTime());
@@ -2010,6 +2274,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         auto stz = new immutable SimpleTimeZone(dur!"minutes"(11 * 60));
         auto sysTime = SysTime(DateTime(1982, 1, 4, 8, 59, 7), hnsecs(27));
         assert(sysTime == sysTime.toOtherTZ(stz));
@@ -2017,6 +2282,12 @@ public:
         assert(sysTime.toOtherTZ(stz).timezone is stz);
         assert(sysTime.toOtherTZ(stz).timezone !is LocalTime());
         assert(sysTime.toOtherTZ(stz).timezone !is UTC());
+        assert(sysTime.toOtherTZ(null).timezone is LocalTime());
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.toOtherTZ(null);
+        }
     }
 
 
@@ -2036,8 +2307,8 @@ public:
         argument to get the desired size.
 
         If the return type is int, and the result can't fit in an int, then the
-        closest value that can be held in 32 bits will be used (so $(D int.max)
-        if it goes over and $(D int.min) if it goes under). However, no attempt
+        closest value that can be held in 32 bits will be used (so `int.max`
+        if it goes over and `int.min` if it goes under). However, no attempt
         is made to deal with integer overflow if the return type is long.
 
         Params:
@@ -2049,7 +2320,7 @@ public:
             A signed integer representing the unix time which is equivalent to
             this SysTime.
       +/
-    T toUnixTime(T = time_t)() @safe const pure nothrow
+    T toUnixTime(T = time_t)() @safe const pure nothrow scope
         if (is(T == int) || is(T == long))
     {
         return stdTimeToUnixTime!T(_stdTime);
@@ -2072,13 +2343,19 @@ public:
 
         auto ca = SysTime(DateTime(2007, 12, 22, 8, 14, 45), pst);
         assert(ca.toUnixTime() == 1_198_340_085);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.toUnixTime();
+        }
     }
 
     @safe unittest
     {
         import std.meta : AliasSeq;
+        import core.time;
         assert(SysTime(DateTime(1970, 1, 1), UTC()).toUnixTime() == 0);
-        foreach (units; AliasSeq!("hnsecs", "usecs", "msecs"))
+        static foreach (units; ["hnsecs", "usecs", "msecs"])
             assert(SysTime(DateTime(1970, 1, 1, 0, 0, 0), dur!units(1), UTC()).toUnixTime() == 0);
         assert(SysTime(DateTime(1970, 1, 1, 0, 0, 1), UTC()).toUnixTime() == 1);
         assert(SysTime(DateTime(1969, 12, 31, 23, 59, 59), hnsecs(9_999_999), UTC()).toUnixTime() == 0);
@@ -2134,6 +2411,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         assert(SysTime.fromUnixTime(0) == SysTime(DateTime(1970, 1, 1), UTC()));
         assert(SysTime.fromUnixTime(1) == SysTime(DateTime(1970, 1, 1, 0, 0, 1), UTC()));
         assert(SysTime.fromUnixTime(-1) == SysTime(DateTime(1969, 12, 31, 23, 59, 59), UTC()));
@@ -2149,17 +2427,17 @@ public:
 
 
     /++
-        Returns a $(D timeval) which represents this $(LREF SysTime).
+        Returns a `timeval` which represents this $(LREF SysTime).
 
         Note that like all conversions in std.datetime, this is a truncating
         conversion.
 
-        If $(D timeval.tv_sec) is int, and the result can't fit in an int, then
+        If `timeval.tv_sec` is int, and the result can't fit in an int, then
         the closest value that can be held in 32 bits will be used for
-        $(D tv_sec). (so $(D int.max) if it goes over and $(D int.min) if it
+        `tv_sec`. (so `int.max` if it goes over and `int.min` if it
         goes under).
       +/
-    timeval toTimeVal() @safe const pure nothrow
+    timeval toTimeVal() @safe const pure nothrow scope
     {
         immutable tv_sec = toUnixTime!(typeof(timeval.tv_sec))();
         immutable fracHNSecs = removeUnitsFromHNSecs!"seconds"(_stdTime - 621_355_968_000_000_000L);
@@ -2169,6 +2447,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         assert(SysTime(DateTime(1970, 1, 1), UTC()).toTimeVal() == timeval(0, 0));
         assert(SysTime(DateTime(1970, 1, 1), hnsecs(9), UTC()).toTimeVal() == timeval(0, 0));
         assert(SysTime(DateTime(1970, 1, 1), hnsecs(10), UTC()).toTimeVal() == timeval(0, 1));
@@ -2187,6 +2466,11 @@ public:
         assert(SysTime(DateTime(1969, 12, 31, 23, 59, 59), msecs(999), UTC()).toTimeVal() == timeval(0, -1000));
         assert(SysTime(DateTime(1969, 12, 31, 23, 59, 59), UTC()).toTimeVal() == timeval(-1, 0));
         assert(SysTime(DateTime(1969, 12, 31, 23, 59, 58), usecs(17), UTC()).toTimeVal() == timeval(-1, -999_983));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.toTimeVal();
+        }
     }
 
 
@@ -2194,15 +2478,15 @@ public:
     {
         private struct timespec {}
         /++
-            Returns a $(D timespec) which represents this $(LREF SysTime).
+            Returns a `timespec` which represents this $(LREF SysTime).
 
             $(BLUE This function is Posix-Only.)
           +/
-        timespec toTimeSpec() @safe const pure nothrow;
+        timespec toTimeSpec() @safe const pure nothrow scope;
     }
     else version (Posix)
     {
-        timespec toTimeSpec() @safe const pure nothrow
+        timespec toTimeSpec() @safe const pure nothrow scope
         {
             immutable tv_sec = toUnixTime!(typeof(timespec.tv_sec))();
             immutable fracHNSecs = removeUnitsFromHNSecs!"seconds"(_stdTime - 621_355_968_000_000_000L);
@@ -2212,6 +2496,7 @@ public:
 
         @safe unittest
         {
+            import core.time;
             assert(SysTime(DateTime(1970, 1, 1), UTC()).toTimeSpec() == timespec(0, 0));
             assert(SysTime(DateTime(1970, 1, 1), hnsecs(9), UTC()).toTimeSpec() == timespec(0, 900));
             assert(SysTime(DateTime(1970, 1, 1), hnsecs(10), UTC()).toTimeSpec() == timespec(0, 1000));
@@ -2237,13 +2522,18 @@ public:
                    timespec(-1, 0));
             assert(SysTime(DateTime(1969, 12, 31, 23, 59, 58), usecs(17), UTC()).toTimeSpec() ==
                    timespec(-1, -999_983_000));
+
+            static void testScope(scope ref SysTime st) @safe
+            {
+                auto result = st.toTimeSpec();
+            }
         }
     }
 
     /++
-        Returns a $(D tm) which represents this $(LREF SysTime).
+        Returns a `tm` which represents this $(LREF SysTime).
       +/
-    tm toTM() @safe const nothrow
+    tm toTM() @safe const nothrow scope
     {
         auto dateTime = cast(DateTime) this;
         tm timeInfo;
@@ -2262,7 +2552,7 @@ public:
         {
             import std.utf : toUTFz;
             timeInfo.tm_gmtoff = cast(int) convert!("hnsecs", "seconds")(adjTime - _stdTime);
-            auto zone = (timeInfo.tm_isdst ? _timezone.dstName : _timezone.stdName);
+            auto zone = timeInfo.tm_isdst ? _timezone.dstName : _timezone.stdName;
             timeInfo.tm_zone = zone.toUTFz!(char*)();
         }
 
@@ -2272,11 +2562,13 @@ public:
     @system unittest
     {
         import std.conv : to;
+        import core.time;
 
         version (Posix)
         {
-            scope(exit) clearTZEnvVar();
+            import std.datetime.timezone : clearTZEnvVar, setTZEnvVar;
             setTZEnvVar("America/Los_Angeles");
+            scope(exit) clearTZEnvVar();
         }
 
         {
@@ -2326,6 +2618,34 @@ public:
                 assert(to!string(timeInfo.tm_zone) == "PDT");
             }
         }
+
+        // This is more to verify that SysTime.init.toTM() doesn't segfault and
+        // does something sane rather than that the value is anything
+        // particularly useful.
+        {
+            auto timeInfo = SysTime.init.toTM();
+
+            assert(timeInfo.tm_sec == 0);
+            assert(timeInfo.tm_min == 0);
+            assert(timeInfo.tm_hour == 0);
+            assert(timeInfo.tm_mday == 1);
+            assert(timeInfo.tm_mon == 0);
+            assert(timeInfo.tm_year == -1899);
+            assert(timeInfo.tm_wday == 1);
+            assert(timeInfo.tm_yday == 0);
+            assert(timeInfo.tm_isdst == 0);
+
+            version (Posix)
+            {
+                assert(timeInfo.tm_gmtoff == 0);
+                assert(to!string(timeInfo.tm_zone) == "SysTime.init's timezone");
+            }
+        }
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.toTM();
+        }
     }
 
 
@@ -2348,7 +2668,7 @@ public:
             allowOverflow = Whether the days should be allowed to overflow,
                             causing the month to increment.
       +/
-    ref SysTime add(string units)(long value, AllowDayOverflow allowOverflow = AllowDayOverflow.yes) @safe nothrow
+    ref SysTime add(string units)(long value, AllowDayOverflow allowOverflow = AllowDayOverflow.yes) @safe nothrow scope
         if (units == "years" || units == "months")
     {
         auto hnsecs = adjTime;
@@ -2399,6 +2719,7 @@ public:
     // Test add!"years"() with AllowDayOverflow.yes
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         {
             auto sysTime = SysTime(Date(1999, 7, 6));
@@ -2593,14 +2914,20 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.add!"years"(4)));
-        //static assert(!__traits(compiles, ist.add!"years"(4)));
+        static assert(!__traits(compiles, ist.add!"years"(4)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.add!"years"(42);
+        }
     }
 
     // Test add!"years"() with AllowDayOverflow.no
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         {
             auto sysTime = SysTime(Date(1999, 7, 6));
@@ -2806,6 +3133,7 @@ public:
     // Test add!"months"() with AllowDayOverflow.yes
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         {
             auto sysTime = SysTime(Date(1999, 7, 6));
@@ -3144,14 +3472,20 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.add!"months"(4)));
-        //static assert(!__traits(compiles, ist.add!"months"(4)));
+        static assert(!__traits(compiles, ist.add!"months"(4)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.add!"months"(42);
+        }
     }
 
     // Test add!"months"() with AllowDayOverflow.no
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         {
             auto sysTime = SysTime(Date(1999, 7, 6));
@@ -3510,8 +3844,9 @@ public:
             allowOverflow = Whether the days should be allowed to overflow,
                             causing the month to increment.
       +/
-    ref SysTime roll(string units)(long value, AllowDayOverflow allowOverflow = AllowDayOverflow.yes) @safe nothrow
-        if (units == "years")
+    ref SysTime roll(string units)
+                    (long value, AllowDayOverflow allowOverflow = AllowDayOverflow.yes) @safe nothrow scope
+    if (units == "years")
     {
         return add!"years"(value, allowOverflow);
     }
@@ -3550,16 +3885,22 @@ public:
     {
         auto st = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         st.roll!"years"(4);
         static assert(!__traits(compiles, cst.roll!"years"(4)));
-        //static assert(!__traits(compiles, ist.roll!"years"(4)));
+        static assert(!__traits(compiles, ist.roll!"years"(4)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.roll!"years"(42);
+        }
     }
 
 
     // Shares documentation with "years" overload.
-    ref SysTime roll(string units)(long value, AllowDayOverflow allowOverflow = AllowDayOverflow.yes) @safe nothrow
-        if (units == "months")
+    ref SysTime roll(string units)
+                    (long value, AllowDayOverflow allowOverflow = AllowDayOverflow.yes) @safe nothrow scope
+    if (units == "months")
     {
         auto hnsecs = adjTime;
         auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
@@ -3588,6 +3929,7 @@ public:
     // Test roll!"months"() with AllowDayOverflow.yes
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         {
             auto sysTime = SysTime(Date(1999, 7, 6));
@@ -3958,14 +4300,20 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.roll!"months"(4)));
-        //static assert(!__traits(compiles, ist.roll!"months"(4)));
+        static assert(!__traits(compiles, ist.roll!"months"(4)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.roll!"months"(42);
+        }
     }
 
     // Test roll!"months"() with AllowDayOverflow.no
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         {
             auto sysTime = SysTime(Date(1999, 7, 6));
@@ -4345,9 +4693,9 @@ public:
         affect larger units. For instance, rolling a $(LREF SysTime) one
         year's worth of days gets the exact same $(LREF SysTime).
 
-        Accepted units are $(D "days"), $(D "minutes"), $(D "hours"),
-        $(D "minutes"), $(D "seconds"), $(D "msecs"), $(D "usecs"), and
-        $(D "hnsecs").
+        Accepted units are `"days"`, `"minutes"`, `"hours"`,
+        `"minutes"`, `"seconds"`, `"msecs"`, `"usecs"`, and
+        `"hnsecs"`.
 
         Note that when rolling msecs, usecs or hnsecs, they all add up to a
         second. So, for example, rolling 1000 msecs is exactly the same as
@@ -4358,7 +4706,7 @@ public:
             value = The number of $(D_PARAM units) to add to this
                     $(LREF SysTime).
       +/
-    ref SysTime roll(string units)(long value) @safe nothrow
+    ref SysTime roll(string units)(long value) @safe nothrow scope
         if (units == "days")
     {
         auto hnsecs = adjTime;
@@ -4443,6 +4791,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         {
             auto sysTime = SysTime(Date(1999, 2, 28));
@@ -4710,14 +5059,19 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.roll!"days"(4)));
-        //static assert(!__traits(compiles, ist.roll!"days"(4)));
+        static assert(!__traits(compiles, ist.roll!"days"(4)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.roll!"days"(42);
+        }
     }
 
 
     // Shares documentation with "days" version.
-    ref SysTime roll(string units)(long value) @safe nothrow
+    ref SysTime roll(string units)(long value) @safe nothrow scope
         if (units == "hours" || units == "minutes" || units == "seconds")
     {
         try
@@ -4761,7 +5115,8 @@ public:
     // Test roll!"hours"().
     @safe unittest
     {
-        static void testST(SysTime orig, int hours, in SysTime expected, size_t line = __LINE__)
+        import core.time;
+        static void testST(SysTime orig, int hours, SysTime expected, size_t line = __LINE__) @safe
         {
             orig.roll!"hours"(hours);
             if (orig != expected)
@@ -4970,15 +5325,21 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.roll!"hours"(4)));
-        //static assert(!__traits(compiles, ist.roll!"hours"(4)));
+        static assert(!__traits(compiles, ist.roll!"hours"(4)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.roll!"hours"(42);
+        }
     }
 
     // Test roll!"minutes"().
     @safe unittest
     {
-        static void testST(SysTime orig, int minutes, in SysTime expected, size_t line = __LINE__)
+        import core.time;
+        static void testST(SysTime orig, int minutes, SysTime expected, size_t line = __LINE__) @safe
         {
             orig.roll!"minutes"(minutes);
             if (orig != expected)
@@ -5180,15 +5541,21 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.roll!"minutes"(4)));
-        //static assert(!__traits(compiles, ist.roll!"minutes"(4)));
+        static assert(!__traits(compiles, ist.roll!"minutes"(4)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.roll!"minutes"(42);
+        }
     }
 
     // Test roll!"seconds"().
     @safe unittest
     {
-        static void testST(SysTime orig, int seconds, in SysTime expected, size_t line = __LINE__)
+        import core.time;
+        static void testST(SysTime orig, int seconds, SysTime expected, size_t line = __LINE__) @safe
         {
             orig.roll!"seconds"(seconds);
             if (orig != expected)
@@ -5368,14 +5735,19 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.roll!"seconds"(4)));
-        //static assert(!__traits(compiles, ist.roll!"seconds"(4)));
+        static assert(!__traits(compiles, ist.roll!"seconds"(4)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.roll!"seconds"(42);
+        }
     }
 
 
     // Shares documentation with "days" version.
-    ref SysTime roll(string units)(long value) @safe nothrow
+    ref SysTime roll(string units)(long value) @safe nothrow scope
         if (units == "msecs" || units == "usecs" || units == "hnsecs")
     {
         auto hnsecs = adjTime;
@@ -5405,7 +5777,8 @@ public:
     // Test roll!"msecs"().
     @safe unittest
     {
-        static void testST(SysTime orig, int milliseconds, in SysTime expected, size_t line = __LINE__)
+        import core.time;
+        static void testST(SysTime orig, int milliseconds, SysTime expected, size_t line = __LINE__) @safe
         {
             orig.roll!"msecs"(milliseconds);
             if (orig != expected)
@@ -5502,15 +5875,21 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        static assert(!__traits(compiles, cst.addMSecs(4)));
-        //static assert(!__traits(compiles, ist.addMSecs(4)));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        static assert(!__traits(compiles, cst.roll!"msecs"(4)));
+        static assert(!__traits(compiles, ist.roll!"msecs"(4)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.roll!"msecs"(42);
+        }
     }
 
     // Test roll!"usecs"().
     @safe unittest
     {
-        static void testST(SysTime orig, long microseconds, in SysTime expected, size_t line = __LINE__)
+        import core.time;
+        static void testST(SysTime orig, long microseconds, SysTime expected, size_t line = __LINE__) @safe
         {
             orig.roll!"usecs"(microseconds);
             if (orig != expected)
@@ -5631,15 +6010,21 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.roll!"usecs"(4)));
-        //static assert(!__traits(compiles, ist.roll!"usecs"(4)));
+        static assert(!__traits(compiles, ist.roll!"usecs"(4)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.roll!"usecs"(42);
+        }
     }
 
     // Test roll!"hnsecs"().
     @safe unittest
     {
-        static void testST(SysTime orig, long hnsecs, in SysTime expected, size_t line = __LINE__)
+        import core.time;
+        static void testST(SysTime orig, long hnsecs, SysTime expected, size_t line = __LINE__) @safe
         {
             orig.roll!"hnsecs"(hnsecs);
             if (orig != expected)
@@ -5772,9 +6157,14 @@ public:
         }
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.roll!"hnsecs"(4)));
-        //static assert(!__traits(compiles, ist.roll!"hnsecs"(4)));
+        static assert(!__traits(compiles, ist.roll!"hnsecs"(4)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.roll!"hnsecs"(42);
+        }
     }
 
 
@@ -5794,7 +6184,7 @@ public:
             duration = The $(REF Duration, core,time) to add to or subtract from
                        this $(LREF SysTime).
       +/
-    SysTime opBinary(string op)(Duration duration) @safe const pure nothrow
+    SysTime opBinary(string op)(Duration duration) @safe const pure nothrow scope
         if (op == "+" || op == "-")
     {
         SysTime retval = SysTime(this._stdTime, this._timezone);
@@ -5824,6 +6214,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         auto st = SysTime(DateTime(1999, 7, 6, 12, 30, 33), hnsecs(2_345_678));
 
         assert(st + dur!"weeks"(7) == SysTime(DateTime(1999, 8, 24, 12, 30, 33), hnsecs(2_345_678)));
@@ -5860,7 +6251,7 @@ public:
         assert(st - dur!"hnsecs"(-7) == SysTime(DateTime(1999, 7, 6, 12, 30, 33), hnsecs(2_345_685)));
         assert(st - dur!"hnsecs"(7) == SysTime(DateTime(1999, 7, 6, 12, 30, 33), hnsecs(2_345_671)));
 
-        static void testST(in SysTime orig, long hnsecs, in SysTime expected, size_t line = __LINE__)
+        static void testST(SysTime orig, long hnsecs, SysTime expected, size_t line = __LINE__) @safe
         {
             auto result = orig + dur!"hnsecs"(hnsecs);
             if (result != expected)
@@ -5984,11 +6375,16 @@ public:
 
         auto duration = dur!"seconds"(12);
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst + duration == SysTime(DateTime(1999, 7, 6, 12, 30, 45)));
-        //assert(ist + duration == SysTime(DateTime(1999, 7, 6, 12, 30, 45)));
+        assert(ist + duration == SysTime(DateTime(1999, 7, 6, 12, 30, 45)));
         assert(cst - duration == SysTime(DateTime(1999, 7, 6, 12, 30, 21)));
-        //assert(ist - duration == SysTime(DateTime(1999, 7, 6, 12, 30, 21)));
+        assert(ist - duration == SysTime(DateTime(1999, 7, 6, 12, 30, 21)));
+
+        static void testScope(scope ref SysTime st, scope ref Duration d) @safe
+        {
+            auto result = st + d;
+        }
     }
 
 
@@ -6008,7 +6404,7 @@ public:
             duration = The $(REF Duration, core,time) to add to or subtract from
                        this $(LREF SysTime).
       +/
-    ref SysTime opOpAssign(string op)(Duration duration) @safe pure nothrow
+    ref SysTime opOpAssign(string op)(Duration duration) @safe pure nothrow scope
         if (op == "+" || op == "-")
     {
         immutable hnsecs = duration.total!"hnsecs";
@@ -6018,6 +6414,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         auto before = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(before + dur!"weeks"(7) == SysTime(DateTime(1999, 8, 24, 12, 30, 33)));
         assert(before + dur!"weeks"(-7) == SysTime(DateTime(1999, 5, 18, 12, 30, 33)));
@@ -6055,7 +6452,7 @@ public:
         assert(before - dur!"hnsecs"(-7) == SysTime(DateTime(1999, 7, 6, 12, 30, 33), hnsecs(7)));
         assert(before - dur!"hnsecs"(7) == SysTime(DateTime(1999, 7, 6, 12, 30, 32), hnsecs(9_999_993)));
 
-        static void testST(SysTime orig, long hnsecs, in SysTime expected, size_t line = __LINE__)
+        static void testST(SysTime orig, long hnsecs, SysTime expected, size_t line = __LINE__) @safe
         {
             auto r = orig += dur!"hnsecs"(hnsecs);
             if (orig != expected)
@@ -6187,11 +6584,17 @@ public:
 
         auto duration = dur!"seconds"(12);
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst += duration));
-        //static assert(!__traits(compiles, ist += duration));
+        static assert(!__traits(compiles, ist += duration));
         static assert(!__traits(compiles, cst -= duration));
-        //static assert(!__traits(compiles, ist -= duration));
+        static assert(!__traits(compiles, ist -= duration));
+
+        static void testScope(scope ref SysTime st, scope ref Duration d) @safe
+        {
+            auto result1 = st += d;
+            auto result2 = st -= d;
+        }
     }
 
 
@@ -6205,7 +6608,7 @@ public:
         $(TR $(TD SysTime) $(TD -) $(TD SysTime) $(TD -->) $(TD duration))
         )
       +/
-    Duration opBinary(string op)(in SysTime rhs) @safe const pure nothrow
+    Duration opBinary(string op)(SysTime rhs) @safe const pure nothrow scope
         if (op == "-")
     {
         return dur!"hnsecs"(_stdTime - rhs._stdTime);
@@ -6213,6 +6616,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         assert(SysTime(DateTime(1999, 7, 6, 12, 30, 33)) - SysTime(DateTime(1998, 7, 6, 12, 30, 33)) ==
                dur!"seconds"(31_536_000));
         assert(SysTime(DateTime(1998, 7, 6, 12, 30, 33)) - SysTime(DateTime(1999, 7, 6, 12, 30, 33)) ==
@@ -6266,9 +6670,15 @@ public:
                dur!"hnsecs"(-1));
 
         version (Posix)
+        {
+            import std.datetime.timezone : PosixTimeZone;
             immutable tz = PosixTimeZone.getTimeZone("America/Los_Angeles");
+        }
         else version (Windows)
+        {
+            import std.datetime.timezone : WindowsTimeZone;
             immutable tz = WindowsTimeZone.getTimeZone("Pacific Standard Time");
+        }
 
         {
             auto dt = DateTime(2011, 1, 13, 8, 17, 2);
@@ -6280,18 +6690,23 @@ public:
 
         auto st = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(st - st == Duration.zero);
         assert(cst - st == Duration.zero);
-        //assert(ist - st == Duration.zero);
+        assert(ist - st == Duration.zero);
 
         assert(st - cst == Duration.zero);
         assert(cst - cst == Duration.zero);
-        //assert(ist - cst == Duration.zero);
+        assert(ist - cst == Duration.zero);
 
-        //assert(st - ist == Duration.zero);
-        //assert(cst - ist == Duration.zero);
-        //assert(ist - ist == Duration.zero);
+        assert(st - ist == Duration.zero);
+        assert(cst - ist == Duration.zero);
+        assert(ist - ist == Duration.zero);
+
+        static void testScope(scope ref SysTime left, scope ref SysTime right) @safe
+        {
+            auto result = left - right;
+        }
     }
 
 
@@ -6316,7 +6731,7 @@ public:
         Params:
             rhs = The $(LREF SysTime) to subtract from this one.
       +/
-    int diffMonths(in SysTime rhs) @safe const nothrow
+    int diffMonths(scope SysTime rhs) @safe const nothrow scope
     {
         return (cast(Date) this).diffMonths(cast(Date) rhs);
     }
@@ -6324,6 +6739,7 @@ public:
     ///
     @safe unittest
     {
+        import core.time;
         import std.datetime.date : Date;
 
         assert(SysTime(Date(1999, 2, 1)).diffMonths(
@@ -6341,65 +6757,83 @@ public:
 
     @safe unittest
     {
+        import core.time;
         auto st = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(st.diffMonths(st) == 0);
         assert(cst.diffMonths(st) == 0);
-        //assert(ist.diffMonths(st) == 0);
+        assert(ist.diffMonths(st) == 0);
 
         assert(st.diffMonths(cst) == 0);
         assert(cst.diffMonths(cst) == 0);
-        //assert(ist.diffMonths(cst) == 0);
+        assert(ist.diffMonths(cst) == 0);
 
-        //assert(st.diffMonths(ist) == 0);
-        //assert(cst.diffMonths(ist) == 0);
-        //assert(ist.diffMonths(ist) == 0);
+        assert(st.diffMonths(ist) == 0);
+        assert(cst.diffMonths(ist) == 0);
+        assert(ist.diffMonths(ist) == 0);
+
+        static void testScope(scope ref SysTime left, scope ref SysTime right) @safe
+        {
+            auto result = left.diffMonths(right);
+        }
     }
 
 
     /++
         Whether this $(LREF SysTime) is in a leap year.
      +/
-    @property bool isLeapYear() @safe const nothrow
+    @property bool isLeapYear() @safe const nothrow scope
     {
         return (cast(Date) this).isLeapYear;
     }
 
     @safe unittest
     {
+        import core.time;
         auto st = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(!st.isLeapYear);
         assert(!cst.isLeapYear);
-        //assert(!ist.isLeapYear);
+        assert(!ist.isLeapYear);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.isLeapYear;
+        }
     }
 
 
     /++
         Day of the week this $(LREF SysTime) is on.
       +/
-    @property DayOfWeek dayOfWeek() @safe const nothrow
+    @property DayOfWeek dayOfWeek() @safe const nothrow scope
     {
         return getDayOfWeek(dayOfGregorianCal);
     }
 
     @safe unittest
     {
+        import core.time;
         auto st = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(st.dayOfWeek == DayOfWeek.tue);
         assert(cst.dayOfWeek == DayOfWeek.tue);
-        //assert(ist.dayOfWeek == DayOfWeek.tue);
+        assert(ist.dayOfWeek == DayOfWeek.tue);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.dayOfWeek;
+        }
     }
 
 
     /++
         Day of the year this $(LREF SysTime) is on.
       +/
-    @property ushort dayOfYear() @safe const nothrow
+    @property ushort dayOfYear() @safe const nothrow scope
     {
         return (cast(Date) this).dayOfYear;
     }
@@ -6407,6 +6841,7 @@ public:
     ///
     @safe unittest
     {
+        import core.time;
         import std.datetime.date : DateTime;
 
         assert(SysTime(DateTime(1999, 1, 1, 12, 22, 7)).dayOfYear == 1);
@@ -6416,12 +6851,18 @@ public:
 
     @safe unittest
     {
+        import core.time;
         auto st = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(st.dayOfYear == 187);
         assert(cst.dayOfYear == 187);
-        //assert(ist.dayOfYear == 187);
+        assert(ist.dayOfYear == 187);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.dayOfYear;
+        }
     }
 
 
@@ -6432,7 +6873,7 @@ public:
             day = The day of the year to set which day of the year this
                   $(LREF SysTime) is on.
       +/
-    @property void dayOfYear(int day) @safe
+    @property void dayOfYear(int day) @safe scope
     {
         immutable hnsecs = adjTime;
         immutable days = convert!("hnsecs", "days")(hnsecs);
@@ -6448,20 +6889,26 @@ public:
 
     @safe unittest
     {
+        import core.time;
         auto st = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         st.dayOfYear = 12;
         assert(st.dayOfYear == 12);
         static assert(!__traits(compiles, cst.dayOfYear = 12));
-        //static assert(!__traits(compiles, ist.dayOfYear = 12));
+        static assert(!__traits(compiles, ist.dayOfYear = 12));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.dayOfYear = 42;
+        }
     }
 
 
     /++
         The Xth day of the Gregorian Calendar that this $(LREF SysTime) is on.
      +/
-    @property int dayOfGregorianCal() @safe const nothrow
+    @property int dayOfGregorianCal() @safe const nothrow scope
     {
         immutable adjustedTime = adjTime;
 
@@ -6480,6 +6927,7 @@ public:
     ///
     @safe unittest
     {
+        import core.time;
         import std.datetime.date : DateTime;
 
         assert(SysTime(DateTime(1, 1, 1, 0, 0, 0)).dayOfGregorianCal == 1);
@@ -6496,6 +6944,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         assert(SysTime(DateTime(1, 1, 1, 0, 0, 0)).dayOfGregorianCal == 1);
         assert(SysTime(DateTime(1, 1, 1, 0, 0, 0), hnsecs(1)).dayOfGregorianCal == 1);
@@ -6657,9 +7106,14 @@ public:
         assert(SysTime(DateTime(-3760, 9, 7, 0, 0, 0)).dayOfGregorianCal == -1_373_427);
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.dayOfGregorianCal == 729_941);
-        //assert(ist.dayOfGregorianCal == 729_941);
+        assert(ist.dayOfGregorianCal == 729_941);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.dayOfGregorianCal;
+        }
     }
 
 
@@ -6667,6 +7121,7 @@ public:
     // between Date and SysTime.
     @safe unittest
     {
+        import core.time;
         void test(Date date, SysTime st, size_t line = __LINE__)
         {
             if (date.dayOfGregorianCal != st.dayOfGregorianCal)
@@ -6832,7 +7287,7 @@ public:
             days = The day of the Gregorian Calendar to set this $(LREF SysTime)
                    to.
      +/
-    @property void dayOfGregorianCal(int days) @safe nothrow
+    @property void dayOfGregorianCal(int days) @safe nothrow scope
     {
         auto hnsecs = adjTime;
         hnsecs = removeUnitsFromHNSecs!"days"(hnsecs);
@@ -6854,6 +7309,7 @@ public:
     ///
     @safe unittest
     {
+        import core.time;
         import std.datetime.date : DateTime;
 
         auto st = SysTime(DateTime(0, 1, 1, 12, 0, 0));
@@ -6884,7 +7340,8 @@ public:
 
     @safe unittest
     {
-        void testST(SysTime orig, int day, in SysTime expected, size_t line = __LINE__)
+        import core.time;
+        void testST(SysTime orig, int day, SysTime expected, size_t line = __LINE__) @safe
         {
             orig.dayOfGregorianCal = day;
             if (orig != expected)
@@ -6921,7 +7378,7 @@ public:
 
         auto st = SysTime(DateTime(1, 1, 1, 12, 2, 9), msecs(212));
 
-        void testST2(int day, in SysTime expected, size_t line = __LINE__)
+        void testST2(int day, SysTime expected, size_t line = __LINE__) @safe
         {
             st.dayOfGregorianCal = day;
             if (st != expected)
@@ -7076,9 +7533,14 @@ public:
         testST2(-735_173, SysTime(DateTime(-2012, 3, 1, 12, 2, 9), msecs(212)));
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         static assert(!__traits(compiles, cst.dayOfGregorianCal = 7));
-        //static assert(!__traits(compiles, ist.dayOfGregorianCal = 7));
+        static assert(!__traits(compiles, ist.dayOfGregorianCal = 7));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            st.dayOfGregorianCal = 42;
+        }
     }
 
 
@@ -7088,7 +7550,7 @@ public:
         See_Also:
             $(HTTP en.wikipedia.org/wiki/ISO_week_date, ISO Week Date).
       +/
-    @property ubyte isoWeek() @safe const nothrow
+    @property ubyte isoWeek() @safe const nothrow scope
     {
         return (cast(Date) this).isoWeek;
     }
@@ -7096,6 +7558,7 @@ public:
     ///
     @safe unittest
     {
+        import core.time;
         import std.datetime.date : Date;
 
         auto st = SysTime(Date(1999, 7, 6));
@@ -7107,12 +7570,20 @@ public:
         assert(ist.isoWeek == 41);
     }
 
+    @safe unittest
+    {
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.isoWeek;
+        }
+    }
+
 
     /++
         $(LREF SysTime) for the last day in the month that this Date is in.
         The time portion of endOfMonth is always 23:59:59.9999999.
       +/
-    @property SysTime endOfMonth() @safe const nothrow
+    @property SysTime endOfMonth() @safe const nothrow scope
     {
         immutable hnsecs = adjTime;
         immutable days = getUnitsFromHNSecs!"days"(hnsecs);
@@ -7158,6 +7629,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         assert(SysTime(Date(1999, 1, 1)).endOfMonth == SysTime(DateTime(1999, 1, 31, 23, 59, 59), hnsecs(9_999_999)));
         assert(SysTime(Date(1999, 2, 1)).endOfMonth == SysTime(DateTime(1999, 2, 28, 23, 59, 59), hnsecs(9_999_999)));
@@ -7192,16 +7664,21 @@ public:
                SysTime(DateTime(-1999, 12, 31, 23, 59, 59), hnsecs(9_999_999)));
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.endOfMonth == SysTime(DateTime(1999, 7, 31, 23, 59, 59), hnsecs(9_999_999)));
-        //assert(ist.endOfMonth == SysTime(DateTime(1999, 7, 31, 23, 59, 59), hnsecs(9_999_999)));
+        assert(ist.endOfMonth == SysTime(DateTime(1999, 7, 31, 23, 59, 59), hnsecs(9_999_999)));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.endOfMonth;
+        }
     }
 
 
     /++
         The last day in the month that this $(LREF SysTime) is in.
       +/
-    @property ubyte daysInMonth() @safe const nothrow
+    @property ubyte daysInMonth() @safe const nothrow scope
     {
         return Date(dayOfGregorianCal).daysInMonth;
     }
@@ -7209,6 +7686,7 @@ public:
     ///
     @safe unittest
     {
+        import core.time;
         import std.datetime.date : DateTime;
 
         assert(SysTime(DateTime(1999, 1, 6, 0, 0, 0)).daysInMonth == 31);
@@ -7219,6 +7697,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         assert(SysTime(DateTime(1999, 1, 1, 12, 1, 13)).daysInMonth == 31);
         assert(SysTime(DateTime(1999, 2, 1, 17, 13, 12)).daysInMonth == 28);
@@ -7250,16 +7729,21 @@ public:
         assert(SysTime(DateTime(-1999, 12, 1, 12, 52, 13)).daysInMonth == 31);
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.daysInMonth == 31);
-        //assert(ist.daysInMonth == 31);
+        assert(ist.daysInMonth == 31);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.daysInMonth;
+        }
     }
 
 
     /++
         Whether the current year is a date in A.D.
       +/
-    @property bool isAD() @safe const nothrow
+    @property bool isAD() @safe const nothrow scope
     {
         return adjTime >= 0;
     }
@@ -7267,6 +7751,7 @@ public:
     ///
     @safe unittest
     {
+        import core.time;
         import std.datetime.date : DateTime;
 
         assert(SysTime(DateTime(1, 1, 1, 12, 7, 0)).isAD);
@@ -7277,6 +7762,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         assert(SysTime(DateTime(2010, 7, 4, 12, 0, 9)).isAD);
         assert(SysTime(DateTime(1, 1, 1, 0, 0, 0)).isAD);
         assert(!SysTime(DateTime(0, 12, 31, 23, 59, 59)).isAD);
@@ -7285,9 +7771,14 @@ public:
         assert(!SysTime(DateTime(-2010, 7, 4, 12, 2, 2)).isAD);
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.isAD);
-        //assert(ist.isAD);
+        assert(ist.isAD);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.isAD;
+        }
     }
 
 
@@ -7298,7 +7789,7 @@ public:
         this function returns 2_450_173, while from noon onward, the Julian
         day number would be 2_450_174, so this function returns 2_450_174.
       +/
-    @property long julianDay() @safe const nothrow
+    @property long julianDay() @safe const nothrow scope
     {
         immutable jd = dayOfGregorianCal + 1_721_425;
         return hour < 12 ? jd - 1 : jd;
@@ -7306,6 +7797,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         assert(SysTime(DateTime(-4713, 11, 24, 0, 0, 0)).julianDay == -1);
         assert(SysTime(DateTime(-4713, 11, 24, 12, 0, 0)).julianDay == 0);
 
@@ -7331,9 +7823,14 @@ public:
         assert(SysTime(DateTime(2010, 8, 24, 12, 0, 0)).julianDay == 2_455_433);
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.julianDay == 2_451_366);
-        //assert(ist.julianDay == 2_451_366);
+        assert(ist.julianDay == 2_451_366);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.julianDay;
+        }
     }
 
 
@@ -7342,13 +7839,14 @@ public:
         any time on this date (since, the modified Julian day changes at
         midnight).
       +/
-    @property long modJulianDay() @safe const nothrow
+    @property long modJulianDay() @safe const nothrow scope
     {
         return dayOfGregorianCal + 1_721_425 - 2_400_001;
     }
 
     @safe unittest
     {
+        import core.time;
         assert(SysTime(DateTime(1858, 11, 17, 0, 0, 0)).modJulianDay == 0);
         assert(SysTime(DateTime(1858, 11, 17, 12, 0, 0)).modJulianDay == 0);
 
@@ -7356,16 +7854,21 @@ public:
         assert(SysTime(DateTime(2010, 8, 24, 12, 0, 0)).modJulianDay == 55_432);
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cst.modJulianDay == 51_365);
-        //assert(ist.modJulianDay == 51_365);
+        assert(ist.modJulianDay == 51_365);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.modJulianDay;
+        }
     }
 
 
     /++
         Returns a $(REF Date,std,datetime,date) equivalent to this $(LREF SysTime).
       +/
-    Date opCast(T)() @safe const nothrow
+    Date opCast(T)() @safe const nothrow scope
         if (is(Unqual!T == Date))
     {
         return Date(dayOfGregorianCal);
@@ -7373,6 +7876,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         assert(cast(Date) SysTime(Date(1999, 7, 6)) == Date(1999, 7, 6));
         assert(cast(Date) SysTime(Date(2000, 12, 31)) == Date(2000, 12, 31));
         assert(cast(Date) SysTime(Date(2001, 1, 1)) == Date(2001, 1, 1));
@@ -7390,9 +7894,14 @@ public:
         assert(cast(Date) SysTime(DateTime(-2001, 1, 1, 14, 12, 11)) == Date(-2001, 1, 1));
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cast(Date) cst != Date.init);
-        //assert(cast(Date) ist != Date.init);
+        assert(cast(Date) ist != Date.init);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = cast(Date) st;
+        }
     }
 
 
@@ -7400,7 +7909,7 @@ public:
         Returns a $(REF DateTime,std,datetime,date) equivalent to this
         $(LREF SysTime).
       +/
-    DateTime opCast(T)() @safe const nothrow
+    DateTime opCast(T)() @safe const nothrow scope
         if (is(Unqual!T == DateTime))
     {
         try
@@ -7426,6 +7935,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         assert(cast(DateTime) SysTime(DateTime(1, 1, 6, 7, 12, 22)) == DateTime(1, 1, 6, 7, 12, 22));
         assert(cast(DateTime) SysTime(DateTime(1, 1, 6, 7, 12, 22), msecs(22)) == DateTime(1, 1, 6, 7, 12, 22));
         assert(cast(DateTime) SysTime(Date(1999, 7, 6)) == DateTime(1999, 7, 6, 0, 0, 0));
@@ -7450,9 +7960,14 @@ public:
                DateTime(2011, 1, 13, 8, 17, 2));
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cast(DateTime) cst != DateTime.init);
-        //assert(cast(DateTime) ist != DateTime.init);
+        assert(cast(DateTime) ist != DateTime.init);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = cast(DateTime) st;
+        }
     }
 
 
@@ -7460,7 +7975,7 @@ public:
         Returns a $(REF TimeOfDay,std,datetime,date) equivalent to this
         $(LREF SysTime).
       +/
-    TimeOfDay opCast(T)() @safe const nothrow
+    TimeOfDay opCast(T)() @safe const nothrow scope
         if (is(Unqual!T == TimeOfDay))
     {
         try
@@ -7483,6 +7998,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         assert(cast(TimeOfDay) SysTime(Date(1999, 7, 6)) == TimeOfDay(0, 0, 0));
         assert(cast(TimeOfDay) SysTime(Date(2000, 12, 31)) == TimeOfDay(0, 0, 0));
         assert(cast(TimeOfDay) SysTime(Date(2001, 1, 1)) == TimeOfDay(0, 0, 0));
@@ -7500,9 +8016,14 @@ public:
         assert(cast(TimeOfDay) SysTime(DateTime(-2001, 1, 1, 14, 12, 11)) == TimeOfDay(14, 12, 11));
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         assert(cast(TimeOfDay) cst != TimeOfDay.init);
-        //assert(cast(TimeOfDay) ist != TimeOfDay.init);
+        assert(cast(TimeOfDay) ist != TimeOfDay.init);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = cast(TimeOfDay) st;
+        }
     }
 
 
@@ -7511,10 +8032,18 @@ public:
     // It may be a good idea to keep it though, since casting from a type to itself
     // should be allowed, and it doesn't work without this opCast() since opCast()
     // has already been defined for other types.
-    SysTime opCast(T)() @safe const pure nothrow
+    SysTime opCast(T)() @safe const pure nothrow scope
         if (is(Unqual!T == SysTime))
     {
         return SysTime(_stdTime, _timezone);
+    }
+
+    @safe unittest
+    {
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = cast(SysTime) st;
+        }
     }
 
 
@@ -7531,7 +8060,7 @@ public:
 
         If this $(LREF SysTime)'s time zone is
         $(REF LocalTime,std,datetime,timezone), then TZ is empty. If its time
-        zone is $(D UTC), then it is "Z". Otherwise, it is the offset from UTC
+        zone is `UTC`, then it is "Z". Otherwise, it is the offset from UTC
         (e.g. +0100 or -0700). Note that the offset from UTC is $(I not) enough
         to uniquely identify the time zone.
 
@@ -7548,45 +8077,67 @@ public:
             writing out the result of toISOString to read in later will continue
             to work. The current behavior will be kept until July 2019 at which
             point, fromISOString will be fixed to be standards compliant.)
+
+        Params:
+            writer = A `char` accepting
+            $(REF_ALTTEXT output range, isOutputRange, std, range, primitives)
+        Returns:
+            A `string` when not using an output range; `void` otherwise.
       +/
-    string toISOString() @safe const nothrow
+    string toISOString() @safe const nothrow scope
     {
+        import std.array : appender;
+        auto app = appender!string();
+        app.reserve(30);
         try
-        {
-            immutable adjustedTime = adjTime;
-            long hnsecs = adjustedTime;
-
-            auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
-
-            if (hnsecs < 0)
-            {
-                hnsecs += convert!("hours", "hnsecs")(24);
-                --days;
-            }
-
-            auto hour = splitUnitsFromHNSecs!"hours"(hnsecs);
-            auto minute = splitUnitsFromHNSecs!"minutes"(hnsecs);
-            auto second = splitUnitsFromHNSecs!"seconds"(hnsecs);
-
-            auto dateTime = DateTime(Date(cast(int) days), TimeOfDay(cast(int) hour,
-                                          cast(int) minute, cast(int) second));
-            auto fracSecStr = fracSecsToISOString(cast(int) hnsecs);
-
-            if (_timezone is LocalTime())
-                return dateTime.toISOString() ~ fracSecStr;
-
-            if (_timezone is UTC())
-                return dateTime.toISOString() ~ fracSecStr ~ "Z";
-
-            immutable utcOffset = dur!"hnsecs"(adjustedTime - stdTime);
-
-            return format("%s%s%s",
-                          dateTime.toISOString(),
-                          fracSecStr,
-                          SimpleTimeZone.toISOExtString(utcOffset));
-        }
+            toISOString(app);
         catch (Exception e)
-            assert(0, "format() threw.");
+            assert(0, "toISOString() threw.");
+        return app.data;
+    }
+
+    /// ditto
+    void toISOString(W)(ref W writer) const scope
+    if (isOutputRange!(W, char))
+    {
+        immutable adjustedTime = adjTime;
+        long hnsecs = adjustedTime;
+
+        auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
+
+        if (hnsecs < 0)
+        {
+            hnsecs += convert!("hours", "hnsecs")(24);
+            --days;
+        }
+
+        immutable hour = splitUnitsFromHNSecs!"hours"(hnsecs);
+        immutable minute = splitUnitsFromHNSecs!"minutes"(hnsecs);
+        immutable second = splitUnitsFromHNSecs!"seconds"(hnsecs);
+
+        auto dateTime = DateTime(Date(cast(int) days), TimeOfDay(cast(int) hour,
+                                      cast(int) minute, cast(int) second));
+
+        if (_timezone is LocalTime())
+        {
+            dateTime.toISOString(writer);
+            fracSecsToISOString(writer, cast(int) hnsecs);
+            return;
+        }
+
+        if (_timezone is UTC())
+        {
+            dateTime.toISOString(writer);
+            fracSecsToISOString(writer, cast(int) hnsecs);
+            put(writer, 'Z');
+            return;
+        }
+
+        immutable utcOffset = dur!"hnsecs"(adjustedTime - stdTime);
+
+        dateTime.toISOString(writer);
+        fracSecsToISOString(writer, cast(int) hnsecs);
+        SimpleTimeZone.toISOExtString(writer, utcOffset);
     }
 
     ///
@@ -7610,6 +8161,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         assert(SysTime(DateTime.init, UTC()).toISOString() == "00010101T000000Z");
         assert(SysTime(DateTime(1, 1, 1, 0, 0, 0), hnsecs(1), UTC()).toISOString() == "00010101T000000.0000001Z");
@@ -7655,9 +8207,14 @@ public:
         assert(SysTime(DateTime(-10000, 10, 20, 1, 1, 1), hnsecs(507890)).toISOString() == "-100001020T010101.050789");
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        assert(cast(TimeOfDay) cst != TimeOfDay.init);
-        //assert(cast(TimeOfDay) ist != TimeOfDay.init);
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        assert(cst.toISOString() == "19990706T123033");
+        assert(ist.toISOString() == "19990706T123033");
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.toISOString();
+        }
     }
 
 
@@ -7675,50 +8232,72 @@ public:
 
         If this $(LREF SysTime)'s time zone is
         $(REF LocalTime,std,datetime,timezone), then TZ is empty. If its time
-        zone is $(D UTC), then it is "Z". Otherwise, it is the offset from UTC
+        zone is `UTC`, then it is "Z". Otherwise, it is the offset from UTC
         (e.g. +01:00 or -07:00). Note that the offset from UTC is $(I not)
         enough to uniquely identify the time zone.
 
         Time zone offsets will be in the form +HH:MM or -HH:MM.
+
+        Params:
+            writer = A `char` accepting
+            $(REF_ALTTEXT output range, isOutputRange, std, range, primitives)
+        Returns:
+            A `string` when not using an output range; `void` otherwise.
       +/
-    string toISOExtString() @safe const nothrow
+    string toISOExtString() @safe const nothrow scope
     {
+        import std.array : appender;
+        auto app = appender!string();
+        app.reserve(35);
         try
-        {
-            immutable adjustedTime = adjTime;
-            long hnsecs = adjustedTime;
-
-            auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
-
-            if (hnsecs < 0)
-            {
-                hnsecs += convert!("hours", "hnsecs")(24);
-                --days;
-            }
-
-            auto hour = splitUnitsFromHNSecs!"hours"(hnsecs);
-            auto minute = splitUnitsFromHNSecs!"minutes"(hnsecs);
-            auto second = splitUnitsFromHNSecs!"seconds"(hnsecs);
-
-            auto dateTime = DateTime(Date(cast(int) days), TimeOfDay(cast(int) hour,
-                                          cast(int) minute, cast(int) second));
-            auto fracSecStr = fracSecsToISOString(cast(int) hnsecs);
-
-            if (_timezone is LocalTime())
-                return dateTime.toISOExtString() ~ fracSecStr;
-
-            if (_timezone is UTC())
-                return dateTime.toISOExtString() ~ fracSecStr ~ "Z";
-
-            immutable utcOffset = dur!"hnsecs"(adjustedTime - stdTime);
-
-            return format("%s%s%s",
-                          dateTime.toISOExtString(),
-                          fracSecStr,
-                          SimpleTimeZone.toISOExtString(utcOffset));
-        }
+            toISOExtString(app);
         catch (Exception e)
-            assert(0, "format() threw.");
+            assert(0, "toISOExtString() threw.");
+        return app.data;
+    }
+
+    /// ditto
+    void toISOExtString(W)(ref W writer) const scope
+    if (isOutputRange!(W, char))
+    {
+        immutable adjustedTime = adjTime;
+        long hnsecs = adjustedTime;
+
+        auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
+
+        if (hnsecs < 0)
+        {
+            hnsecs += convert!("hours", "hnsecs")(24);
+            --days;
+        }
+
+        immutable hour = splitUnitsFromHNSecs!"hours"(hnsecs);
+        immutable minute = splitUnitsFromHNSecs!"minutes"(hnsecs);
+        immutable second = splitUnitsFromHNSecs!"seconds"(hnsecs);
+
+        immutable dateTime = DateTime(Date(cast(int) days), TimeOfDay(cast(int) hour,
+                                      cast(int) minute, cast(int) second));
+
+        if (_timezone is LocalTime())
+        {
+            dateTime.toISOExtString(writer);
+            fracSecsToISOString(writer, cast(int) hnsecs);
+            return;
+        }
+
+        if (_timezone is UTC())
+        {
+            dateTime.toISOExtString(writer);
+            fracSecsToISOString(writer, cast(int) hnsecs);
+            put(writer, 'Z');
+            return;
+        }
+
+        immutable utcOffset = dur!"hnsecs"(adjustedTime - stdTime);
+
+        dateTime.toISOExtString(writer);
+        fracSecsToISOString(writer, cast(int) hnsecs);
+        SimpleTimeZone.toISOExtString(writer, utcOffset);
     }
 
     ///
@@ -7742,6 +8321,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         assert(SysTime(DateTime.init, UTC()).toISOExtString() == "0001-01-01T00:00:00Z");
         assert(SysTime(DateTime(1, 1, 1, 0, 0, 0), hnsecs(1), UTC()).toISOExtString() ==
@@ -7793,9 +8373,14 @@ public:
                "-10000-10-20T01:01:01.050789");
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        assert(cast(TimeOfDay) cst != TimeOfDay.init);
-        //assert(cast(TimeOfDay) ist != TimeOfDay.init);
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        assert(cst.toISOExtString() == "1999-07-06T12:30:33");
+        assert(ist.toISOExtString() == "1999-07-06T12:30:33");
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.toISOExtString();
+        }
     }
 
     /++
@@ -7811,50 +8396,72 @@ public:
 
         If this $(LREF SysTime)'s time zone is
         $(REF LocalTime,std,datetime,timezone), then TZ is empty. If its time
-        zone is $(D UTC), then it is "Z". Otherwise, it is the offset from UTC
+        zone is `UTC`, then it is "Z". Otherwise, it is the offset from UTC
         (e.g. +01:00 or -07:00). Note that the offset from UTC is $(I not)
         enough to uniquely identify the time zone.
 
         Time zone offsets will be in the form +HH:MM or -HH:MM.
+
+        Params:
+            writer = A `char` accepting
+            $(REF_ALTTEXT output range, isOutputRange, std, range, primitives)
+        Returns:
+            A `string` when not using an output range; `void` otherwise.
       +/
-    string toSimpleString() @safe const nothrow
+    string toSimpleString() @safe const nothrow scope
     {
+        import std.array : appender;
+        auto app = appender!string();
+        app.reserve(35);
         try
-        {
-            immutable adjustedTime = adjTime;
-            long hnsecs = adjustedTime;
-
-            auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
-
-            if (hnsecs < 0)
-            {
-                hnsecs += convert!("hours", "hnsecs")(24);
-                --days;
-            }
-
-            auto hour = splitUnitsFromHNSecs!"hours"(hnsecs);
-            auto minute = splitUnitsFromHNSecs!"minutes"(hnsecs);
-            auto second = splitUnitsFromHNSecs!"seconds"(hnsecs);
-
-            auto dateTime = DateTime(Date(cast(int) days), TimeOfDay(cast(int) hour,
-                                          cast(int) minute, cast(int) second));
-            auto fracSecStr = fracSecsToISOString(cast(int) hnsecs);
-
-            if (_timezone is LocalTime())
-                return dateTime.toSimpleString() ~ fracSecStr;
-
-            if (_timezone is UTC())
-                return dateTime.toSimpleString() ~ fracSecStr ~ "Z";
-
-            immutable utcOffset = dur!"hnsecs"(adjustedTime - stdTime);
-
-            return format("%s%s%s",
-                          dateTime.toSimpleString(),
-                          fracSecStr,
-                          SimpleTimeZone.toISOExtString(utcOffset));
-        }
+            toSimpleString(app);
         catch (Exception e)
-            assert(0, "format() threw.");
+            assert(0, "toSimpleString() threw.");
+        return app.data;
+    }
+
+    /// ditto
+    void toSimpleString(W)(ref W writer) const scope
+    if (isOutputRange!(W, char))
+    {
+        immutable adjustedTime = adjTime;
+        long hnsecs = adjustedTime;
+
+        auto days = splitUnitsFromHNSecs!"days"(hnsecs) + 1;
+
+        if (hnsecs < 0)
+        {
+            hnsecs += convert!("hours", "hnsecs")(24);
+            --days;
+        }
+
+        immutable hour = splitUnitsFromHNSecs!"hours"(hnsecs);
+        immutable minute = splitUnitsFromHNSecs!"minutes"(hnsecs);
+        immutable second = splitUnitsFromHNSecs!"seconds"(hnsecs);
+
+        immutable dateTime = DateTime(Date(cast(int) days), TimeOfDay(cast(int) hour,
+                                      cast(int) minute, cast(int) second));
+
+        if (_timezone is LocalTime())
+        {
+            dateTime.toSimpleString(writer);
+            fracSecsToISOString(writer, cast(int) hnsecs);
+            return;
+        }
+
+        if (_timezone is UTC())
+        {
+            dateTime.toSimpleString(writer);
+            fracSecsToISOString(writer, cast(int) hnsecs);
+            put(writer, 'Z');
+            return;
+        }
+
+        immutable utcOffset = dur!"hnsecs"(adjustedTime - stdTime);
+
+        dateTime.toSimpleString(writer);
+        fracSecsToISOString(writer, cast(int) hnsecs);
+        SimpleTimeZone.toISOExtString(writer, utcOffset);
     }
 
     ///
@@ -7878,6 +8485,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         // Test A.D.
         assert(SysTime(DateTime.init, UTC()).toString() == "0001-Jan-01 00:00:00Z");
         assert(SysTime(DateTime(1, 1, 1, 0, 0, 0), hnsecs(1), UTC()).toString() == "0001-Jan-01 00:00:00.0000001Z");
@@ -7930,9 +8538,14 @@ public:
                "-10000-Oct-20 01:01:01.050789");
 
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        assert(cast(TimeOfDay) cst != TimeOfDay.init);
-        //assert(cast(TimeOfDay) ist != TimeOfDay.init);
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        assert(cst.toSimpleString() == "1999-Jul-06 12:30:33");
+        assert(ist.toSimpleString() == "1999-Jul-06 12:30:33");
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.toSimpleString();
+        }
     }
 
 
@@ -7958,20 +8571,39 @@ public:
         `fromISOString`, `fromISOExtString`, and `fromSimpleString`.
 
         The format returned by toString may or may not change in the future.
+
+        Params:
+            writer = A `char` accepting
+            $(REF_ALTTEXT output range, isOutputRange, std, range, primitives)
+        Returns:
+            A `string` when not using an output range; `void` otherwise.
       +/
-    string toString() @safe const nothrow
+    string toString() @safe const nothrow scope
     {
         return toSimpleString();
     }
 
+    /// ditto
+    void toString(W)(ref W writer) const scope
+    if (isOutputRange!(W, char))
+    {
+        toSimpleString(writer);
+    }
+
     @safe unittest
     {
+        import core.time;
         auto st = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
         const cst = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        //immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
-        assert(st.toString());
-        assert(cst.toString());
-        //assert(ist.toString());
+        immutable ist = SysTime(DateTime(1999, 7, 6, 12, 30, 33));
+        static assert(__traits(compiles, st.toString()));
+        static assert(__traits(compiles, cst.toString()));
+        static assert(__traits(compiles, ist.toString()));
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = st.toString();
+        }
     }
 
 
@@ -7980,7 +8612,7 @@ public:
         YYYYMMDDTHHMMSS.FFFFFFFTZ (where F is fractional seconds is the time
         zone). Whitespace is stripped from the given string.
 
-        The exact format is exactly as described in $(D toISOString) except that
+        The exact format is exactly as described in `toISOString` except that
         trailing zeroes are permitted - including having fractional seconds with
         all zeroes. However, a decimal point with nothing following it is
         invalid. Also, while $(LREF toISOString) will never generate a string
@@ -7991,7 +8623,7 @@ public:
 
         If there is no time zone in the string, then
         $(REF LocalTime,std,datetime,timezone) is used. If the time zone is "Z",
-        then $(D UTC) is used. Otherwise, a
+        then `UTC` is used. Otherwise, a
         $(REF SimpleTimeZone,std,datetime,timezone) which corresponds to the
         given offset from UTC is used. To get the returned $(LREF SysTime) to be
         a particular time zone, pass in that time zone and the $(LREF SysTime)
@@ -8023,21 +8655,22 @@ public:
             not in the ISO format or if the resulting $(LREF SysTime) would not
             be valid.
       +/
-    static SysTime fromISOString(S)(in S isoString, immutable TimeZone tz = null) @safe
+    static SysTime fromISOString(S)(scope const S isoString, immutable TimeZone tz = null) @safe
         if (isSomeString!S)
     {
         import std.algorithm.searching : startsWith, find;
         import std.conv : to;
         import std.string : strip;
+        import std.utf : byCodeUnit;
 
-        auto dstr = to!dstring(strip(isoString));
-        immutable skipFirst = dstr.startsWith('+', '-') != 0;
+        auto str = strip(isoString);
+        immutable skipFirst = str.startsWith('+', '-');
 
-        auto found = (skipFirst ? dstr[1..$] : dstr).find('.', 'Z', '+', '-');
-        auto dateTimeStr = dstr[0 .. $ - found[0].length];
+        auto found = (skipFirst ? str[1..$] : str).byCodeUnit.find('.', 'Z', '+', '-');
+        auto dateTimeStr = str[0 .. $ - found[0].length];
 
-        dstring fracSecStr;
-        dstring zoneStr;
+        typeof(str) fracSecStr;
+        typeof(str) zoneStr;
 
         if (found[1] != 0)
         {
@@ -8047,20 +8680,39 @@ public:
 
                 if (foundTZ[1] != 0)
                 {
-                    fracSecStr = found[0][0 .. $ - foundTZ[0].length];
-                    zoneStr = foundTZ[0];
+                    static if (isNarrowString!S)
+                    {
+                        fracSecStr = found[0][0 .. $ - foundTZ[0].length].source;
+                        zoneStr = foundTZ[0].source;
+                    }
+                    else
+                    {
+                        fracSecStr = found[0][0 .. $ - foundTZ[0].length];
+                        zoneStr = foundTZ[0];
+                    }
                 }
                 else
-                    fracSecStr = found[0];
+                {
+                    static if (isNarrowString!S)
+                        fracSecStr = found[0].source;
+                    else
+                        fracSecStr = found[0];
+                }
             }
             else
-                zoneStr = found[0];
+            {
+                static if (isNarrowString!S)
+                    zoneStr = found[0].source;
+                else
+                    zoneStr = found[0];
+            }
         }
 
         try
         {
             auto dateTime = DateTime.fromISOString(dateTimeStr);
             auto fracSec = fracSecsFromISOString(fracSecStr);
+
             Rebindable!(immutable TimeZone) parsedZone;
 
             if (zoneStr.empty)
@@ -8125,6 +8777,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         foreach (str; ["", "20100704000000", "20100704 000000", "20100704t000000",
                        "20100704T000000.", "20100704T000000.A", "20100704T000000.Z",
                        "20100704T000000.0000000A", "20100704T000000.00000000A",
@@ -8212,6 +8865,12 @@ public:
         test("20101222T172201.0000000+0130", SysTime(DateTime(2010, 12, 22, 17, 22, 01), east90));
         test("20101222T172201.45+0800", SysTime(DateTime(2010, 12, 22, 17, 22, 01), hnsecs(4_500_000), east480));
 
+        // for dstring coverage
+        assert(SysTime.fromISOString("20101222T172201.23112-0100"d) == SysTime(
+            DateTime(2010, 12, 22, 17, 22, 01), hnsecs(2_311_200), west60));
+        assert(SysTime.fromISOString("19070707T121212.0010000"d) == SysTime(
+            DateTime(1907, 07, 07, 12, 12, 12), msecs(1)));
+
         // @@@DEPRECATED_2019-07@@@
         // This isn't deprecated per se, but that text will make it so that it
         // pops up when deprecations are moved along around July 2019. At that
@@ -8235,6 +8894,11 @@ public:
         test("20101222T172201.1234567+01:00", SysTime(DateTime(2010, 12, 22, 17, 22, 01), hnsecs(1_234_567), east60));
         test("20101222T172201.0000000+01:30", SysTime(DateTime(2010, 12, 22, 17, 22, 01), east90));
         test("20101222T172201.45+08:00", SysTime(DateTime(2010, 12, 22, 17, 22, 01), hnsecs(4_500_000), east480));
+
+        static void testScope(scope ref string str) @safe
+        {
+            auto result = SysTime.fromISOString(str);
+        }
     }
 
     // bug# 17801
@@ -8242,9 +8906,9 @@ public:
     {
         import std.conv : to;
         import std.meta : AliasSeq;
-        foreach (C; AliasSeq!(char, wchar, dchar))
+        static foreach (C; AliasSeq!(char, wchar, dchar))
         {
-            foreach (S; AliasSeq!(C[], const(C)[], immutable(C)[]))
+            static foreach (S; AliasSeq!(C[], const(C)[], immutable(C)[]))
             {
                 assert(SysTime.fromISOString(to!S("20121221T141516Z")) ==
                        SysTime(DateTime(2012, 12, 21, 14, 15, 16), UTC()));
@@ -8258,7 +8922,7 @@ public:
         YYYY-MM-DDTHH:MM:SS.FFFFFFFTZ (where F is fractional seconds is the
         time zone). Whitespace is stripped from the given string.
 
-        The exact format is exactly as described in $(D toISOExtString)
+        The exact format is exactly as described in `toISOExtString`
         except that trailing zeroes are permitted - including having fractional
         seconds with all zeroes. However, a decimal point with nothing following
         it is invalid. Also, while $(LREF toISOExtString) will never generate a
@@ -8269,7 +8933,7 @@ public:
 
         If there is no time zone in the string, then
         $(REF LocalTime,std,datetime,timezone) is used. If the time zone is "Z",
-        then $(D UTC) is used. Otherwise, a
+        then `UTC` is used. Otherwise, a
         $(REF SimpleTimeZone,std,datetime,timezone) which corresponds to the
         given offset from UTC is used. To get the returned $(LREF SysTime) to be
         a particular time zone, pass in that time zone and the $(LREF SysTime)
@@ -8290,23 +8954,23 @@ public:
             not in the ISO format or if the resulting $(LREF SysTime) would not
             be valid.
       +/
-    static SysTime fromISOExtString(S)(in S isoExtString, immutable TimeZone tz = null) @safe
+    static SysTime fromISOExtString(S)(scope const S isoExtString, immutable TimeZone tz = null) @safe
         if (isSomeString!(S))
     {
         import std.algorithm.searching : countUntil, find;
         import std.conv : to;
-        import std.string : strip;
+        import std.string : strip, indexOf;
 
-        auto dstr = to!dstring(strip(isoExtString));
+        auto str = strip(isoExtString);
 
-        auto tIndex = dstr.countUntil('T');
+        auto tIndex = str.indexOf('T');
         enforce(tIndex != -1, new DateTimeException(format("Invalid ISO Extended String: %s", isoExtString)));
 
-        auto found = dstr[tIndex + 1 .. $].find('.', 'Z', '+', '-');
-        auto dateTimeStr = dstr[0 .. $ - found[0].length];
+        auto found = str[tIndex + 1 .. $].find('.', 'Z', '+', '-');
+        auto dateTimeStr = str[0 .. $ - found[0].length];
 
-        dstring fracSecStr;
-        dstring zoneStr;
+        typeof(str) fracSecStr;
+        typeof(str) zoneStr;
 
         if (found[1] != 0)
         {
@@ -8388,6 +9052,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         foreach (str; ["", "20100704000000", "20100704 000000",
                        "20100704t000000", "20100704T000000.", "20100704T000000.0",
                        "2010-07:0400:00:00", "2010-07-04 00:00:00",
@@ -8476,16 +9141,22 @@ public:
         test("2010-12-22T17:22:01.0+01", SysTime(DateTime(2010, 12, 22, 17, 22, 01), east60));
         test("2010-12-22T17:22:01.0000000+01:30", SysTime(DateTime(2010, 12, 22, 17, 22, 01), east90));
         test("2010-12-22T17:22:01.45+08:00", SysTime(DateTime(2010, 12, 22, 17, 22, 01), hnsecs(4_500_000), east480));
+
+        static void testScope(scope ref string str) @safe
+        {
+            auto result = SysTime.fromISOExtString(str);
+        }
     }
 
     // bug# 17801
     @safe unittest
     {
+        import core.time;
         import std.conv : to;
         import std.meta : AliasSeq;
-        foreach (C; AliasSeq!(char, wchar, dchar))
+        static foreach (C; AliasSeq!(char, wchar, dchar))
         {
-            foreach (S; AliasSeq!(C[], const(C)[], immutable(C)[]))
+            static foreach (S; AliasSeq!(C[], const(C)[], immutable(C)[]))
             {
                 assert(SysTime.fromISOExtString(to!S("2012-12-21T14:15:16Z")) ==
                        SysTime(DateTime(2012, 12, 21, 14, 15, 16), UTC()));
@@ -8499,7 +9170,7 @@ public:
         YYYY-MM-DD HH:MM:SS.FFFFFFFTZ (where F is fractional seconds is the
         time zone). Whitespace is stripped from the given string.
 
-        The exact format is exactly as described in $(D toSimpleString) except
+        The exact format is exactly as described in `toSimpleString` except
         that trailing zeroes are permitted - including having fractional seconds
         with all zeroes. However, a decimal point with nothing following it is
         invalid. Also, while $(LREF toSimpleString) will never generate a
@@ -8510,7 +9181,7 @@ public:
 
         If there is no time zone in the string, then
         $(REF LocalTime,std,datetime,timezone) is used. If the time zone is "Z",
-        then $(D UTC) is used. Otherwise, a
+        then `UTC` is used. Otherwise, a
         $(REF SimpleTimeZone,std,datetime,timezone) which corresponds to the
         given offset from UTC is used. To get the returned $(LREF SysTime) to be
         a particular time zone, pass in that time zone and the $(LREF SysTime)
@@ -8522,7 +9193,7 @@ public:
 
         Params:
             simpleString = A string formatted in the way that
-                           $(D toSimpleString) formats dates and times.
+                           `toSimpleString` formats dates and times.
             tz           = The time zone to convert the given time to (no
                            conversion occurs if null).
 
@@ -8531,23 +9202,23 @@ public:
             not in the ISO format or if the resulting $(LREF SysTime) would not
             be valid.
       +/
-    static SysTime fromSimpleString(S)(in S simpleString, immutable TimeZone tz = null) @safe
+    static SysTime fromSimpleString(S)(scope const S simpleString, immutable TimeZone tz = null) @safe
         if (isSomeString!(S))
     {
-        import std.algorithm.searching : countUntil, find;
+        import std.algorithm.searching : find;
         import std.conv : to;
-        import std.string : strip;
+        import std.string : strip, indexOf;
 
-        auto dstr = to!dstring(strip(simpleString));
+        auto str = strip(simpleString);
 
-        auto spaceIndex = dstr.countUntil(' ');
+        auto spaceIndex = str.indexOf(' ');
         enforce(spaceIndex != -1, new DateTimeException(format("Invalid Simple String: %s", simpleString)));
 
-        auto found = dstr[spaceIndex + 1 .. $].find('.', 'Z', '+', '-');
-        auto dateTimeStr = dstr[0 .. $ - found[0].length];
+        auto found = str[spaceIndex + 1 .. $].find('.', 'Z', '+', '-');
+        auto dateTimeStr = str[0 .. $ - found[0].length];
 
-        dstring fracSecStr;
-        dstring zoneStr;
+        typeof(str) fracSecStr;
+        typeof(str) zoneStr;
 
         if (found[1] != 0)
         {
@@ -8630,6 +9301,7 @@ public:
 
     @safe unittest
     {
+        import core.time;
         foreach (str; ["", "20100704000000", "20100704 000000",
                        "20100704t000000", "20100704T000000.", "20100704T000000.0",
                        "2010-07-0400:00:00", "2010-07-04 00:00:00", "2010-07-04t00:00:00",
@@ -8720,16 +9392,22 @@ public:
         test("2010-Dec-22 17:22:01.0+01", SysTime(DateTime(2010, 12, 22, 17, 22, 01), east60));
         test("2010-Dec-22 17:22:01.0000000+01:30", SysTime(DateTime(2010, 12, 22, 17, 22, 01), east90));
         test("2010-Dec-22 17:22:01.45+08:00", SysTime(DateTime(2010, 12, 22, 17, 22, 01), hnsecs(4_500_000), east480));
+
+        static void testScope(scope ref string str) @safe
+        {
+            auto result = SysTime.fromSimpleString(str);
+        }
     }
 
     // bug# 17801
     @safe unittest
     {
+        import core.time;
         import std.conv : to;
         import std.meta : AliasSeq;
-        foreach (C; AliasSeq!(char, wchar, dchar))
+        static foreach (C; AliasSeq!(char, wchar, dchar))
         {
-            foreach (S; AliasSeq!(C[], const(C)[], immutable(C)[]))
+            static foreach (S; AliasSeq!(C[], const(C)[], immutable(C)[]))
             {
                 assert(SysTime.fromSimpleString(to!S("2012-Dec-21 14:15:16Z")) ==
                        SysTime(DateTime(2012, 12, 21, 14, 15, 16), UTC()));
@@ -8777,9 +9455,9 @@ public:
 private:
 
     /+
-        Returns $(D stdTime) converted to $(LREF SysTime)'s time zone.
+        Returns `stdTime` converted to $(LREF SysTime)'s time zone.
       +/
-    @property long adjTime() @safe const nothrow
+    @property long adjTime() @safe const nothrow scope
     {
         return _timezone.utcToTZ(_stdTime);
     }
@@ -8788,24 +9466,95 @@ private:
     /+
         Converts the given hnsecs from $(LREF SysTime)'s time zone to std time.
       +/
-    @property void adjTime(long adjTime) @safe nothrow
+    @property void adjTime(long adjTime) @safe nothrow scope
     {
         _stdTime = _timezone.tzToUTC(adjTime);
     }
 
 
-    // Commented out due to bug http://d.puremagic.com/issues/show_bug.cgi?id=5058
-    /+
-    invariant()
+    final class InitTimeZone : TimeZone
     {
-        assert(_timezone !is null, "Invariant Failure: timezone is null. Were you foolish enough to use " ~
-                                   "SysTime.init? (since timezone for SysTime.init can't be set at compile time).");
+    public:
+
+        static immutable(InitTimeZone) opCall() @safe pure nothrow @nogc { return _initTimeZone; }
+
+        @property override bool hasDST() @safe const nothrow @nogc { return false; }
+
+        override bool dstInEffect(long stdTime) @safe const nothrow @nogc { return false; }
+
+        override long utcToTZ(long stdTime) @safe const nothrow @nogc { return 0; }
+
+        override long tzToUTC(long adjTime) @safe const nothrow @nogc { return 0; }
+
+        override Duration utcOffsetAt(long stdTime) @safe const nothrow @nogc { return Duration.zero; }
+
+    private:
+
+        this() @safe immutable pure
+        {
+            super("SysTime.init's timezone", "SysTime.init's timezone", "SysTime.init's timezone");
+        }
+
+        static immutable InitTimeZone _initTimeZone = new immutable(InitTimeZone);
     }
-    +/
+
+    // https://issues.dlang.org/show_bug.cgi?id=17732
+    @safe unittest
+    {
+        assert(SysTime.init.timezone is InitTimeZone());
+        assert(SysTime.init.toISOString() == "00010101T000000+00:00");
+        assert(SysTime.init.toISOExtString() == "0001-01-01T00:00:00+00:00");
+        assert(SysTime.init.toSimpleString() == "0001-Jan-01 00:00:00+00:00");
+        assert(SysTime.init.toString() == "0001-Jan-01 00:00:00+00:00");
+    }
+
+    // Assigning a value to _timezone in SysTime.init currently doesn't work due
+    // to https://issues.dlang.org/show_bug.cgi?id=17740. So, to hack around
+    // that problem, these accessors have been added so that we can insert a
+    // runtime check for null and then use InitTimeZone for SysTime.init (which
+    // which is the only case where _timezone would be null). This thus fixes
+    // the problem with segfaulting when using SysTime.init but at the cost of
+    // what should be an unnecessary null check. Once 17740 has finally been
+    // fixed, _timezoneStorage should be removed, these accessors should be
+    // removed, and the _timezone variable declaration should be restored.
+    pragma(inline, true) @property _timezone() @safe const pure nothrow @nogc
+    {
+        return _timezoneStorage is null ? InitTimeZone() : _timezoneStorage;
+    }
+
+    pragma(inline, true) @property void _timezone(immutable TimeZone tz) @safe pure nothrow @nogc scope
+    {
+        _timezoneStorage = tz;
+    }
 
 
     long  _stdTime;
-    Rebindable!(immutable TimeZone) _timezone;
+    Rebindable!(immutable TimeZone) _timezoneStorage;
+    //Rebindable!(immutable TimeZone) _timezone = InitTimeZone();
+}
+
+///
+@safe unittest
+{
+    import core.time : days, hours, seconds;
+    import std.datetime.date : DateTime;
+    import std.datetime.timezone : SimpleTimeZone, UTC;
+
+    // make a specific point in time in the UTC timezone
+    auto st = SysTime(DateTime(2018, 1, 1, 10, 30, 0), UTC());
+    // make a specific point in time in the New York timezone
+    auto ny = SysTime(
+        DateTime(2018, 1, 1, 10, 30, 0),
+        new immutable SimpleTimeZone(-5.hours, "America/New_York")
+    );
+
+    // ISO standard time strings
+    assert(st.toISOString() == "20180101T103000Z");
+    assert(st.toISOExtString() == "2018-01-01T10:30:00Z");
+
+    // add two days and 30 seconds
+    st += 2.days + 30.seconds;
+    assert(st.toISOExtString() == "2018-01-03T10:30:30Z");
 }
 
 
@@ -8822,7 +9571,7 @@ private:
 
     "std time"'s epoch is based on the Proleptic Gregorian Calendar per ISO
     8601 and is what $(LREF SysTime) uses internally. However, holding the time
-    as an integer in hnescs since that epoch technically isn't actually part of
+    as an integer in hnsecs since that epoch technically isn't actually part of
     the standard, much as it's based on it, so the name "std time" isn't
     particularly good, but there isn't an official name for it. C# uses "ticks"
     for the same thing, but they aren't actually clock ticks, and the term
@@ -8836,7 +9585,7 @@ private:
     See_Also:
         SysTime.fromUnixTime
   +/
-long unixTimeToStdTime(long unixTime) @safe pure nothrow
+long unixTimeToStdTime(long unixTime) @safe pure nothrow @nogc
 {
     return 621_355_968_000_000_000L + convert!("seconds", "hnsecs")(unixTime);
 }
@@ -8903,8 +9652,8 @@ long unixTimeToStdTime(long unixTime) @safe pure nothrow
     argument to get the desired size.
 
     If the return type is int, and the result can't fit in an int, then the
-    closest value that can be held in 32 bits will be used (so $(D int.max)
-    if it goes over and $(D int.min) if it goes under). However, no attempt
+    closest value that can be held in 32 bits will be used (so `int.max`
+    if it goes over and `int.min` if it goes under). However, no attempt
     is made to deal with integer overflow if the return type is long.
 
     Params:
@@ -8999,31 +9748,31 @@ version (StdDdoc)
     /++
         $(BLUE This function is Windows-Only.)
 
-        Converts a $(D SYSTEMTIME) struct to a $(LREF SysTime).
+        Converts a `SYSTEMTIME` struct to a $(LREF SysTime).
 
         Params:
-            st = The $(D SYSTEMTIME) struct to convert.
-            tz = The time zone that the time in the $(D SYSTEMTIME) struct is
-                 assumed to be (if the $(D SYSTEMTIME) was supplied by a Windows
-                 system call, the $(D SYSTEMTIME) will either be in local time
+            st = The `SYSTEMTIME` struct to convert.
+            tz = The time zone that the time in the `SYSTEMTIME` struct is
+                 assumed to be (if the `SYSTEMTIME` was supplied by a Windows
+                 system call, the `SYSTEMTIME` will either be in local time
                  or UTC, depending on the call).
 
         Throws:
             $(REF DateTimeException,std,datetime,date) if the given
-            $(D SYSTEMTIME) will not fit in a $(LREF SysTime), which is highly
-            unlikely to happen given that $(D SysTime.max) is in 29,228 A.D. and
-            the maximum $(D SYSTEMTIME) is in 30,827 A.D.
+            `SYSTEMTIME` will not fit in a $(LREF SysTime), which is highly
+            unlikely to happen given that `SysTime.max` is in 29,228 A.D. and
+            the maximum `SYSTEMTIME` is in 30,827 A.D.
       +/
-    SysTime SYSTEMTIMEToSysTime(const SYSTEMTIME* st, immutable TimeZone tz = LocalTime()) @safe;
+    SysTime SYSTEMTIMEToSysTime(const scope SYSTEMTIME* st, immutable TimeZone tz = LocalTime()) @safe;
 
 
     /++
         $(BLUE This function is Windows-Only.)
 
-        Converts a $(LREF SysTime) to a $(D SYSTEMTIME) struct.
+        Converts a $(LREF SysTime) to a `SYSTEMTIME` struct.
 
-        The $(D SYSTEMTIME) which is returned will be set using the given
-        $(LREF SysTime)'s time zone, so to get the $(D SYSTEMTIME) in
+        The `SYSTEMTIME` which is returned will be set using the given
+        $(LREF SysTime)'s time zone, so to get the `SYSTEMTIME` in
         UTC, set the $(LREF SysTime)'s time zone to UTC.
 
         Params:
@@ -9031,24 +9780,24 @@ version (StdDdoc)
 
         Throws:
             $(REF DateTimeException,std,datetime,date) if the given
-            $(LREF SysTime) will not fit in a $(D SYSTEMTIME). This will only
+            $(LREF SysTime) will not fit in a `SYSTEMTIME`. This will only
             happen if the $(LREF SysTime)'s date is prior to 1601 A.D.
       +/
-    SYSTEMTIME SysTimeToSYSTEMTIME(in SysTime sysTime) @safe;
+    SYSTEMTIME SysTimeToSYSTEMTIME(scope SysTime sysTime) @safe;
 
 
     /++
         $(BLUE This function is Windows-Only.)
 
-        Converts a $(D FILETIME) struct to the number of hnsecs since midnight,
+        Converts a `FILETIME` struct to the number of hnsecs since midnight,
         January 1st, 1 A.D.
 
         Params:
-            ft = The $(D FILETIME) struct to convert.
+            ft = The `FILETIME` struct to convert.
 
         Throws:
             $(REF DateTimeException,std,datetime,date) if the given
-            $(D FILETIME) cannot be represented as the return value.
+            `FILETIME` cannot be represented as the return value.
       +/
     long FILETIMEToStdTime(scope const FILETIME* ft) @safe;
 
@@ -9056,16 +9805,16 @@ version (StdDdoc)
     /++
         $(BLUE This function is Windows-Only.)
 
-        Converts a $(D FILETIME) struct to a $(LREF SysTime).
+        Converts a `FILETIME` struct to a $(LREF SysTime).
 
         Params:
-            ft = The $(D FILETIME) struct to convert.
+            ft = The `FILETIME` struct to convert.
             tz = The time zone that the $(LREF SysTime) will be in
-                 ($(D FILETIME)s are in UTC).
+                 (`FILETIME`s are in UTC).
 
         Throws:
             $(REF DateTimeException,std,datetime,date) if the given
-            $(D FILETIME) will not fit in a $(LREF SysTime).
+            `FILETIME` will not fit in a $(LREF SysTime).
       +/
     SysTime FILETIMEToSysTime(scope const FILETIME* ft, immutable TimeZone tz = LocalTime()) @safe;
 
@@ -9074,7 +9823,7 @@ version (StdDdoc)
         $(BLUE This function is Windows-Only.)
 
         Converts a number of hnsecs since midnight, January 1st, 1 A.D. to a
-        $(D FILETIME) struct.
+        `FILETIME` struct.
 
         Params:
             stdTime = The number of hnsecs since midnight, January 1st, 1 A.D.
@@ -9082,7 +9831,7 @@ version (StdDdoc)
 
         Throws:
             $(REF DateTimeException,std,datetime,date) if the given value will
-            not fit in a $(D FILETIME).
+            not fit in a `FILETIME`.
       +/
     FILETIME stdTimeToFILETIME(long stdTime) @safe;
 
@@ -9090,22 +9839,22 @@ version (StdDdoc)
     /++
         $(BLUE This function is Windows-Only.)
 
-        Converts a $(LREF SysTime) to a $(D FILETIME) struct.
+        Converts a $(LREF SysTime) to a `FILETIME` struct.
 
-        $(D FILETIME)s are always in UTC.
+        `FILETIME`s are always in UTC.
 
         Params:
             sysTime = The $(LREF SysTime) to convert.
 
         Throws:
             $(REF DateTimeException,std,datetime,date) if the given
-            $(LREF SysTime) will not fit in a $(D FILETIME).
+            $(LREF SysTime) will not fit in a `FILETIME`.
       +/
-    FILETIME SysTimeToFILETIME(SysTime sysTime) @safe;
+    FILETIME SysTimeToFILETIME(scope SysTime sysTime) @safe;
 }
 else version (Windows)
 {
-    SysTime SYSTEMTIMEToSysTime(const SYSTEMTIME* st, immutable TimeZone tz = LocalTime()) @safe
+    SysTime SYSTEMTIMEToSysTime(const scope SYSTEMTIME* st, immutable TimeZone tz = LocalTime()) @safe
     {
         const max = SysTime.max;
 
@@ -9149,6 +9898,7 @@ else version (Windows)
 
         auto dt = DateTime(st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
 
+        import core.time : msecs;
         return SysTime(dt, msecs(st.wMilliseconds), tz);
     }
 
@@ -9158,12 +9908,17 @@ else version (Windows)
         SYSTEMTIME st = void;
         GetSystemTime(&st);
         auto converted = SYSTEMTIMEToSysTime(&st, UTC());
-
+        import core.time : abs;
         assert(abs((converted - sysTime)) <= dur!"seconds"(2));
+
+        static void testScope(scope SYSTEMTIME* st) @safe
+        {
+            auto result = SYSTEMTIMEToSysTime(st);
+        }
     }
 
 
-    SYSTEMTIME SysTimeToSYSTEMTIME(in SysTime sysTime) @safe
+    SYSTEMTIME SysTimeToSYSTEMTIME(scope SysTime sysTime) @safe
     {
         immutable dt = cast(DateTime) sysTime;
 
@@ -9200,6 +9955,11 @@ else version (Windows)
         assert(st.wMinute == result.wMinute);
         assert(st.wSecond == result.wSecond);
         assert(st.wMilliseconds == result.wMilliseconds);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = SysTimeToSYSTEMTIME(st);
+        }
     }
 
     private enum hnsecsFrom1601 = 504_911_232_000_000_000L;
@@ -9235,7 +9995,13 @@ else version (Windows)
 
         auto converted = FILETIMEToSysTime(&ft);
 
+        import core.time : abs;
         assert(abs((converted - sysTime)) <= dur!"seconds"(2));
+
+        static void testScope(scope FILETIME* ft) @safe
+        {
+            auto result = FILETIMEToSysTime(ft);
+        }
     }
 
 
@@ -9254,7 +10020,7 @@ else version (Windows)
         return ft;
     }
 
-    FILETIME SysTimeToFILETIME(SysTime sysTime) @safe
+    FILETIME SysTimeToFILETIME(scope SysTime sysTime) @safe
     {
         return stdTimeToFILETIME(sysTime.stdTime);
     }
@@ -9272,6 +10038,11 @@ else version (Windows)
 
         assert(ft.dwLowDateTime == result.dwLowDateTime);
         assert(ft.dwHighDateTime == result.dwHighDateTime);
+
+        static void testScope(scope ref SysTime st) @safe
+        {
+            auto result = SysTimeToFILETIME(st);
+        }
     }
 }
 
@@ -9289,7 +10060,7 @@ alias DosFileTime = uint;
         tz  = The time zone which the DOS file time is assumed to be in.
 
     Throws:
-        $(REF DateTimeException,std,datetime,date) if the $(D DosFileTime) is
+        $(REF DateTimeException,std,datetime,date) if the `DosFileTime` is
         invalid.
   +/
 SysTime DosFileTimeToSysTime(DosFileTime dft, immutable TimeZone tz = LocalTime()) @safe
@@ -9312,11 +10083,22 @@ SysTime DosFileTimeToSysTime(DosFileTime dft, immutable TimeZone tz = LocalTime(
         throw new DateTimeException("Invalid DosFileTime", __FILE__, __LINE__, dte);
 }
 
+///
 @safe unittest
 {
+    import std.datetime.date : DateTime;
+
     assert(DosFileTimeToSysTime(0b00000000001000010000000000000000) == SysTime(DateTime(1980, 1, 1, 0, 0, 0)));
     assert(DosFileTimeToSysTime(0b11111111100111111011111101111101) == SysTime(DateTime(2107, 12, 31, 23, 59, 58)));
     assert(DosFileTimeToSysTime(0x3E3F8456) == SysTime(DateTime(2011, 1, 31, 16, 34, 44)));
+}
+
+@safe unittest
+{
+    static void testScope(scope ref DosFileTime dft) @safe
+    {
+        auto result = DosFileTimeToSysTime(dft);
+    }
 }
 
 
@@ -9328,9 +10110,9 @@ SysTime DosFileTimeToSysTime(DosFileTime dft, immutable TimeZone tz = LocalTime(
 
     Throws:
         $(REF DateTimeException,std,datetime,date) if the given
-        $(LREF SysTime) cannot be converted to a $(D DosFileTime).
+        $(LREF SysTime) cannot be converted to a `DosFileTime`.
   +/
-DosFileTime SysTimeToDosFileTime(SysTime sysTime) @safe
+DosFileTime SysTimeToDosFileTime(scope SysTime sysTime) @safe
 {
     auto dateTime = cast(DateTime) sysTime;
 
@@ -9351,17 +10133,28 @@ DosFileTime SysTimeToDosFileTime(SysTime sysTime) @safe
     return cast(DosFileTime) retval;
 }
 
+///
 @safe unittest
 {
+    import std.datetime.date : DateTime;
+
     assert(SysTimeToDosFileTime(SysTime(DateTime(1980, 1, 1, 0, 0, 0))) == 0b00000000001000010000000000000000);
     assert(SysTimeToDosFileTime(SysTime(DateTime(2107, 12, 31, 23, 59, 58))) == 0b11111111100111111011111101111101);
     assert(SysTimeToDosFileTime(SysTime(DateTime(2011, 1, 31, 16, 34, 44))) == 0x3E3F8456);
 }
 
+@safe unittest
+{
+    static void testScope(scope ref SysTime st) @safe
+    {
+        auto result = SysTimeToDosFileTime(st);
+    }
+}
+
 
 /++
-    The given array of $(D char) or random-access range of $(D char) or
-    $(D ubyte) is expected to be in the format specified in
+    The given array of `char` or random-access range of `char` or
+    `ubyte` is expected to be in the format specified in
     $(HTTP tools.ietf.org/html/rfc5322, RFC 5322) section 3.3 with the
     grammar rule $(I date-time). It is the date-time format commonly used in
     internet messages such as e-mail and HTTP. The corresponding
@@ -9376,10 +10169,10 @@ DosFileTime SysTimeToDosFileTime(SysTime sysTime) @safe
     of the given date (though it is technically invalid per the spec if the
     day of the week doesn't match the actual day of the week of the given date).
 
-    If the time zone is $(D "-0000") (or considered to be equivalent to
-    $(D "-0000") by section 4.3 of the spec), a
-    $(REF SimpleTimeZone,std,datetime,timezone) with a utc offset of $(D 0) is
-    used rather than $(REF UTC,std,datetime,timezone), whereas $(D "+0000") uses
+    If the time zone is `"-0000"` (or considered to be equivalent to
+    `"-0000"` by section 4.3 of the spec), a
+    $(REF SimpleTimeZone,std,datetime,timezone) with a utc offset of `0` is
+    used rather than $(REF UTC,std,datetime,timezone), whereas `"+0000"` uses
     $(REF UTC,std,datetime,timezone).
 
     Note that because $(LREF SysTime) does not currently support having a second
@@ -9387,7 +10180,7 @@ DosFileTime SysTimeToDosFileTime(SysTime sysTime) @safe
     does have a value of 60 for the seconds, it is treated as 59.
 
     The one area in which this function violates RFC 5322 is that it accepts
-    $(D "\n") in folding whitespace in the place of $(D "\r\n"), because the
+    `"\n"` in folding whitespace in the place of `"\r\n"`, because the
     HTTP spec requires it.
 
     Throws:
@@ -9395,14 +10188,14 @@ DosFileTime SysTimeToDosFileTime(SysTime sysTime) @safe
         follow the grammar for a date-time field or if the resulting
         $(LREF SysTime) is invalid.
   +/
-SysTime parseRFC822DateTime()(in char[] value) @safe
+SysTime parseRFC822DateTime()(scope const char[] value) @safe
 {
     import std.string : representation;
     return parseRFC822DateTime(value.representation);
 }
 
 /++ Ditto +/
-SysTime parseRFC822DateTime(R)(R value) @safe
+SysTime parseRFC822DateTime(R)(scope R value)
 if (isRandomAccessRange!R && hasSlicing!R && hasLength!R &&
     (is(Unqual!(ElementType!R) == char) || is(Unqual!(ElementType!R) == ubyte)))
 {
@@ -9624,7 +10417,7 @@ afterMon: stripAndCheckLen(value[3 .. value.length], "1200:00A".length);
     assertThrown!DateTimeException(parseRFC822DateTime(badStr));
 }
 
-version (unittest) void testParse822(alias cr)(string str, SysTime expected, size_t line = __LINE__)
+version (unittest) private void testParse822(alias cr)(string str, SysTime expected, size_t line = __LINE__)
 {
     import std.format : format;
     auto value = cr(str);
@@ -9633,7 +10426,7 @@ version (unittest) void testParse822(alias cr)(string str, SysTime expected, siz
         throw new AssertError(format("wrong result. expected [%s], actual[%s]", expected, result), __FILE__, line);
 }
 
-version (unittest) void testBadParse822(alias cr)(string str, size_t line = __LINE__)
+version (unittest) private void testBadParse822(alias cr)(string str, size_t line = __LINE__)
 {
     try
         parseRFC822DateTime(cr(str));
@@ -9644,6 +10437,7 @@ version (unittest) void testBadParse822(alias cr)(string str, size_t line = __LI
 
 @system unittest
 {
+    import core.time;
     import std.algorithm.iteration : filter, map;
     import std.algorithm.searching : canFind;
     import std.array : array;
@@ -9668,11 +10462,11 @@ version (unittest) void testBadParse822(alias cr)(string str, size_t line = __LI
         static auto start() { Rand3Letters retval; retval.popFront(); return retval; }
     }
 
-    foreach (cr; AliasSeq!(function(string a){return cast(char[]) a;},
+    static foreach (cr; AliasSeq!(function(string a){return cast(char[]) a;},
                            function(string a){return cast(ubyte[]) a;},
                            function(string a){return a;},
                            function(string a){return map!(b => cast(char) b)(a.representation);}))
-    (){ // avoid slow optimizations for large functions @@@BUG@@@ 2396
+    {{
         scope(failure) writeln(typeof(cr).stringof);
         alias test = testParse822!cr;
         alias testBad = testBadParse822!cr;
@@ -9910,7 +10704,12 @@ version (unittest) void testBadParse822(alias cr)(string str, size_t line = __LI
             testBad(cast(string) currStr);
             testBad((cast(string) currStr) ~ "                                    ");
         }
-    }();
+    }}
+
+    static void testScope(scope ref string str) @safe
+    {
+        auto result = parseRFC822DateTime(str);
+    }
 }
 
 // Obsolete Format per section 4.3 of RFC 5322.
@@ -9934,11 +10733,11 @@ version (unittest) void testBadParse822(alias cr)(string str, size_t line = __LI
     auto tooLate1 = SysTime(Date(10_000, 1, 1), UTC());
     auto tooLate2 = SysTime(DateTime(12_007, 12, 31, 12, 22, 19), UTC());
 
-    foreach (cr; AliasSeq!(function(string a){return cast(char[]) a;},
+    static foreach (cr; AliasSeq!(function(string a){return cast(char[]) a;},
                            function(string a){return cast(ubyte[]) a;},
                            function(string a){return a;},
                            function(string a){return map!(b => cast(char) b)(a.representation);}))
-    (){ // avoid slow optimizations for large functions @@@BUG@@@ 2396
+    {{
         scope(failure) writeln(typeof(cr).stringof);
         alias test = testParse822!cr;
         {
@@ -10128,7 +10927,7 @@ version (unittest) void testBadParse822(alias cr)(string str, size_t line = __LI
                 assert(collectExceptionMsg!DateTimeException(parseRFC822DateTime(value)) == tooShortMsg);
             }
         }
-    }();
+    }}
 }
 
 
@@ -10137,24 +10936,32 @@ private:
 /+
     Returns the given hnsecs as an ISO string of fractional seconds.
   +/
-static string fracSecsToISOString(int hnsecs) @safe pure nothrow
+string fracSecsToISOString(int hnsecs) @safe pure nothrow
 {
+    import std.array : appender;
+    auto w = appender!string();
+    try
+        fracSecsToISOString(w, hnsecs);
+    catch (Exception e)
+        assert(0, "fracSecsToISOString() threw.");
+    return w.data;
+}
+
+void fracSecsToISOString(W)(ref W writer, int hnsecs)
+{
+    import std.conv : toChars;
+    import std.range : padLeft;
+
     assert(hnsecs >= 0);
 
-    try
-    {
-        if (hnsecs == 0)
-            return "";
+    if (hnsecs == 0)
+        return;
 
-        string isoString = format(".%07d", hnsecs);
-
-        while (isoString[$ - 1] == '0')
-            isoString.popBack();
-
-        return isoString;
-    }
-    catch (Exception e)
-        assert(0, "format() threw.");
+    put(writer, '.');
+    auto chars = hnsecs.toChars.padLeft('0', 7);
+    while (chars.back == '0')
+        chars.popBack();
+    put(writer, chars);
 }
 
 @safe unittest
@@ -10189,7 +10996,7 @@ static string fracSecsToISOString(int hnsecs) @safe pure nothrow
     Returns a Duration corresponding to to the given ISO string of
     fractional seconds.
   +/
-static Duration fracSecsFromISOString(S)(in S isoString) @trusted pure
+static Duration fracSecsFromISOString(S)(scope const S isoString) @safe pure
 if (isSomeString!S)
 {
     import std.algorithm.searching : all;
@@ -10221,6 +11028,7 @@ if (isSomeString!S)
 
 @safe unittest
 {
+    import core.time;
     static void testFSInvalid(string isoString)
     {
         fracSecsFromISOString(isoString);
@@ -10337,7 +11145,7 @@ if (validTimeUnits(units) &&
 /+
     Strips what RFC 5322, section 3.2.2 refers to as CFWS from the left-hand
     side of the given range (it strips comments delimited by $(D '(') and
-    $(D ')') as well as folding whitespace).
+    `'`') as well as folding whitespace).
 
     It is assumed that the given range contains the value of a header field and
     no terminating CRLF for the line (though the CRLF for folding whitespace is
@@ -10426,9 +11234,9 @@ if (isRandomAccessRange!R && hasSlicing!R && hasLength!R &&
     import std.stdio : writeln;
     import std.string : representation;
 
-    foreach (cr; AliasSeq!(function(string a){return cast(ubyte[]) a;},
+    static foreach (cr; AliasSeq!(function(string a){return cast(ubyte[]) a;},
                            function(string a){return map!(b => cast(char) b)(a.representation);}))
-    (){ // avoid slow optimizations for large functions @@@BUG@@@ 2396
+    {
         scope(failure) writeln(typeof(cr).stringof);
 
         assert(_stripCFWS(cr("")).empty);
@@ -10516,7 +11324,7 @@ if (isRandomAccessRange!R && hasSlicing!R && hasLength!R &&
         assert(equal(_stripCFWS(cr(" \n (hello) \n (hello) \n \n hello")), cr("hello")));
         assert(equal(_stripCFWS(cr(" \n \n (hello)\t\n (hello) \n hello")), cr("hello")));
         assert(equal(_stripCFWS(cr(" \n\t\n\t(hello)\t\n (hello) \n hello")), cr("hello")));
-    }();
+    }
 }
 
 // This is so that we don't have to worry about std.conv.to throwing. It also
@@ -10544,22 +11352,20 @@ if (isIntegral!T && isSigned!T) // The constraints on R were already covered by 
 {
     import std.conv : to;
     import std.range : chain, iota;
-    import std.stdio : writeln;
     foreach (i; chain(iota(0, 101), [250, 999, 1000, 1001, 2345, 9999]))
     {
-        scope(failure) writeln(i);
-        assert(_convDigits!int(to!string(i)) == i);
+        assert(_convDigits!int(to!string(i)) == i, i.to!string);
     }
     foreach (str; ["-42", "+42", "1a", "1 ", " ", " 42 "])
     {
-        scope(failure) writeln(str);
-        assert(_convDigits!int(str) == -1);
+        assert(_convDigits!int(str) == -1, str);
     }
 }
 
 
 version (unittest)
 {
+private:
     // Variables to help in testing.
     Duration currLocalDiffFromUTC;
     immutable (TimeZone)[] testTZs;
@@ -10842,11 +11648,13 @@ version (unittest)
 
         version (Posix)
         {
+            import std.datetime.timezone : PosixTimeZone;
             immutable otherTZ = lt < 0 ? PosixTimeZone.getTimeZone("Australia/Sydney")
                                        : PosixTimeZone.getTimeZone("America/Denver");
         }
         else version (Windows)
         {
+            import std.datetime.timezone : WindowsTimeZone;
             immutable otherTZ = lt < 0 ? WindowsTimeZone.getTimeZone("AUS Eastern Standard Time")
                                        : WindowsTimeZone.getTimeZone("Mountain Standard Time");
         }

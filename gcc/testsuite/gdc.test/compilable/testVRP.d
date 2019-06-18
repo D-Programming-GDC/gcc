@@ -19,32 +19,18 @@ void leftShift()
 
 void leftShiftFail()
 {
-    {
-        ubyte x, y;
-        ushort z;
-        static assert(!__traits(compiles, z = x << y));
-        // 1 << 31 surely overflows the range of 'ushort'.
-    }
-    {
-        ulong a, b;
-        int res;
-        static assert(!__traits(compiles, res = a << (b % 65U)));
-    }
+    ubyte x, y;
+    ushort z;
+    static assert(!__traits(compiles, z = x << y));
+    // 1 << 31 surely overflows the range of 'ushort'.
 }
 
 void rightShiftFail()
 {
-    {
-        short x;
-        byte y, z;
-        static assert(!__traits(compiles, z = x >> y));
-        // [this passes in 2.053.]
-    }
-    {
-        ulong a, b;
-        int res;
-        static assert(!__traits(compiles, res = a >> (b % 65U)));
-    }
+    short x;
+    byte y, z;
+    static assert(!__traits(compiles, z = x >> y));
+    // [this passes in 2.053.]
 }
 
 void rightShift()
@@ -187,41 +173,15 @@ void bitAnd()
 
 void bitAndTest()
 {
-    {
-        ushort a, b;
-        byte res = ((a % 7) - 6) & ((b % 7) - 6);
-    }
-    {
-        // rhs[-128..127] outside range of lhs[0..255]
-        //   -> calls byte.implicitConvTo(ubyte) => MATCH.convert
-        byte a, b;
-        ubyte res;
-
-        res = cast(byte)(a + 5) & b;
-        res = cast(byte)(a - 5) & b;
-        res = cast(byte)(a / 5) & b;
-        res = cast(byte)(a * 5) & b;
-        res = cast(byte)(a % 5) & b;
-    }
+    ushort a, b;
+    byte res = ((a % 7) - 6) & ((b % 7) - 6);
 }
 
 void bitOrFail()
 {
-    {
-        ubyte c;
-        static assert(!__traits(compiles, c = c | 0x100));
-        // [this passes in 2.053.]
-    }
-    {
-        byte a, b;
-        ubyte res;
-
-        static assert(!__traits(compiles, res = (a + 5) | b)); // [-128..255]
-        static assert(!__traits(compiles, res = (a - 5) | b)); // [-133..127]
-        static assert(!__traits(compiles, res = (a / 5) | b)); // [-128..127]
-        static assert(!__traits(compiles, res = (a * 5) | b)); // [-640..639]
-        static assert(!__traits(compiles, res = (a % 5) | b)); // [-128..127]
-    }
+    ubyte c;
+    static assert(!__traits(compiles, c = c | 0x100));
+    // [this passes in 2.053.]
 }
 
 void bitAndOr()
@@ -232,81 +192,27 @@ void bitAndOr()
 
 void bitOrTest()
 {
-    {
-        // Tests condition for different signs between min & max
-        // ((imin.negative ^ imax.negative) == 1 && (rhs.imin.negative ^ rhs.imax.negative) == 1
-        ushort a, b;
-        byte res = ((a % 127) - 126) | ((b % 6) - 5);
-    }
-    {
-        // rhs[-128..127] outside range of lhs[0..255]
-        //   -> calls byte.implicitConvTo(ubyte) => MATCH.convert
-        byte a, b, c;
-        ubyte res;
-
-        res = cast(byte)(a + 5) | b;
-        res = cast(byte)(a - 5) | b;
-        res = cast(byte)(a / 5) | b;
-        res = cast(byte)(a * 5) | b;
-        res = cast(byte)(a % 5) | b;
-    }
+    // Tests condition for different signs between min & max
+    // ((imin.negative ^ imax.negative) == 1 && (rhs.imin.negative ^ rhs.imax.negative) == 1
+    ushort a, b;
+    byte res = ((a % 127) - 126) | ((b % 6) - 5);
 }
 
 void bitAndFail()
 {
-    {
-        int d;
-        short s;
-        byte c;
-        static assert(!__traits(compiles, c = d & s));
-        static assert(!__traits(compiles, c = d & 256));
-        // [these pass in 2.053.]
-    }
-    {
-        byte a, b;
-        ubyte res;
-
-        static assert(!__traits(compiles, res = (a + 5) & b)); // [-128..132]
-        static assert(!__traits(compiles, res = (a - 5) & b)); // [-256..127]
-        static assert(!__traits(compiles, res = (a / 5) & b)); // [-128..127]
-        static assert(!__traits(compiles, res = (a * 5) & b)); // [-640..635]
-        static assert(!__traits(compiles, res = (a % 5) & b)); // [-128..127]
-    }
+    int d;
+    short s;
+    byte c;
+    static assert(!__traits(compiles, c = d & s));
+    static assert(!__traits(compiles, c = d & 256));
+    // [these pass in 2.053.]
 }
 
 void bitXor()
 {
-    {
-        ushort s;
-        ubyte c;
-        c = (0xffff << (s & 0)) ^ 0xff00;
-    }
-    {
-        // rhs[-128..127] outside range of lhs[0..255]
-        //   -> calls byte.implicitConvTo(ubyte) => MATCH.convert
-        byte a, b, c;
-        ubyte res;
-
-        res = cast(byte)(a + 5) ^ b;
-        res = cast(byte)(a - 5) ^ b;
-        res = cast(byte)(a / 5) ^ b;
-        res = cast(byte)(a * 5) ^ b;
-        res = cast(byte)(a % 5) ^ b;
-    }
-}
-
-void bitXorFail()
-{
-    {
-        byte a, b;
-        ubyte res;
-
-        static assert(!__traits(compiles, res = (a + 5) ^ b)); // [-256..255]
-        static assert(!__traits(compiles, res = (a - 5) ^ b)); // [-256..255]
-        static assert(!__traits(compiles, res = (a / 5) ^ b)); // [-128..127]
-        static assert(!__traits(compiles, res = (a * 5) ^ b)); // [-640..1023]
-        static assert(!__traits(compiles, res = (a % 5) ^ b)); // [-128..127]
-    }
+    ushort s;
+    ubyte c;
+    c = (0xffff << (s & 0)) ^ 0xff00;
 }
 
 void bitComplement()
@@ -371,7 +277,7 @@ void bug1977_comment20()
 }
 
 /******************************************/
-// 9617
+// https://issues.dlang.org/show_bug.cgi?id=9617
 
 void test9617()
 {

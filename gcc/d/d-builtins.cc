@@ -210,7 +210,7 @@ build_frontend_type (tree type)
       if (dtype->nextOf ()->isTypeBasic () == NULL)
 	break;
 
-      dtype = (TypeVector::create (Loc (), dtype))->addMod (mod);
+      dtype = (TypeVector::create (dtype))->addMod (mod);
       builtin_converted_decls.safe_push (builtin_data (dtype, type));
       return dtype;
     }
@@ -299,7 +299,7 @@ build_frontend_type (tree type)
 		  return NULL;
 		}
 
-	      args->push (Parameter::create (sc, targ, NULL, NULL));
+	      args->push (Parameter::create (sc, targ, NULL, NULL, NULL));
 	    }
 
 	  /* GCC generic and placeholder built-ins are marked as variadic, yet
@@ -460,10 +460,10 @@ d_init_versions (void)
   if (global.params.useUnitTests)
     VersionCondition::addPredefinedGlobalIdent ("unittest");
 
-  if (global.params.useAssert)
+  if (global.params.useAssert == CHECKENABLEon)
     VersionCondition::addPredefinedGlobalIdent ("assert");
 
-  if (global.params.useArrayBounds == BOUNDSCHECKoff)
+  if (global.params.useArrayBounds == CHECKENABLEoff)
     VersionCondition::addPredefinedGlobalIdent ("D_NoBoundsChecks");
 
   if (global.params.betterC)
@@ -657,7 +657,7 @@ maybe_set_builtin_1 (Dsymbol *d)
   if (ad != NULL)
     {
       /* Recursively search through attribute decls.  */
-      Dsymbols *decls = ad->include (NULL, NULL);
+      Dsymbols *decls = ad->include (NULL);
       if (decls && decls->dim)
 	{
 	  for (size_t i = 0; i < decls->dim; i++)

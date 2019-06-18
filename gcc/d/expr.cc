@@ -521,23 +521,14 @@ public:
 	gcc_unreachable ();
       }
 
+    /* For static and dynamic arrays, the relational op is turned into a
+       library call.  It is not lowered during codegen.  */
     if ((tb1->ty == Tsarray || tb1->ty == Tarray)
 	&& (tb2->ty == Tsarray || tb2->ty == Tarray))
       {
-	/* For static and dynamic arrays, the result of the relational op is
-	   the result of the operator applied to the first non-equal element
-	   of the array.  If two arrays compare equal, but are of different
-	   lengths, the shorter array compares as less than the longer.  */
-	Type *telem = tb1->nextOf ()->toBasetype ();
-
-	tree call = build_libcall (LIBCALL_ADCMP2, Type::tint32, 3,
-				   d_array_convert (e->e1),
-				   d_array_convert (e->e2),
-				   build_typeinfo (e->loc, telem->arrayOf ()));
-	result = build_boolop (code, call, integer_zero_node);
-
-	this->result_ = d_convert (build_ctype (e->type), result);
-	return;
+	error ("cannot handle comparison of type %<%s == %s%>",
+	       tb1->toChars (), tb2->toChars ());
+	gcc_unreachable ();
       }
 
     /* Simple comparison.  */
@@ -545,11 +536,14 @@ public:
     this->result_ = d_convert (build_ctype (e->type), result);
   }
 
-  /* Build an `and if' expression.  If the right operand expression is void,
-     then the resulting type is void.  Otherwise the result is bool.  */
+  /* Build a logical `and if' or `or if' expression.  If the right operand
+     expression is void, then the resulting type is void.  Otherwise the
+     result is bool.  */
 
-  void visit (AndAndExp *e)
+  void visit (LogicalExp *e)
   {
+    tree_code code = (e->op == TOKandand) ? TRUTH_ANDIF_EXPR : TRUTH_ORIF_EXPR;
+
     if (e->e2->type->toBasetype ()->ty != Tvoid)
       {
 	tree t1 = build_expr (e->e1);
@@ -559,39 +553,19 @@ public:
 	t2 = convert_for_condition (t2, e->e2->type);
 
 	this->result_ = d_convert (build_ctype (e->type),
-				   build_boolop (TRUTH_ANDIF_EXPR, t1, t2));
+				   build_boolop (code, t1, t2));
       }
     else
       {
 	tree t1 = convert_for_condition (build_expr (e->e1), e->e1->type);
 	tree t2 = build_expr_dtor (e->e2);
+
+	/* Invert condition for logical or if expression.  */
+	if (e->op == TOKoror)
+	  t1 = build1 (TRUTH_NOT_EXPR, d_bool_type, t1);
 
 	this->result_ = build_condition (build_ctype (e->type),
 					 t1, t2, void_node);
-      }
-  }
-
-  /* Build an `or if' expression.  If the right operand expression is void,
-     then the resulting type is void.  Otherwise the result is bool.  */
-
-  void visit (OrOrExp *e)
-  {
-    if (e->e2->type->toBasetype ()->ty != Tvoid)
-      {
-	tree t1 = convert_for_condition (build_expr (e->e1), e->e1->type);
-	tree t2 = convert_for_condition (build_expr (e->e2), e->e2->type);
-
-	this->result_ = d_convert (build_ctype (e->type),
-				   build_boolop (TRUTH_ORIF_EXPR, t1, t2));
-      }
-    else
-      {
-	tree t1 = convert_for_condition (build_expr (e->e1), e->e1->type);
-	tree t2 = build_expr_dtor (e->e2);
-	tree cond = build1 (TRUTH_NOT_EXPR, d_bool_type, t1);
-
-	this->result_ = build_condition (build_ctype (e->type),
-					 cond, t2, void_node);
       }
   }
 
@@ -1972,7 +1946,7 @@ public:
     tree assert_pass = void_node;
     tree assert_fail;
 
-    if (global.params.useAssert
+    if (global.params.useAssert == CHECKENABLEon
 	&& global.params.checkAction == CHECKACTION_D)
       {
 	/* Generate: ((bool) e1  ? (void)0 : _d_assert (...))
@@ -2017,7 +1991,7 @@ public:
 	      }
 	  }
       }
-    else if (global.params.useAssert
+    else if (global.params.useAssert == CHECKENABLEon
 	     && global.params.checkAction == CHECKACTION_C)
       {
 	/* Generate: __builtin_trap()  */

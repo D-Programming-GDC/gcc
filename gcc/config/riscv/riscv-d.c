@@ -37,3 +37,27 @@ riscv_d_target_versions (void)
   else
     d_add_builtin_version ("D_SoftFloat");
 }
+
+/* Implement TARGET_D_FLOAT_ABI_TYPE for RISC-V targets.  */
+
+const char *
+riscv_d_float_abi_type (void)
+{
+  switch (riscv_abi)
+    {
+    case ABI_ILP32E:
+    case ABI_ILP32:
+    case ABI_LP64:
+      return "soft";
+
+    case ABI_ILP32F:
+    case ABI_LP64F:
+      return "single";
+
+    case ABI_ILP32D:
+    case ABI_LP64D:
+      return "double";
+    }
+
+  return NULL;
+}

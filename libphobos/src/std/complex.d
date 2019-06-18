@@ -1,23 +1,23 @@
 // Written in the D programming language.
 
 /** This module contains the $(LREF Complex) type, which is used to represent
-    _complex numbers, along with related mathematical operations and functions.
+    complex numbers, along with related mathematical operations and functions.
 
     $(LREF Complex) will eventually
     $(DDLINK deprecate, Deprecated Features, replace)
-    the built-in types $(D cfloat), $(D cdouble), $(D creal), $(D ifloat),
-    $(D idouble), and $(D ireal).
+    the built-in types `cfloat`, `cdouble`, `creal`, `ifloat`,
+    `idouble`, and `ireal`.
 
     Authors:    Lars Tandle Kyllingstad, Don Clugston
     Copyright:  Copyright (c) 2010, Lars T. Kyllingstad.
     License:    $(HTTP boost.org/LICENSE_1_0.txt, Boost License 1.0)
-    Source:     $(PHOBOSSRC std/_complex.d)
+    Source:     $(PHOBOSSRC std/complex.d)
 */
 module std.complex;
 
 import std.traits;
 
-/** Helper function that returns a _complex number with the specified
+/** Helper function that returns a complex number with the specified
     real and imaginary parts.
 
     Params:
@@ -28,13 +28,13 @@ import std.traits;
         im = (optional) imaginary part of complex number, 0 if omitted.
 
     Returns:
-        $(D Complex) instance with real and imaginary parts set
-        to the values provided as input.  If neither $(D re) nor
-        $(D im) are floating-point numbers, the return type will
-        be $(D Complex!double).  Otherwise, the return type is
+        `Complex` instance with real and imaginary parts set
+        to the values provided as input.  If neither `re` nor
+        `im` are floating-point numbers, the return type will
+        be `Complex!double`.  Otherwise, the return type is
         deduced using $(D std.traits.CommonType!(R, I)).
 */
-auto complex(R)(R re)  @safe pure nothrow @nogc
+auto complex(R)(const R re)  @safe pure nothrow @nogc
 if (is(R : double))
 {
     static if (isFloatingPoint!R)
@@ -44,7 +44,7 @@ if (is(R : double))
 }
 
 /// ditto
-auto complex(R, I)(R re, I im)  @safe pure nothrow @nogc
+auto complex(R, I)(const R re, const I im)  @safe pure nothrow @nogc
 if (is(R : double) && is(I : double))
 {
     static if (isFloatingPoint!R || isFloatingPoint!I)
@@ -93,8 +93,8 @@ if (is(R : double) && is(I : double))
 }
 
 
-/** A complex number parametrised by a type $(D T), which must be either
-    $(D float), $(D double) or $(D real).
+/** A complex number parametrised by a type `T`, which must be either
+    `float`, `double` or `real`.
 */
 struct Complex(T)
 if (isFloatingPoint!T)
@@ -146,8 +146,7 @@ if (isFloatingPoint!T)
     }
 
     /// ditto
-    void toString(Writer, Char)(scope Writer w,
-                        FormatSpec!Char formatSpec) const
+    void toString(Writer, Char)(scope Writer w, const ref FormatSpec!Char formatSpec) const
         if (isOutputRange!(Writer, const(Char)[]))
     {
         import std.format : formatValue;
@@ -174,14 +173,14 @@ if (isFloatingPoint!T)
     }
 
     /// ditto
-    this(Rx : T, Ry : T)(Rx x, Ry y)
+    this(Rx : T, Ry : T)(const Rx x, const Ry y)
     {
         re = x;
         im = y;
     }
 
     /// ditto
-    this(R : T)(R r)
+    this(R : T)(const R r)
     {
         re = r;
         im = 0;
@@ -198,7 +197,7 @@ if (isFloatingPoint!T)
     }
 
     // this = numeric
-    ref Complex opAssign(R : T)(R r)
+    ref Complex opAssign(R : T)(const R r)
     {
         re = r;
         im = 0;
@@ -214,7 +213,7 @@ if (isFloatingPoint!T)
     }
 
     // this == numeric
-    bool opEquals(R : T)(R r) const
+    bool opEquals(R : T)(const R r) const
     {
         return re == r && im == 0;
     }
@@ -246,7 +245,7 @@ if (isFloatingPoint!T)
     }
 
     // complex op numeric
-    Complex!(CommonType!(T,R)) opBinary(string op, R)(R r) const
+    Complex!(CommonType!(T,R)) opBinary(string op, R)(const R r) const
         if (isNumeric!R)
     {
         alias C = typeof(return);
@@ -255,21 +254,21 @@ if (isFloatingPoint!T)
     }
 
     // numeric + complex,  numeric * complex
-    Complex!(CommonType!(T, R)) opBinaryRight(string op, R)(R r) const
+    Complex!(CommonType!(T, R)) opBinaryRight(string op, R)(const R r) const
         if ((op == "+" || op == "*") && (isNumeric!R))
     {
         return opBinary!(op)(r);
     }
 
     // numeric - complex
-    Complex!(CommonType!(T, R)) opBinaryRight(string op, R)(R r) const
+    Complex!(CommonType!(T, R)) opBinaryRight(string op, R)(const R r) const
         if (op == "-" && isNumeric!R)
     {
         return Complex(r - re, -im);
     }
 
     // numeric / complex
-    Complex!(CommonType!(T, R)) opBinaryRight(string op, R)(R r) const
+    Complex!(CommonType!(T, R)) opBinaryRight(string op, R)(const R r) const
         if (op == "/" && isNumeric!R)
     {
         import std.math : fabs;
@@ -295,7 +294,7 @@ if (isFloatingPoint!T)
     }
 
     // numeric ^^ complex
-    Complex!(CommonType!(T, R)) opBinaryRight(string op, R)(R lhs) const
+    Complex!(CommonType!(T, R)) opBinaryRight(string op, R)(const R lhs) const
         if (op == "^^" && isNumeric!R)
     {
         import std.math : cos, exp, log, sin, PI;
@@ -322,7 +321,7 @@ if (isFloatingPoint!T)
     // OP-ASSIGN OPERATORS
 
     // complex += complex,  complex -= complex
-    ref Complex opOpAssign(string op, C)(C z)
+    ref Complex opOpAssign(string op, C)(const C z)
         if ((op == "+" || op == "-") && is(C R == Complex!R))
     {
         mixin ("re "~op~"= z.re;");
@@ -331,7 +330,7 @@ if (isFloatingPoint!T)
     }
 
     // complex *= complex
-    ref Complex opOpAssign(string op, C)(C z)
+    ref Complex opOpAssign(string op, C)(const C z)
         if (op == "*" && is(C R == Complex!R))
     {
         auto temp = re*z.re - im*z.im;
@@ -341,7 +340,7 @@ if (isFloatingPoint!T)
     }
 
     // complex /= complex
-    ref Complex opOpAssign(string op, C)(C z)
+    ref Complex opOpAssign(string op, C)(const C z)
         if (op == "/" && is(C R == Complex!R))
     {
         import std.math : fabs;
@@ -367,7 +366,7 @@ if (isFloatingPoint!T)
     }
 
     // complex ^^= complex
-    ref Complex opOpAssign(string op, C)(C z)
+    ref Complex opOpAssign(string op, C)(const C z)
         if (op == "^^" && is(C R == Complex!R))
     {
         import std.math : exp, log, cos, sin;
@@ -382,7 +381,7 @@ if (isFloatingPoint!T)
     }
 
     // complex += numeric,  complex -= numeric
-    ref Complex opOpAssign(string op, U : T)(U a)
+    ref Complex opOpAssign(string op, U : T)(const U a)
         if (op == "+" || op == "-")
     {
         mixin ("re "~op~"= a;");
@@ -390,7 +389,7 @@ if (isFloatingPoint!T)
     }
 
     // complex *= numeric,  complex /= numeric
-    ref Complex opOpAssign(string op, U : T)(U a)
+    ref Complex opOpAssign(string op, U : T)(const U a)
         if (op == "*" || op == "/")
     {
         mixin ("re "~op~"= a;");
@@ -399,7 +398,7 @@ if (isFloatingPoint!T)
     }
 
     // complex ^^= real
-    ref Complex opOpAssign(string op, R)(R r)
+    ref Complex opOpAssign(string op, R)(const R r)
         if (op == "^^" && isFloatingPoint!R)
     {
         import std.math : cos, sin;
@@ -411,7 +410,7 @@ if (isFloatingPoint!T)
     }
 
     // complex ^^= int
-    ref Complex opOpAssign(string op, U)(U i)
+    ref Complex opOpAssign(string op, U)(const U i)
         if (op == "^^" && isIntegral!U)
     {
         switch (i)
@@ -736,7 +735,7 @@ T sqAbs(T)(Complex!T z) @safe pure nothrow @nogc
 }
 
 /// ditto
-T sqAbs(T)(T x) @safe pure nothrow @nogc
+T sqAbs(T)(const T x) @safe pure nothrow @nogc
 if (isFloatingPoint!T)
 {
     return x*x;
@@ -796,7 +795,7 @@ Complex!T conj(T)(Complex!T z) @safe pure nothrow @nogc
     argument = The argument
   Returns: The complex number with the given modulus and argument.
 */
-Complex!(CommonType!(T, U)) fromPolar(T, U)(T modulus, U argument)
+Complex!(CommonType!(T, U)) fromPolar(T, U)(const T modulus, const U argument)
     @safe pure nothrow @nogc
 {
     import std.math : sin, cos;
@@ -822,7 +821,6 @@ Complex!(CommonType!(T, U)) fromPolar(T, U)(T modulus, U argument)
 */
 Complex!T sin(T)(Complex!T z)  @safe pure nothrow @nogc
 {
-    import std.math : expi, coshisinh;
     auto cs = expi(z.re);
     auto csh = coshisinh(z.im);
     return typeof(return)(cs.im * csh.re, cs.re * csh.im);
@@ -840,7 +838,6 @@ Complex!T sin(T)(Complex!T z)  @safe pure nothrow @nogc
 /// ditto
 Complex!T cos(T)(Complex!T z)  @safe pure nothrow @nogc
 {
-    import std.math : expi, coshisinh;
     auto cs = expi(z.re);
     auto csh = coshisinh(z.im);
     return typeof(return)(cs.re * csh.re, - cs.im * csh.im);
@@ -850,22 +847,26 @@ Complex!T cos(T)(Complex!T z)  @safe pure nothrow @nogc
 @safe pure nothrow unittest
 {
     import std.complex;
-    import std.math;
     assert(cos(complex(0.0)) == 1.0);
-    assert(cos(complex(1.3L)) == std.math.cos(1.3L));
+}
+
+deprecated
+@safe pure nothrow unittest
+{
+    import std.math;
     auto c1 = cos(complex(0, 5.2L));
     auto c2 = cosh(5.2L);
     assert(feqrel(c1.re, c2.re) >= real.mant_dig - 1 &&
         feqrel(c1.im, c2.im) >= real.mant_dig - 1);
+    assert(cos(complex(1.3L)) == std.math.cos(1.3L));
 }
-
 
 /**
     Params: y = A real number.
     Returns: The value of cos(y) + i sin(y).
 
     Note:
-    $(D expi) is included here for convenience and for easy migration of code
+    `expi` is included here for convenience and for easy migration of code
     that uses $(REF _expi, std,math).  Unlike $(REF _expi, std,math), which uses the
     x87 $(I fsincos) instruction when possible, this function is no faster
     than calculating cos(y) and sin(y) separately.
@@ -879,15 +880,68 @@ Complex!real expi(real y)  @trusted pure nothrow @nogc
 ///
 @safe pure nothrow unittest
 {
+    import std.math : cos, sin;
+    assert(expi(0.0L) == 1.0L);
+    assert(expi(1.3e5L) == complex(cos(1.3e5L), sin(1.3e5L)));
+}
+
+deprecated
+@safe pure nothrow unittest
+{
     static import std.math;
 
     assert(expi(1.3e5L) == complex(std.math.cos(1.3e5L), std.math.sin(1.3e5L)));
-    assert(expi(0.0L) == 1.0L);
     auto z1 = expi(1.234);
     auto z2 = std.math.expi(1.234);
     assert(z1.re == z2.re && z1.im == z2.im);
 }
 
+/**
+    Params: y = A real number.
+    Returns: The value of cosh(y) + i sinh(y)
+
+    Note:
+    `coshisinh` is included here for convenience and for easy migration of code
+    that uses $(REF _coshisinh, std,math).
+*/
+Complex!real coshisinh(real y) @safe pure nothrow @nogc
+{
+    static import std.math;
+    if (std.math.fabs(y) <= 0.5)
+        return Complex!real(std.math.cosh(y), std.math.sinh(y));
+    else
+    {
+        auto z = std.math.exp(y);
+        auto zi = 0.5 / z;
+        z = 0.5 * z;
+        return Complex!real(z + zi, z - zi);
+    }
+}
+
+///
+@safe pure nothrow @nogc unittest
+{
+    import std.math : cosh, sinh;
+    assert(coshisinh(3.0L) == complex(cosh(3.0L), sinh(3.0L)));
+}
+
+deprecated
+@safe pure nothrow @nogc unittest
+{
+    static import std.math;
+    assert(coshisinh(3.0L) == complex(std.math.cosh(3.0L), std.math.sinh(3.0L)));
+    auto z1 = coshisinh(1.234);
+    auto z2 = std.math.coshisinh(1.234);
+    static if (real.mant_dig == 53)
+    {
+        assert(std.math.feqrel(z1.re, z2.re) >= real.mant_dig - 1 &&
+               std.math.feqrel(z1.im, z2.im) >= real.mant_dig - 1);
+    }
+    else
+    {
+        assert(z1.re == z2.re && z1.im == z2.im);
+    }
+}
 
 /**
     Params: z = A complex number.

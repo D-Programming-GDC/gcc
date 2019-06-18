@@ -39,3 +39,16 @@ s390_d_target_versions (void)
   else if (TARGET_HARD_FLOAT)
     d_add_builtin_version ("D_HardFloat");
 }
+
+/* Implement TARGET_D_FLOAT_ABI_TYPE for S/390 and zSeries targets.  */
+
+const char *
+s390_d_float_abi_type (void)
+{
+  if (TARGET_HARD_FLOAT)
+    return "hard";
+  else if (TARGET_SOFT_FLOAT)
+    return "soft";
+
+  return NULL;
+}

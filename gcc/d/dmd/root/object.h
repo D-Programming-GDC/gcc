@@ -1,14 +1,18 @@
 
 /* Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * All Rights Reserved, written by Walter Bright
  * http://www.digitalmars.com
  * Distributed under the Boost Software License, Version 1.0.
- * (See accompanying file LICENSE or copy at http://www.boost.org/LICENSE_1_0.txt)
- * https://github.com/dlang/dmd/blob/master/src/root/object.h
+ * http://www.boost.org/LICENSE_1_0.txt
+ * https://github.com/dlang/dmd/blob/master/src/dmd/root/object.h
  */
 
 #pragma once
 
-#include "dsystem.h"
+#define POSIX (__linux__ || __GLIBC__ || __gnu_hurd__ || __APPLE__ || __FreeBSD__ || __OpenBSD__ || __sun)
+
+#include "dcompat.h"
+#include <stddef.h>
 
 typedef size_t hash_t;
 
@@ -23,7 +27,8 @@ enum DYNCAST
     DYNCAST_IDENTIFIER,
     DYNCAST_TUPLE,
     DYNCAST_PARAMETER,
-    DYNCAST_STATEMENT
+    DYNCAST_STATEMENT,
+    DYNCAST_TEMPLATEPARAMETER
 };
 
 /*
@@ -45,9 +50,10 @@ public:
     /**
      * Pretty-print an Object. Useful for debugging the old-fashioned way.
      */
-    virtual void print();
-
     virtual const char *toChars();
+    /// This function is `extern(D)` and should not be called from C++,
+    /// as the ABI does not match on some platforms
+    virtual DArray<const char> toString();
     virtual void toBuffer(OutBuffer *buf);
 
     /**

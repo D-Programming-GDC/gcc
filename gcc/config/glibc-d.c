@@ -55,10 +55,21 @@ glibc_d_critsec_size (void)
 #endif
 }
 
+/* Implement TARGET_D_OBJECT_FORMAT for Glibc targets.  */
+
+const char *
+glibc_d_object_format (void)
+{
+  return "elf";
+}
+
 #undef TARGET_D_OS_VERSIONS
 #define TARGET_D_OS_VERSIONS glibc_d_os_builtins
 
 #undef TARGET_D_CRITSEC_SIZE
 #define TARGET_D_CRITSEC_SIZE glibc_d_critsec_size
+
+#undef TARGET_D_OBJECT_FORMAT
+#define TARGET_D_OBJECT_FORMAT glibc_d_object_format
 
 struct gcc_targetdm targetdm = TARGETDM_INITIALIZER;

@@ -45,31 +45,57 @@ gdc-cross$(exeext): gdc$(exeext)
 	-rm -f gdc-cross$(exeext)
 	cp gdc$(exeext) gdc-cross$(exeext)
 
-# Filter out pedantic and virtual overload warnings.
-d-warn = $(filter-out -pedantic -Woverloaded-virtual, $(STRICT_WARN))
+# Use strict warnings.
+d-warn = $(STRICT_WARN)
 
-# Also filter out warnings for missing format attributes in the D Frontend.
-DMD_WARN_CXXFLAGS = $(filter-out -Wmissing-format-attribute, $(WARN_CXXFLAGS))
-DMD_COMPILE = $(subst $(WARN_CXXFLAGS), $(DMD_WARN_CXXFLAGS), $(COMPILE))
-DMDGEN_COMPILE = $(subst $(COMPILER), $(COMPILER_FOR_BUILD), $(DMD_COMPILE))
+# D compiler and flags for building the front-end.
+ifeq ($(TREECHECKING),)
+CHECKING_DFLAGS = -frelease
+else
+CHECKING_DFLAGS =
+endif
+WARN_DFLAGS = -Wall -Wdeprecated $(NOCOMMON_FLAG)
+
+ALL_DFLAGS = $(DFLAGS-$@) $(GDCFLAGS) -fversion=IN_GCC $(CHECKING_DFLAGS) \
+	$(PICFLAG) $(ALIASING_FLAGS) $(COVERAGE_FLAGS) $(WARN_DFLAGS)
+
+DCOMPILE.base = $(GDC) $(NO_PIE_CFLAGS) -c $(ALL_DFLAGS) -o $@
+DCOMPILE = $(DCOMPILE.base) -MT $@ -MMD -MP -MF $(@D)/$(DEPDIR)/$(*F).TPo
+DPOSTCOMPILE = @mv $(@D)/$(DEPDIR)/$(*F).TPo $(@D)/$(DEPDIR)/$(*F).Po
+DLINKER = $(GDC) $(NO_PIE_FLAG) -lstdc++
+
+# Like LINKER, but use a mutex for serializing front end links.
+ifeq (@DO_LINK_MUTEX@,true)
+DLLINKER = $(SHELL) $(srcdir)/lock-and-run.sh linkfe.lck $(DLINKER)
+else
+DLLINKER = $(DLINKER)
+endif
 
 # D Frontend object files.
 D_FRONTEND_OBJS = \
 	d/aav.o \
 	d/access.o \
+	d/aggregate.o \
 	d/aliasthis.o \
 	d/apply.o \
 	d/argtypes.o \
+	d/array.o \
 	d/arrayop.o \
+	d/arraytypes.o \
 	d/attrib.o \
+	d/astcodegen.o \
 	d/blockexit.o \
+	d/builtin.o \
 	d/canthrow.o \
-	d/checkedint.o \
 	d/clone.o \
+	d/compiler.o \
+	d/complex.o \
 	d/cond.o \
 	d/constfold.o \
 	d/cppmangle.o \
 	d/ctfeexpr.o \
+	d/ctfloat.o \
+	d/ctorflow.o \
 	d/dcast.o \
 	d/dclass.o \
 	d/declaration.o \
@@ -84,25 +110,35 @@ D_FRONTEND_OBJS = \
 	d/dscope.o \
 	d/dstruct.o \
 	d/dsymbol.o \
+	d/dsymbolsem.o \
 	d/dtemplate.o \
 	d/dversion.o \
 	d/entity.o \
+	d/errors.o \
 	d/escape.o \
 	d/expression.o \
 	d/expressionsem.o \
 	d/file.o \
 	d/filename.o \
 	d/func.o \
+	d/globals.o \
+	d/gluelayer.o \
+	d/hash.o \
 	d/hdrgen.o \
 	d/iasm.o \
 	d/iasmgcc.o \
+	d/id.o \
 	d/identifier.o \
+	d/impcnvtab.o \
 	d/imphint.o \
 	d/init.o \
 	d/initsem.o \
+	d/inline.o \
 	d/intrange.o \
 	d/json.o \
+	d/lambdacomp.o \
 	d/lexer.o \
+	d/longdouble.o \
 	d/mtype.o \
 	d/nogc.o \
 	d/nspace.o \
@@ -111,26 +147,33 @@ D_FRONTEND_OBJS = \
 	d/optimize.o \
 	d/outbuffer.o \
 	d/parse.o \
+	d/parsetimevisitor.o \
+	d/permissivevisitor.o \
+	d/port.o \
 	d/rmem.o \
 	d/rootobject.o \
 	d/safe.o \
 	d/sapply.o \
+	d/semantic2.o \
+	d/semantic3.o \
 	d/sideeffect.o \
 	d/speller.o \
 	d/statement.o \
+	d/statement_rewrite_walker.o \
 	d/statementsem.o \
 	d/staticassert.o \
 	d/staticcond.o \
 	d/stringtable.o \
+	d/target.o \
+	d/templateparamsem.o \
 	d/tokens.o \
 	d/traits.o \
+	d/transitivevisitor.o \
 	d/typesem.o \
+	d/typinf.o \
 	d/utf.o \
-	d/utils.o
-
-# D Frontend generated files.
-D_GENERATED_SRCS = d/id.c d/id.h d/impcnvtab.c
-D_GENERATED_OBJS = d/id.o d/impcnvtab.o
+	d/utils.o \
+	d/visitor.o
 
 # Language-specific object files for D.
 D_OBJS = \
@@ -140,12 +183,12 @@ D_OBJS = \
 	d/intrinsics.o d/modules.o d/runtime.o d/toir.o d/typeinfo.o d/types.o
 
 # All language-specific object files for D.
-D_ALL_OBJS = $(D_FRONTEND_OBJS) $(D_GENERATED_OBJS) $(D_OBJS) $(D_TARGET_OBJS)
+D_ALL_OBJS = $(D_FRONTEND_OBJS) $(D_OBJS) $(D_TARGET_OBJS)
 
 d_OBJS = $(D_ALL_OBJS) d/d-spec.o
 
 d21$(exeext): $(D_ALL_OBJS) attribs.o $(BACKEND) $(LIBDEPS)
-	+$(LLINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o $@ \
+	+$(DLLINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o $@ \
 		$(D_ALL_OBJS) attribs.o $(BACKEND) $(LIBS) $(BACKENDLIBS)
 
 # Documentation.
@@ -196,7 +239,7 @@ d.srcextra:
 
 d.tags: force
 	cd $(srcdir)/d; \
-	etags -o TAGS.sub *.c *.cc *.h dmd/*.c dmd/*.h dmd/root/*.h dmd/root/*.c; \
+	etags -o TAGS.sub *.c *.cc *.h dmd/*.h dmd/root/*.h; \
 	etags --include TAGS.sub --include ../TAGS.sub
 
 d.man: doc/gdc.1
@@ -302,19 +345,16 @@ d.stagefeedback: stagefeedback-start
 	-mv d/*$(objext) stagefeedback/d
 
 # Include the dfrontend and build directories for headers.
-D_INCLUDES = -I$(srcdir)/d -I$(srcdir)/d/dmd -Id
-
-CFLAGS-d/id.o += $(D_INCLUDES)
-CFLAGS-d/impcnvtab.o += $(D_INCLUDES)
+D_INCLUDES = -I$(srcdir)/d -J$(srcdir)/d/dmd/ddoc
 
 # Override build rules for D frontend.
-d/%.o: d/dmd/%.c $(D_GENERATED_SRCS)
-	$(DMD_COMPILE) $(D_INCLUDES) $<
-	$(POSTCOMPILE)
+d/%.o: d/dmd/%.d
+	$(DCOMPILE) $(D_INCLUDES) $<
+	$(DPOSTCOMPILE)
 
-d/%.o: d/dmd/root/%.c $(D_GENERATED_SRCS)
-	$(DMD_COMPILE) $(D_INCLUDES) $<
-	$(POSTCOMPILE)
+d/%.o: d/dmd/root/%.d
+	$(DCOMPILE) $(D_INCLUDES) $<
+	$(DPOSTCOMPILE)
 
 # Generated programs.
 d/idgen$(build_exeext): d/idgen.dmdgen.o $(BUILD_LIBDEPS)
@@ -334,7 +374,3 @@ d/id.h: d/id.c
 
 d/impcnvtab.c: d/impcnvgen$(build_exeext)
 	cd d && ./impcnvgen$(build_exeext)
-
-d/%.dmdgen.o: $(srcdir)/d/dmd/%.c
-	$(DMDGEN_COMPILE) $(D_INCLUDES) $<
-	$(POSTCOMPILE)

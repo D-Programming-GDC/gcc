@@ -21,20 +21,27 @@ class Dsymbol;
 class Expression;
 class Parameter;
 class Type;
-struct OutBuffer;
+class TypeTuple;
+class TypeFunction;
 
 struct Target
 {
-    static int ptrsize;
-    static int realsize;             // size a real consumes in memory
-    static int realpad;              // 'padding' added to the CPU real size to bring it up to realsize
-    static int realalignsize;        // alignment for reals
-    static bool reverseCppOverloads; // with dmc and cl, overloaded functions are grouped and in reverse order
-    static bool cppExceptions;       // set if catching C++ exceptions is supported
-    static int c_longsize;           // size of a C 'long' or 'unsigned long' type
-    static int c_long_doublesize;    // size of a C 'long double'
-    static int classinfosize;        // size of 'ClassInfo'
+    // D ABI
+    static unsigned ptrsize;
+    static unsigned realsize;           // size a real consumes in memory
+    static unsigned realpad;            // 'padding' added to the CPU real size to bring it up to realsize
+    static unsigned realalignsize;      // alignment for reals
+    static unsigned classinfosize;      // size of 'ClassInfo'
     static unsigned long long maxStaticDataSize;  // maximum size of static data
+
+    // C ABI
+    static unsigned c_longsize;         // size of a C 'long' or 'unsigned long' type
+    static unsigned c_long_doublesize;  // size of a C 'long double'
+
+    // C++ ABI
+    static bool reverseCppOverloads;    // with dmc and cl, overloaded functions are grouped and in reverse order
+    static bool cppExceptions;          // set if catching C++ exceptions is supported
+    static bool twoDtorInVtable;        // target C++ ABI puts deleting and non-deleting destructor into vtable
 
     template <typename T>
     struct FPTypeProperties
@@ -60,8 +67,8 @@ struct Target
 
     static void _init();
     // Type sizes and support.
-    static unsigned alignsize(Type* type);
-    static unsigned fieldalign(Type* type);
+    static unsigned alignsize(Type *type);
+    static unsigned fieldalign(Type *type);
     static unsigned critsecsize();
     static Type *va_listType();  // get type of va_list
     static int isVectorTypeSupported(int sz, Type *type);
@@ -73,4 +80,8 @@ struct Target
     static Type *cppParameterType(Parameter *p);
     static bool cppFundamentalType(const Type *t, bool& isFundamental);
     static LINK systemLinkage();
+    static TypeTuple *toArgTypes(Type *t);
+    static bool isReturnOnStack(TypeFunction *tf, bool needsThis);
+    static d_uns64 parameterSize(const Loc& loc, Type *t);
+    static Expression *getTargetInfo(const char* name, const Loc& loc);
 };

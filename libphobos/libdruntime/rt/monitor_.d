@@ -2,7 +2,7 @@
  * Contains the implementation for object monitors.
  *
  * Copyright: Copyright Digital Mars 2000 - 2015.
- * License:   $(WEB www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
+ * License:   $(HTTP www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
  * Authors:   Walter Bright, Sean Kelly, Martin Nowak
  */
 
@@ -25,7 +25,7 @@ in
 {
     assert(ownee.__monitor is null);
 }
-body
+do
 {
     auto m = ensureMonitor(cast(Object) owner);
     auto i = m.impl;
@@ -60,12 +60,32 @@ extern (C) void _d_monitordelete(Object h, bool det)
     }
 }
 
+// does not call dispose events, for internal use only
+extern (C) void _d_monitordelete_nogc(Object h) @nogc
+{
+    auto m = getMonitor(h);
+    if (m is null)
+        return;
+
+    if (m.impl)
+    {
+        // let the GC collect the monitor
+        setMonitor(h, null);
+    }
+    else if (!atomicOp!("-=")(m.refs, cast(size_t) 1))
+    {
+        // refcount == 0 means unshared => no synchronization required
+        deleteMonitor(cast(Monitor*) m);
+        setMonitor(h, null);
+    }
+}
+
 extern (C) void _d_monitorenter(Object h)
 in
 {
     assert(h !is null, "Synchronized object must not be null.");
 }
-body
+do
 {
     auto m = cast(Monitor*) ensureMonitor(h);
     auto i = m.impl;
@@ -169,6 +189,7 @@ version (GNU)
 
 version (SingleThreaded)
 {
+@nogc:
     alias Mutex = int;
 
     void initMutex(Mutex* mtx)
