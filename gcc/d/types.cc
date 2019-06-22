@@ -416,11 +416,11 @@ layout_aggregate_type (AggregateDeclaration *decl, tree type,
 	      insert_aggregate_field (type, field, 0);
 	    }
 
-	  if (!id && !cd->isCPPclass ())
+	  if (!id && cd->hasMonitor ())
 	    {
 	      tree field = create_field_decl (ptr_type_node, "__monitor", 1,
 					      inherited_p);
-	      insert_aggregate_field (type, field, Target::ptrsize);
+	      insert_aggregate_field (type, field, target.ptrsize);
 	    }
 	}
 
@@ -682,26 +682,23 @@ public:
 
        Variadic functions with D linkage have an additional hidden argument
        with the name _arguments passed to the function.  */
-    if (t->varargs == 1 && t->linkage == LINKd)
+    if (t->parameterList.varargs == VARARGvariadic && t->linkage == LINKd)
       {
 	tree type = build_ctype (Type::typeinfotypelist->type);
 	fnparams = chainon (fnparams, build_tree_list (0, type));
       }
 
-    if (t->parameters)
-      {
-	size_t n_args = Parameter::dim (t->parameters);
+    size_t n_args = t->parameterList.length ();
 
-	for (size_t i = 0; i < n_args; i++)
-	  {
-	    tree type = type_passed_as (Parameter::getNth (t->parameters, i));
-	    fnparams = chainon (fnparams, build_tree_list (0, type));
-	  }
+    for (size_t i = 0; i < n_args; i++)
+      {
+	tree type = type_passed_as (t->parameterList[i]);
+	fnparams = chainon (fnparams, build_tree_list (0, type));
       }
 
     /* When the last parameter is void_list_node, that indicates a fixed length
        parameter list, otherwise function is treated as variadic.  */
-    if (t->varargs != 1)
+    if (t->parameterList.varargs != VARARGvariadic)
       fnparams = chainon (fnparams, void_list_node);
 
     if (t->next != NULL)
@@ -899,10 +896,10 @@ public:
     TYPE_CONTEXT (t->ctype) = d_decl_context (t->sym);
     build_type_decl (t->ctype, t->sym);
 
-    /* For structs with a user defined postblit or a destructor,
-       also set TREE_ADDRESSABLE on the type and all variants.
+    /* For structs with a user defined postblit, copy constructor, or a
+       destructor, also set TREE_ADDRESSABLE on the type and all variants.
        This will make the struct be passed around by reference.  */
-    if (t->sym->postblit || t->sym->dtor)
+    if (t->sym->postblit || t->sym->hasCopyCtor || t->sym->dtor)
       {
 	for (tree tv = t->ctype; tv != NULL_TREE; tv = TYPE_NEXT_VARIANT (tv))
 	  TREE_ADDRESSABLE (tv) = 1;

@@ -1,7 +1,7 @@
 /* 
 DFLAGS:
 REQUIRED_ARGS: -c
-EXTRA_SOURCES: extra-files/no_TypeInfo/object.d
+EXTRA_SOURCES: extra-files/minimal/object.d
 TEST_OUTPUT:
 ---
 fail_compilation/no_TypeInfo.d(13): Error: `object.TypeInfo` could not be found, but is implicitly used

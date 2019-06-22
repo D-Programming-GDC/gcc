@@ -69,9 +69,10 @@ Authors:   $(HTTP erdani.org, Andrei Alexandrescu),
 module std.typecons;
 
 import std.format : singleSpec, FormatSpec, formatValue;
-import std.meta; // : AliasSeq, allSatisfy;
+import std.meta : AliasSeq, allSatisfy;
 import std.range.primitives : isOutputRange;
 import std.traits;
+import std.internal.attributes : betterC;
 
 ///
 @safe unittest
@@ -511,7 +512,7 @@ if (distinctFieldNames!(Specs))
     //      :
     // NOTE: field[k] is an expression (which yields a symbol of a
     //       variable) and can't be aliased directly.
-    string injectNamedFields()
+    enum injectNamedFields = ()
     {
         string decl = "";
         static foreach (i, val; fieldSpecs)
@@ -524,7 +525,7 @@ if (distinctFieldNames!(Specs))
             }
         }}
         return decl;
-    }
+    };
 
     // Returns Specs for a subtuple this[from .. to] preserving field
     // names if any.
@@ -856,7 +857,7 @@ if (distinctFieldNames!(Specs))
          Returns: A concatenation of this tuple and `t`
          */
         auto opBinary(string op, T)(auto ref T t)
-        if (op == "~")
+        if (op == "~" && !(is(T : U[], U) && isTuple!U))
         {
             static if (isTuple!T)
             {
@@ -873,7 +874,7 @@ if (distinctFieldNames!(Specs))
 
         /// ditto
         auto opBinaryRight(string op, T)(auto ref T t)
-        if (op == "~")
+        if (op == "~" && !(is(T : U[], U) && isTuple!U))
         {
             static if (isTuple!T)
             {
@@ -948,6 +949,8 @@ if (distinctFieldNames!(Specs))
                 static assert(nN <= nT, "Cannot have more names than tuple members");
                 alias allNames = AliasSeq!(names, fieldNames[nN .. $]);
 
+                import std.meta : Alias, aliasSeqOf;
+
                 template GetItem(size_t idx)
                 {
                     import std.array : empty;
@@ -1020,6 +1023,7 @@ if (distinctFieldNames!(Specs))
         if (is(typeof(translate) : V[K], V, K) && isSomeString!V &&
                 (isSomeString!K || is(K : size_t)))
         {
+            import std.meta : aliasSeqOf;
             import std.range : ElementType;
             static if (isSomeString!(ElementType!(typeof(translate.keys))))
             {
@@ -1175,7 +1179,12 @@ if (distinctFieldNames!(Specs))
             size_t h = 0;
             static foreach (i, T; Types)
             {{
-                const k = typeid(T).getHash((() @trusted => cast(const void*) &field[i])());
+                static if (__traits(compiles, h = .hashOf(field[i])))
+                    const k = .hashOf(field[i]);
+                else
+                    // Workaround for when .hashOf is not both @safe and nothrow.
+                    // BUG: Improperly casts away `shared`!
+                    const k = typeid(T).getHash((() @trusted => cast(const void*) &field[i])());
                 static if (i == 0)
                     h = k;
                 else
@@ -1225,7 +1234,7 @@ if (distinctFieldNames!(Specs))
         }
 
         /// ditto
-        void toString(DG, Char)(scope DG sink, const ref FormatSpec!Char fmt) const
+        void toString(DG, Char)(scope DG sink, scope const ref FormatSpec!Char fmt) const
         {
             import std.format : formatElement, formattedWrite, FormatException;
             if (fmt.nested)
@@ -1281,9 +1290,10 @@ if (distinctFieldNames!(Specs))
             }
             else
             {
+                const spec = fmt.spec;
                 throw new FormatException(
                     "Expected '%s' or '%(...%)' or '%(...%|...%)' format specifier for type '" ~
-                        Unqual!(typeof(this)).stringof ~ "', not '%" ~ fmt.spec ~ "'.");
+                        Unqual!(typeof(this)).stringof ~ "', not '%" ~ spec ~ "'.");
             }
         }
 
@@ -1411,6 +1421,23 @@ if (distinctFieldNames!(Specs))
     assert(t.bar == "3");
 }
 
+// https://issues.dlang.org/show_bug.cgi?id=18824
+// tuple concat
+@safe unittest
+{
+    alias Type = Tuple!(int, string);
+    Type[] arr;
+    auto t = tuple(2, "s");
+    // Test opBinaryRight
+    arr = arr ~ t;
+    // Test opBinary
+    arr = t ~ arr;
+    static assert(is(typeof(arr) == Type[]));
+    immutable Type[] b;
+    auto c = b ~ t;
+    static assert(is(typeof(c) == immutable(Type)[]));
+}
+
 // tuple concat
 @safe unittest
 {
@@ -1473,6 +1500,26 @@ if (distinctFieldNames!(Specs))
 
     //Error: mutable method Bad.opEquals is not callable using a const object
     assert(t == AliasSeq!(1, Bad(1), "asdf"));
+}
+
+// Ensure Tuple.toHash works
+@safe unittest
+{
+    Tuple!(int, int) point;
+    assert(point.toHash == typeof(point).init.toHash);
+    assert(tuple(1, 2) != point);
+    assert(tuple(1, 2) == tuple(1, 2));
+    point[0] = 1;
+    assert(tuple(1, 2) != point);
+    point[1] = 2;
+    assert(tuple(1, 2) == point);
+}
+
+@safe @betterC unittest
+{
+    auto t = tuple(1, 2);
+    assert(t == tuple(1, 2));
+    auto t3 = tuple(1, 'd');
 }
 
 /**
@@ -2086,9 +2133,16 @@ if (is(T == class) || is(T == interface) || isAssociativeArray!T)
         U stripped;
     }
 
-    void opAssign(T another) @trusted pure nothrow @nogc
+    void opAssign(T another) pure nothrow @nogc
     {
-        stripped = cast(U) another;
+        // If `T` defines `opCast` we must infer the safety
+        static if (hasMember!(T, "opCast"))
+        {
+            // This will allow the compiler to infer the safety of `T.opCast!U`
+            // without generating any runtime cost
+            if (false) { stripped = cast(U) another; }
+        }
+        () @trusted { stripped = cast(U) another; }();
     }
 
     void opAssign(typeof(this) another) @trusted pure nothrow @nogc
@@ -2105,8 +2159,9 @@ if (is(T == class) || is(T == interface) || isAssociativeArray!T)
         }
     }
 
-    this(T initializer) @trusted pure nothrow @nogc
+    this(T initializer) pure nothrow @nogc
     {
+        // Infer safety from opAssign
         opAssign(initializer);
     }
 
@@ -2260,6 +2315,26 @@ if (is(T == class) || is(T == interface) || isDynamicArray!T || isAssociativeArr
     assert(o1 != new Object(), "Rebindable!(const(Object)) should be"
         ~ " comparable against Object itself and use Object.opEquals.");
 }
+
+@safe unittest // issue 18755
+{
+    static class Foo
+    {
+        auto opCast(T)() @system immutable pure nothrow
+        {
+            *(cast(uint*) 0xdeadbeef) = 0xcafebabe;
+            return T.init;
+        }
+    }
+
+    static assert(!__traits(compiles, () @safe {
+        auto r = Rebindable!(immutable Foo)(new Foo);
+    }));
+    static assert(__traits(compiles, () @system {
+        auto r = Rebindable!(immutable Foo)(new Foo);
+    }));
+}
+
 /**
 Convenience function for creating a `Rebindable` using automatic type
 inference.
@@ -2679,7 +2754,11 @@ Params:
 
     size_t toHash() const @safe nothrow
     {
-        return _isNull ? 0 : typeid(T).getHash(&_value.payload);
+        static if (__traits(compiles, .hashOf(_value.payload)))
+            return _isNull ? 0 : .hashOf(_value.payload);
+        else
+            // Workaround for when .hashOf is not both @safe and nothrow.
+            return _isNull ? 0 : typeid(T).getHash(&_value.payload);
     }
 
     /**
@@ -2705,7 +2784,28 @@ Params:
     }
 
     /// ditto
-    void toString(W)(ref W writer, const ref FormatSpec!char fmt)
+    string toString() const
+    {
+        import std.array : appender;
+        auto app = appender!string();
+        auto spec = singleSpec("%s");
+        toString(app, spec);
+        return app.data;
+    }
+
+    /// ditto
+    void toString(W)(ref W writer, scope const ref FormatSpec!char fmt)
+    if (isOutputRange!(W, char))
+    {
+        import std.range.primitives : put;
+        if (isNull)
+            put(writer, "Nullable.null");
+        else
+            formatValue(writer, _value.payload, fmt);
+    }
+
+    /// ditto
+    void toString(W)(ref W writer, scope const ref FormatSpec!char fmt) const
     if (isOutputRange!(W, char))
     {
         import std.range.primitives : put;
@@ -2717,7 +2817,7 @@ Params:
 
     //@@@DEPRECATED_2.086@@@
     deprecated("To be removed after 2.086. Please use the output range overload instead.")
-    void toString()(scope void delegate(const(char)[]) sink, const ref FormatSpec!char fmt)
+    void toString()(scope void delegate(const(char)[]) sink, scope const ref FormatSpec!char fmt)
     {
         if (isNull)
         {
@@ -2732,7 +2832,7 @@ Params:
     // Issue 14940
     //@@@DEPRECATED_2.086@@@
     deprecated("To be removed after 2.086. Please use the output range overload instead.")
-    void toString()(scope void delegate(const(char)[]) @safe sink, const ref FormatSpec!char fmt)
+    void toString()(scope void delegate(const(char)[]) @safe sink, scope const ref FormatSpec!char fmt)
     {
         if (isNull)
         {
@@ -2775,6 +2875,16 @@ Returns:
     Nullable!int a = 1;
     formattedWrite(app, "%s", a);
     assert(app.data == "1");
+}
+
+// Issue 19799
+@safe unittest
+{
+    import std.format : format;
+
+    const Nullable!string a = const(Nullable!string)();
+
+    format!"%s"(a);
 }
 
 /**
@@ -2850,7 +2960,6 @@ Params:
 Gets the value if not null. If `this` is in the null state, and the optional
 parameter `fallback` was provided, it will be returned. Without `fallback`,
 calling `get` with a null state is invalid.
-This function is also called for the implicit conversion to `T`.
 
 Params:
     fallback = the value to return in case the `Nullable` is null.
@@ -2871,7 +2980,9 @@ Returns:
         return isNull ? fallback : _value.payload;
     }
 
-///
+//@@@DEPRECATED_2.096@@@
+deprecated(
+    "Implicit conversion with `alias Nullable.get this` will be removed after 2.096. Please use `.get` explicitly.")
 @system unittest
 {
     import core.exception : AssertError;
@@ -2889,24 +3000,33 @@ Returns:
     assert(i == 5);
 }
 
+    //@@@DEPRECATED_2.096@@@
+    deprecated(
+        "Implicit conversion with `alias Nullable.get this` will be removed after 2.096. Please use `.get` explicitly.")
+    @property ref inout(T) get_() inout @safe pure nothrow
+    {
+        return get;
+    }
+
 ///
 @safe pure nothrow unittest
 {
     int i = 42;
-    Nullable!int ni2;
-    int x = ni2.get(i);
+    Nullable!int ni;
+    int x = ni.get(i);
     assert(x == i);
 
-    ni2 = 7;
-    x = ni2.get(i);
+    ni = 7;
+    x = ni.get(i);
     assert(x == 7);
 }
 
 /**
 Implicitly converts to `T`.
 `this` must not be in the null state.
+This feature is deprecated and will be removed after 2.096.
  */
-    alias get this;
+    alias get_ this;
 }
 
 /// ditto
@@ -2936,8 +3056,8 @@ auto nullable(T)(T t)
     if (!queryResult.isNull)
     {
         //Process Mr. Doe's customer record
-        auto address = queryResult.address;
-        auto customerNum = queryResult.customerNum;
+        auto address = queryResult.get.address;
+        auto customerNum = queryResult.get.customerNum;
 
         //Do some things with this customer's info
     }
@@ -2961,6 +3081,9 @@ auto nullable(T)(T t)
     assertThrown!Throwable(a.get);
 }
 
+//@@@DEPRECATED_2.096@@@
+deprecated(
+    "Implicit conversion with `alias Nullable.get this` will be removed after 2.096. Please use `.get` explicitly.")
 @system unittest
 {
     import std.exception : assertThrown;
@@ -3014,10 +3137,10 @@ auto nullable(T)(T t)
     assert(s == S(6));
     assert(s != S(0));
     assert(s.get != S(0));
-    s.x = 9190;
-    assert(s.x == 9190);
+    s.get.x = 9190;
+    assert(s.get.x == 9190);
     s.nullify();
-    assertThrown!Throwable(s.x = 9441);
+    assertThrown!Throwable(s.get.x = 9441);
 }
 @safe unittest
 {
@@ -3046,7 +3169,7 @@ auto nullable(T)(T t)
     assert(s.isNull);
     s = S(5);
     assert(!s.isNull);
-    assert(s.x == 5);
+    assert(s.get.x == 5);
     s.nullify();
     assert(s.isNull);
 }
@@ -3166,10 +3289,10 @@ auto nullable(T)(T t)
         auto x2 = immutable Nullable!S1(sm);
         auto x3 =           Nullable!S1(si);
         auto x4 = immutable Nullable!S1(si);
-        assert(x1.val == 1);
-        assert(x2.val == 1);
-        assert(x3.val == 1);
-        assert(x4.val == 1);
+        assert(x1.get.val == 1);
+        assert(x2.get.val == 1);
+        assert(x3.get.val == 1);
+        assert(x4.get.val == 1);
     }
 
     auto nm = 10;
@@ -3182,8 +3305,8 @@ auto nullable(T)(T t)
         static assert(!__traits(compiles, { auto x2 = immutable Nullable!S2(sm); }));
         static assert(!__traits(compiles, { auto x3 =           Nullable!S2(si); }));
         auto x4 = immutable Nullable!S2(si);
-        assert(*x1.val == 10);
-        assert(*x4.val == 10);
+        assert(*x1.get.val == 10);
+        assert(*x4.get.val == 10);
     }
 
     {
@@ -3193,10 +3316,10 @@ auto nullable(T)(T t)
         auto x2 = immutable Nullable!S3(sm);
         auto x3 =           Nullable!S3(si);
         auto x4 = immutable Nullable!S3(si);
-        assert(*x1.val == 10);
-        assert(*x2.val == 10);
-        assert(*x3.val == 10);
-        assert(*x4.val == 10);
+        assert(*x1.get.val == 10);
+        assert(*x2.get.val == 10);
+        assert(*x3.get.val == 10);
+        assert(*x4.get.val == 10);
     }
 }
 @safe unittest
@@ -3215,6 +3338,7 @@ auto nullable(T)(T t)
 
     Nullable!int ni;
     assert(ni.to!string() == "Nullable.null");
+    assert((cast(const) ni).to!string() == "Nullable.null");
 
     struct Test { string s; }
     alias NullableTest = Nullable!Test;
@@ -3224,6 +3348,8 @@ auto nullable(T)(T t)
     assert(nt.to!string() == `Test("test")`);
     // test appender version
     assert(nt.toString() == `Test("test")`);
+    // test const version
+    assert((cast(const) nt).toString() == `const(Test)("test")`);
 
     NullableTest ntn = Test("null");
     assert(ntn.to!string() == `Test("null")`);
@@ -3284,16 +3410,6 @@ auto nullable(T)(T t)
     assert(c.canary == 0xA71FE);
 }
 
-// Regression test for issue 18539
-@safe unittest
-{
-    import std.math : approxEqual;
-
-    auto foo = nullable(2.0);
-    auto bar = nullable(2.0);
-
-    assert(foo.approxEqual(bar));
-}
 // bugzilla issue 19037
 @safe unittest
 {
@@ -3438,7 +3554,7 @@ Params:
     {
         import std.format : FormatSpec, formatValue;
         // Needs to be a template because of DMD @@BUG@@ 13737.
-        void toString()(scope void delegate(const(char)[]) sink, const ref FormatSpec!char fmt)
+        void toString()(scope void delegate(const(char)[]) sink, scope const ref FormatSpec!char fmt)
         {
             if (isNull)
             {
@@ -3467,7 +3583,7 @@ Returns:
         }
         //Need to use 'is' if T is a float type
         //because NaN != NaN
-        else static if (isFloatingPoint!T)
+        else static if (__traits(isFloating, T) || __traits(compiles, { static assert(!(nullValue == nullValue)); }))
         {
             return _value is nullValue;
         }
@@ -3486,6 +3602,14 @@ Returns:
 
     ni = 0;
     assert(!ni.isNull);
+}
+
+@system unittest
+{
+    assert(typeof(this).init.isNull, typeof(this).stringof ~
+        ".isNull does not work correctly because " ~ T.stringof ~
+        " has an == operator that is non-reflexive and could not be" ~
+        " determined before runtime to be non-reflexive!");
 }
 
 // https://issues.dlang.org/show_bug.cgi?id=11135
@@ -3660,6 +3784,25 @@ if (is (typeof(nullValue) == T))
     assert(a == 8);
     a.nullify();
     assert(a.isNull);
+}
+
+@nogc nothrow pure @safe unittest
+{
+    // issue 19226 - fully handle non-self-equal nullValue
+    static struct Fraction
+    {
+        int denominator;
+        bool isNaN() const
+        {
+            return denominator == 0;
+        }
+        bool opEquals(const Fraction rhs) const
+        {
+            return !isNaN && denominator == rhs.denominator;
+        }
+    }
+    alias N = Nullable!(Fraction, Fraction.init);
+    assert(N.init.isNull);
 }
 
 @safe unittest
@@ -3892,7 +4035,7 @@ Params:
     {
         import std.format : FormatSpec, formatValue;
         // Needs to be a template because of DMD @@BUG@@ 13737.
-        void toString()(scope void delegate(const(char)[]) sink, const ref FormatSpec!char fmt)
+        void toString()(scope void delegate(const(char)[]) sink, scope const ref FormatSpec!char fmt)
         {
             if (isNull)
             {
@@ -4404,7 +4547,7 @@ $(UL
  $(LI Variadic arguments to constructors are not forwarded to super.)
  $(LI Deep interface inheritance causes compile error with messages like
       "Error: function std.typecons._AutoImplement!(Foo)._AutoImplement.bar
-      does not override any function".  [$(BUGZILLA 2525), $(BUGZILLA 3525)] )
+      does not override any function".  [$(BUGZILLA 2525)] )
  $(LI The `parent` keyword is actually a delegate to the super class'
       corresponding member function.  [$(BUGZILLA 2540)] )
  $(LI Using alias template parameter in `how` and/or `what` may cause
@@ -4830,6 +4973,7 @@ private static:
         }
     }
 
+    import std.meta : templateNot;
     alias Implementation = AutoImplement!(Issue17177, how, templateNot!isFinalFunction);
 }
 
@@ -4885,10 +5029,11 @@ package template OverloadSet(string nam, T...)
 /*
 Used by MemberFunctionGenerator.
  */
-package template FuncInfo(alias func, /+[BUG 4217 ?]+/ T = typeof(&func))
+package template FuncInfo(alias func)
+if (is(typeof(&func)))
 {
-    alias RT = ReturnType!T;
-    alias PT = Parameters!T;
+    alias RT = ReturnType!(typeof(&func));
+    alias PT = Parameters!(typeof(&func));
 }
 package template FuncInfo(Func)
 {
@@ -5099,7 +5244,7 @@ private static:
             {
                 preamble ~= "alias self = " ~ name ~ ";\n";
                 if (WITH_BASE_CLASS && !__traits(isAbstractFunction, func))
-                    preamble ~= "alias parent = AliasSeq!(__traits(getMember, super, \"" ~ name ~ "\"))[0];";
+                    preamble ~= `alias parent = __traits(getMember, super, "` ~ name ~ `");`;
             }
 
             // Function body
@@ -5344,6 +5489,7 @@ if (Targets.length >= 1 && allSatisfy!(isMutable, Targets))
         template OnlyVirtual(members...)
         {
             enum notFinal(alias T) = !__traits(isFinalFunction, T);
+            import std.meta : Filter;
             alias OnlyVirtual = Filter!(notFinal, members);
         }
 
@@ -5482,8 +5628,8 @@ if (Targets.length >= 1 && allSatisfy!(isMutable, Targets))
             }
 
         public:
-            mixin mixinAll!(
-                staticMap!(generateFun, staticIota!(0, TargetMembers.length)));
+            static foreach (i; 0 .. TargetMembers.length)
+                mixin(generateFun!i);
         }
     }
 }
@@ -5756,7 +5902,7 @@ package template GetOverloadedMethods(T)
 {
     import std.meta : Filter;
 
-    alias allMembers = AliasSeq!(__traits(allMembers, T));
+    alias allMembers = __traits(allMembers, T);
     template follows(size_t i = 0)
     {
         static if (i >= allMembers.length)
@@ -5999,47 +6145,6 @@ package template DerivedFunctionType(T...)
     static assert(is(DerivedFunctionType!(F17, F18) == void));
 }
 
-package template staticIota(int beg, int end)
-{
-    static if (beg + 1 >= end)
-    {
-        static if (beg >= end)
-        {
-            alias staticIota = AliasSeq!();
-        }
-        else
-        {
-            alias staticIota = AliasSeq!(+beg);
-        }
-    }
-    else
-    {
-        enum mid = beg + (end - beg) / 2;
-        alias staticIota = AliasSeq!(staticIota!(beg, mid), staticIota!(mid, end));
-    }
-}
-
-package template mixinAll(mixins...)
-{
-    static if (mixins.length == 1)
-    {
-        static if (is(typeof(mixins[0]) == string))
-        {
-            mixin(mixins[0]);
-        }
-        else
-        {
-            alias it = mixins[0];
-            mixin it;
-        }
-    }
-    else static if (mixins.length >= 2)
-    {
-        mixin mixinAll!(mixins[ 0 .. $/2]);
-        mixin mixinAll!(mixins[$/2 .. $ ]);
-    }
-}
-
 package template Bind(alias Template, args1...)
 {
     alias Bind(args2...) = Template!(args1, args2);
@@ -6120,17 +6225,28 @@ struct RefCounted(T, RefCountedAutoInitialize autoInit =
         RefCountedAutoInitialize.yes)
 if (!is(T == class) && !(is(T == interface)))
 {
+    version (D_BetterC)
+    {
+        private enum enableGCScan = false;
+    }
+    else
+    {
+        private enum enableGCScan = hasIndirections!T;
+    }
+
     extern(C) private pure nothrow @nogc static // TODO remove pure when https://issues.dlang.org/show_bug.cgi?id=15862 has been fixed
     {
         pragma(mangle, "free") void pureFree( void *ptr );
-        pragma(mangle, "gc_addRange") void pureGcAddRange( in void* p, size_t sz, const TypeInfo ti = null );
-        pragma(mangle, "gc_removeRange") void pureGcRemoveRange( in void* p );
+        static if (enableGCScan)
+        {
+            pragma(mangle, "gc_addRange") void pureGcAddRange( in void* p, size_t sz, const TypeInfo ti = null );
+            pragma(mangle, "gc_removeRange") void pureGcRemoveRange( in void* p );
+        }
     }
 
     /// `RefCounted` storage implementation.
     struct RefCountedStore
     {
-        import core.memory : pureMalloc;
         private struct Impl
         {
             T _payload;
@@ -6141,59 +6257,36 @@ if (!is(T == class) && !(is(T == interface)))
 
         private void initialize(A...)(auto ref A args)
         {
-            import core.exception : onOutOfMemoryError;
             import std.conv : emplace;
 
-            _store = cast(Impl*) pureMalloc(Impl.sizeof);
-            if (_store is null)
-                onOutOfMemoryError();
-            static if (hasIndirections!T)
-                pureGcAddRange(&_store._payload, T.sizeof);
+            allocateStore();
             emplace(&_store._payload, args);
             _store._count = 1;
         }
 
-        private void move(ref T source)
+        private void move(ref T source) nothrow pure
         {
-            import core.exception : onOutOfMemoryError;
-            import core.stdc.string : memcpy, memset;
+            import std.algorithm.mutation : moveEmplace;
 
-            _store = cast(Impl*) pureMalloc(Impl.sizeof);
-            if (_store is null)
-                onOutOfMemoryError();
-            static if (hasIndirections!T)
-                pureGcAddRange(&_store._payload, T.sizeof);
-
-            // Can't use std.algorithm.move(source, _store._payload)
-            // here because it requires the target to be initialized.
-            // Might be worth to add this as `moveEmplace`
-
-            // Can avoid destructing result.
-            static if (hasElaborateAssign!T || !isAssignable!T)
-                memcpy(&_store._payload, &source, T.sizeof);
-            else
-                _store._payload = source;
-
-            // If the source defines a destructor or a postblit hook, we must obliterate the
-            // object in order to avoid double freeing and undue aliasing
-            static if (hasElaborateDestructor!T || hasElaborateCopyConstructor!T)
-            {
-                // If T is nested struct, keep original context pointer
-                static if (__traits(isNested, T))
-                    enum sz = T.sizeof - (void*).sizeof;
-                else
-                    enum sz = T.sizeof;
-
-                static if (__traits(isZeroInit, T))
-                    memset(&source, 0, sz);
-                else
-                {
-                    auto init = typeid(T).initializer();
-                    memcpy(&source, init.ptr, sz);
-                }
-            }
-
+            allocateStore();
+            moveEmplace(source, _store._payload);
             _store._count = 1;
+        }
+
+        // 'nothrow': can only generate an Error
+        private void allocateStore() nothrow pure
+        {
+            static if (enableGCScan)
+            {
+                import std.internal.memory : enforceCalloc;
+                _store = cast(Impl*) enforceCalloc(1, Impl.sizeof);
+                pureGcAddRange(&_store._payload, T.sizeof);
+            }
+            else
+            {
+                import std.internal.memory : enforceMalloc;
+                _store = cast(Impl*) enforceMalloc(Impl.sizeof);
+            }
         }
 
         /**
@@ -6275,7 +6368,7 @@ to deallocate the corresponding resource.
             return;
         // Done, deallocate
         .destroy(_refCounted._store._payload);
-        static if (hasIndirections!T)
+        static if (enableGCScan)
         {
             pureGcRemoveRange(&_refCounted._store._payload);
         }
@@ -6365,7 +6458,7 @@ assert(refCountedStore.isInitialized)).
 }
 
 ///
-pure @system nothrow @nogc unittest
+@betterC pure @system nothrow @nogc unittest
 {
     // A pair of an `int` and a `size_t` - the latter being the
     // reference count - will be dynamically allocated
@@ -6418,7 +6511,7 @@ pure @system unittest
     assert(a.x._refCounted._store._count == 2, "BUG 4356 still unfixed");
 }
 
-pure @system nothrow @nogc unittest
+@betterC pure @system nothrow @nogc unittest
 {
     import std.algorithm.mutation : swap;
 
@@ -6427,7 +6520,7 @@ pure @system nothrow @nogc unittest
 }
 
 // 6606
-@safe pure nothrow @nogc unittest
+@betterC @safe pure nothrow @nogc unittest
 {
     union U {
        size_t i;
@@ -6442,7 +6535,7 @@ pure @system nothrow @nogc unittest
 }
 
 // 6436
-@system pure unittest
+@betterC @system pure unittest
 {
     struct S { this(ref int val) { assert(val == 3); ++val; } }
 
@@ -6452,14 +6545,14 @@ pure @system nothrow @nogc unittest
 }
 
 // gc_addRange coverage
-@system pure unittest
+@betterC @system pure unittest
 {
     struct S { int* p; }
 
     auto s = RefCounted!S(null);
 }
 
-@system pure nothrow @nogc unittest
+@betterC @system pure nothrow @nogc unittest
 {
     RefCounted!int a;
     a = 5; //This should not assert
@@ -6592,13 +6685,20 @@ mixin template Proxy(alias a)
 
         static if (accessibleFrom!(const typeof(this)))
         {
-            override hash_t toHash() const nothrow @trusted
+            override hash_t toHash() const nothrow @safe
             {
-                static if (is(typeof(&a) == ValueType*))
-                    alias v = a;
+                static if (__traits(compiles, .hashOf(a)))
+                    return .hashOf(a);
                 else
-                    auto v = a;     // if a is (property) function
-                return typeid(ValueType).getHash(cast(const void*)&v);
+                // Workaround for when .hashOf is not both @safe and nothrow.
+                {
+                    static if (is(typeof(&a) == ValueType*))
+                        alias v = a;
+                    else
+                        auto v = a; // if a is (property) function
+                    // BUG: Improperly casts away `shared`!
+                    return typeid(ValueType).getHash((() @trusted => cast(const void*) &v)());
+                }
             }
         }
     }
@@ -6629,13 +6729,20 @@ mixin template Proxy(alias a)
 
         static if (accessibleFrom!(const typeof(this)))
         {
-            hash_t toHash() const nothrow @trusted
+            hash_t toHash() const nothrow @safe
             {
-                static if (is(typeof(&a) == ValueType*))
-                    alias v = a;
+                static if (__traits(compiles, .hashOf(a)))
+                    return .hashOf(a);
                 else
-                    auto v = a;     // if a is (property) function
-                return typeid(ValueType).getHash(cast(const void*)&v);
+                // Workaround for when .hashOf is not both @safe and nothrow.
+                {
+                    static if (is(typeof(&a) == ValueType*))
+                        alias v = a;
+                    else
+                        auto v = a; // if a is (property) function
+                    // BUG: Improperly casts away `shared`!
+                    return typeid(ValueType).getHash((() @trusted => cast(const void*) &v)());
+                }
             }
         }
     }
@@ -7160,8 +7267,14 @@ mixin template Proxy(alias a)
     bool* b = Name("a") in names;
 }
 
+// workaround for https://issues.dlang.org/show_bug.cgi?id=19669
+private enum isDIP1000 = __traits(compiles, () @safe {
+     int x;
+     int* p;
+     p = &x;
+});
 // excludes struct S; it's 'mixin Proxy!foo' doesn't compile with -dip1000
-version (DIP1000) {} else
+static if (isDIP1000) {} else
 @system unittest
 {
     // bug14213, using function for the payload
@@ -7321,7 +7434,7 @@ struct Typedef(T, T init = T.init, string cookie=null)
     }
 
     /// ditto
-    void toString(this T, W)(ref W writer, const ref FormatSpec!char fmt)
+    void toString(this T, W)(ref W writer, scope const ref FormatSpec!char fmt)
     if (isOutputRange!(W, char))
     {
         formatValue(writer, Typedef_payload, fmt);

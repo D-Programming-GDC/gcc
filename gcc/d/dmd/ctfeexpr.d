@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2018 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/ctfeexpr.d, _ctfeexpr.d)
@@ -155,7 +155,7 @@ extern (C++) final class ThrownExceptionExp : Expression
     }
 
     // Generate an error message when this exception is not caught
-    void generateUncaughtError()
+    extern (D) void generateUncaughtError()
     {
         UnionExp ue = void;
         Expression e = resolveSlice((*thrown.value.elements)[0], &ue);
@@ -292,7 +292,7 @@ private Expressions* copyLiteralArray(Expressions* oldelems, Expression basis = 
 // This value will be used for in-place modification.
 UnionExp copyLiteral(Expression e)
 {
-    UnionExp ue;
+    UnionExp ue = void;
     if (e.op == TOK.string_) // syntaxCopy doesn't make a copy for StringExp!
     {
         StringExp se = cast(StringExp)e;
@@ -360,7 +360,10 @@ UnionExp copyLiteral(Expression e)
                 {
                     auto tsa = cast(TypeSArray)v.type;
                     auto len = cast(size_t)tsa.dim.toInteger();
-                    m = createBlockDuplicatedArrayLiteral(e.loc, v.type, m, len);
+                    UnionExp uex = void;
+                    m = createBlockDuplicatedArrayLiteral(&uex, e.loc, v.type, m, len);
+                    if (m == uex.exp())
+                        m = uex.copy();
                 }
             }
             el = m;
@@ -451,6 +454,14 @@ Expression paintTypeOntoLiteral(Type type, Expression lit)
     if (lit.type.equals(type))
         return lit;
     return paintTypeOntoLiteralCopy(type, lit).copy();
+}
+
+Expression paintTypeOntoLiteral(UnionExp* pue, Type type, Expression lit)
+{
+    if (lit.type.equals(type))
+        return lit;
+    *pue = paintTypeOntoLiteralCopy(type, lit);
+    return pue.exp();
 }
 
 private UnionExp paintTypeOntoLiteralCopy(Type type, Expression lit)
@@ -579,6 +590,7 @@ uinteger_t resolveArrayLength(const Expression e)
  * Helper for NewExp
  * Create an array literal consisting of 'elem' duplicated 'dim' times.
  * Params:
+ *      pue = where to store result
  *      loc = source location where the interpretation occurs
  *      type = target type of the result
  *      elem = the source of array element, it will be owned by the result
@@ -586,14 +598,17 @@ uinteger_t resolveArrayLength(const Expression e)
  * Returns:
  *      Constructed ArrayLiteralExp
  */
-ArrayLiteralExp createBlockDuplicatedArrayLiteral(const ref Loc loc, Type type, Expression elem, size_t dim)
+ArrayLiteralExp createBlockDuplicatedArrayLiteral(UnionExp* pue, const ref Loc loc, Type type, Expression elem, size_t dim)
 {
     if (type.ty == Tsarray && type.nextOf().ty == Tsarray && elem.type.ty != Tsarray)
     {
         // If it is a multidimensional array literal, do it recursively
         auto tsa = cast(TypeSArray)type.nextOf();
         const len = cast(size_t)tsa.dim.toInteger();
-        elem = createBlockDuplicatedArrayLiteral(loc, type.nextOf(), elem, len);
+        UnionExp ue = void;
+        elem = createBlockDuplicatedArrayLiteral(&ue, loc, type.nextOf(), elem, len);
+        if (elem == ue.exp())
+            elem = ue.copy();
     }
 
     // Buzilla 15681
@@ -605,7 +620,8 @@ ArrayLiteralExp createBlockDuplicatedArrayLiteral(const ref Loc loc, Type type, 
     {
         el = mustCopy && i ? copyLiteral(elem).copy() : elem;
     }
-    auto ale = new ArrayLiteralExp(loc, type, elements);
+    emplaceExp!(ArrayLiteralExp)(pue, loc, type, elements);
+    auto ale = cast(ArrayLiteralExp)pue.exp();
     ale.ownedByCtfe = OwnedBy.ctfe;
     return ale;
 }
@@ -614,7 +630,7 @@ ArrayLiteralExp createBlockDuplicatedArrayLiteral(const ref Loc loc, Type type, 
  * Helper for NewExp
  * Create a string literal consisting of 'value' duplicated 'dim' times.
  */
-StringExp createBlockDuplicatedStringLiteral(const ref Loc loc, Type type, dchar value, size_t dim, ubyte sz)
+StringExp createBlockDuplicatedStringLiteral(UnionExp* pue, const ref Loc loc, Type type, dchar value, size_t dim, ubyte sz)
 {
     auto s = cast(char*)mem.xcalloc(dim, sz);
     foreach (elemi; 0 .. dim)
@@ -634,7 +650,8 @@ StringExp createBlockDuplicatedStringLiteral(const ref Loc loc, Type type, dchar
             assert(0);
         }
     }
-    auto se = new StringExp(loc, s, dim);
+    emplaceExp!(StringExp)(pue, loc, s, dim);
+    auto se= cast(StringExp)pue.exp();
     se.type = type;
     se.sz = sz;
     se.committed = true;
@@ -1170,10 +1187,17 @@ private bool isArray(const Expression e)
     return e.op == TOK.arrayLiteral || e.op == TOK.string_ || e.op == TOK.slice || e.op == TOK.null_;
 }
 
-/* For strings, return <0 if e1 < e2, 0 if e1==e2, >0 if e1 > e2.
+/*****
+ * Params:
+ *      loc = source file location
+ *      e1 = left operand
+ *      e2 = right operand
+ *      identity = true for `is` identity comparisons
+ * Returns:
+ * For strings, return <0 if e1 < e2, 0 if e1==e2, >0 if e1 > e2.
  * For all other types, return 0 if e1 == e2, !=0 if e1 != e2.
  */
-private int ctfeRawCmp(const ref Loc loc, Expression e1, Expression e2)
+private int ctfeRawCmp(const ref Loc loc, Expression e1, Expression e2, bool identity = false)
 {
     if (e1.op == TOK.classReference || e2.op == TOK.classReference)
     {
@@ -1254,9 +1278,11 @@ private int ctfeRawCmp(const ref Loc loc, Expression e1, Expression e2)
     {
         real_t r1 = e1.type.isreal() ? e1.toReal() : e1.toImaginary();
         real_t r2 = e1.type.isreal() ? e2.toReal() : e2.toImaginary();
+        if (identity)
+            return !RealIdentical(r1, r2);
         if (CTFloat.isNaN(r1) || CTFloat.isNaN(r2)) // if unordered
         {
-            return 1;
+            return 1;   // they are not equal
         }
         else
         {
@@ -1265,7 +1291,13 @@ private int ctfeRawCmp(const ref Loc loc, Expression e1, Expression e2)
     }
     else if (e1.type.iscomplex())
     {
-        return e1.toComplex() != e2.toComplex();
+        auto c1 = e1.toComplex();
+        auto c2 = e2.toComplex();
+        if (identity)
+        {
+            return !RealIdentical(c1.re, c2.re) && !RealIdentical(c1.im, c2.im);
+        }
+        return c1 != c2;
     }
     if (e1.op == TOK.structLiteral && e2.op == TOK.structLiteral)
     {
@@ -1286,11 +1318,16 @@ private int ctfeRawCmp(const ref Loc loc, Expression e1, Expression e2)
             {
                 Expression ee1 = (*es1.elements)[i];
                 Expression ee2 = (*es2.elements)[i];
+
+                // https://issues.dlang.org/show_bug.cgi?id=16284
+                if (ee1.op == TOK.void_ && ee2.op == TOK.void_) // if both are VoidInitExp
+                    continue;
+
                 if (ee1 == ee2)
                     continue;
                 if (!ee1 || !ee2)
                     return 1;
-                const int cmp = ctfeRawCmp(loc, ee1, ee2);
+                const int cmp = ctfeRawCmp(loc, ee1, ee2, identity);
                 if (cmp)
                     return 1;
             }
@@ -1316,13 +1353,13 @@ private int ctfeRawCmp(const ref Loc loc, Expression e1, Expression e2)
                 if (used[j])
                     continue;
                 Expression k2 = (*es2.keys)[j];
-                if (ctfeRawCmp(loc, k1, k2))
+                if (ctfeRawCmp(loc, k1, k2, identity))
                     continue;
                 used[j] = true;
                 v2 = (*es2.values)[j];
                 break;
             }
-            if (!v2 || ctfeRawCmp(loc, v1, v2))
+            if (!v2 || ctfeRawCmp(loc, v1, v2, identity))
             {
                 mem.xfree(used);
                 return 1;
@@ -1344,6 +1381,7 @@ int ctfeEqual(const ref Loc loc, TOK op, Expression e1, Expression e2)
 /// Evaluate is, !is.  Resolves slices before comparing. Returns 0 or 1
 int ctfeIdentity(const ref Loc loc, TOK op, Expression e1, Expression e2)
 {
+    //printf("ctfeIdentity %s %s\n", e1.toChars(), e2.toChars());
     //printf("ctfeIdentity op = '%s', e1 = %s %s, e2 = %s %s\n", Token::toChars(op),
     //    Token::toChars(e1.op), e1.toChars(), Token::toChars(e2.op), e1.toChars());
     int cmp;
@@ -1362,17 +1400,19 @@ int ctfeIdentity(const ref Loc loc, TOK op, Expression e1, Expression e2)
         cmp = (es1.var == es2.var && es1.offset == es2.offset);
     }
     else if (e1.type.isreal())
-        cmp = RealEquals(e1.toReal(), e2.toReal());
+        cmp = RealIdentical(e1.toReal(), e2.toReal());
     else if (e1.type.isimaginary())
-        cmp = RealEquals(e1.toImaginary(), e2.toImaginary());
+        cmp = RealIdentical(e1.toImaginary(), e2.toImaginary());
     else if (e1.type.iscomplex())
     {
         complex_t v1 = e1.toComplex();
         complex_t v2 = e2.toComplex();
-        cmp = RealEquals(creall(v1), creall(v2)) && RealEquals(cimagl(v1), cimagl(v1));
+        cmp = RealIdentical(creall(v1), creall(v2)) && RealIdentical(cimagl(v1), cimagl(v1));
     }
     else
-        cmp = !ctfeRawCmp(loc, e1, e2);
+    {
+        cmp = !ctfeRawCmp(loc, e1, e2, true);
+    }
     if (op == TOK.notIdentity || op == TOK.notEqual)
         cmp ^= 1;
     return cmp;
@@ -1537,50 +1577,67 @@ Expression ctfeIndex(const ref Loc loc, Type type, Expression e1, uinteger_t ind
     }
 }
 
-Expression ctfeCast(const ref Loc loc, Type type, Type to, Expression e)
+Expression ctfeCast(UnionExp* pue, const ref Loc loc, Type type, Type to, Expression e)
 {
+    Expression paint()
+    {
+        return paintTypeOntoLiteral(pue, to, e);
+    }
+
     if (e.op == TOK.null_)
-        return paintTypeOntoLiteral(to, e);
+        return paint();
+
     if (e.op == TOK.classReference)
     {
         // Disallow reinterpreting class casts. Do this by ensuring that
         // the original class can implicitly convert to the target class
         ClassDeclaration originalClass = (cast(ClassReferenceExp)e).originalClass();
         if (originalClass.type.implicitConvTo(to.mutableOf()))
-            return paintTypeOntoLiteral(to, e);
+            return paint();
         else
-            return new NullExp(loc, to);
+        {
+            emplaceExp!(NullExp)(pue, loc, to);
+            return pue.exp();
+        }
     }
+
     // Allow TypeInfo type painting
     if (isTypeInfo_Class(e.type) && e.type.implicitConvTo(to))
-        return paintTypeOntoLiteral(to, e);
+        return paint();
+
     // Allow casting away const for struct literals
     if (e.op == TOK.structLiteral && e.type.toBasetype().castMod(0) == to.toBasetype().castMod(0))
-    {
-        return paintTypeOntoLiteral(to, e);
-    }
+        return paint();
+
     Expression r;
     if (e.type.equals(type) && type.equals(to))
     {
         // necessary not to change e's address for pointer comparisons
         r = e;
     }
-    else if (to.toBasetype().ty == Tarray && type.toBasetype().ty == Tarray && to.toBasetype().nextOf().size() == type.toBasetype().nextOf().size())
+    else if (to.toBasetype().ty == Tarray &&
+             type.toBasetype().ty == Tarray &&
+             to.toBasetype().nextOf().size() == type.toBasetype().nextOf().size())
     {
         // https://issues.dlang.org/show_bug.cgi?id=12495
         // Array reinterpret casts: eg. string to immutable(ubyte)[]
-        return paintTypeOntoLiteral(to, e);
+        return paint();
     }
     else
     {
-        r = Cast(loc, type, to, e).copy();
+        *pue = Cast(loc, type, to, e);
+        r = pue.exp();
     }
+
     if (CTFEExp.isCantExp(r))
         error(loc, "cannot cast `%s` to `%s` at compile time", e.toChars(), to.toChars());
-    if (e.op == TOK.arrayLiteral)
-        (cast(ArrayLiteralExp)e).ownedByCtfe = OwnedBy.ctfe;
-    if (e.op == TOK.string_)
-        (cast(StringExp)e).ownedByCtfe = OwnedBy.ctfe;
+
+    if (auto ae = e.isArrayLiteralExp())
+        ae.ownedByCtfe = OwnedBy.ctfe;
+
+    if (auto se = e.isStringExp())
+        se.ownedByCtfe = OwnedBy.ctfe;
+
     return r;
 }
 
@@ -1601,8 +1658,12 @@ void assignInPlace(Expression dest, Expression src)
         assert(dest.op == src.op);
         oldelems = (cast(StructLiteralExp)dest).elements;
         newelems = (cast(StructLiteralExp)src).elements;
-        if ((cast(StructLiteralExp)dest).sd.isNested() && oldelems.dim == newelems.dim - 1)
-            oldelems.push(null);
+        auto sd = (cast(StructLiteralExp)dest).sd;
+        const nfields = sd.nonHiddenFields();
+        const nvthis = sd.fields.dim - nfields;
+        if (nvthis && oldelems.dim >= nfields && oldelems.dim < newelems.dim)
+            foreach (_; 0 .. newelems.dim - oldelems.dim)
+                oldelems.push(null);
     }
     else if (dest.op == TOK.arrayLiteral && src.op == TOK.arrayLiteral)
     {
@@ -1800,7 +1861,14 @@ bool isCtfeValueValid(Expression newval)
     {
         // e1 should be a CTFE reference
         Expression e1 = (cast(AddrExp)newval).e1;
-        return tb.ty == Tpointer && (e1.op == TOK.structLiteral && isCtfeValueValid(e1) || e1.op == TOK.variable || e1.op == TOK.dotVariable && isCtfeReferenceValid(e1) || e1.op == TOK.index && isCtfeReferenceValid(e1) || e1.op == TOK.slice && e1.type.toBasetype().ty == Tsarray);
+        return tb.ty == Tpointer &&
+        (
+            (e1.op == TOK.structLiteral || e1.op == TOK.arrayLiteral) && isCtfeValueValid(e1) ||
+             e1.op == TOK.variable ||
+             e1.op == TOK.dotVariable && isCtfeReferenceValid(e1) ||
+             e1.op == TOK.index && isCtfeReferenceValid(e1) ||
+             e1.op == TOK.slice && e1.type.toBasetype().ty == Tsarray
+        );
     }
     if (newval.op == TOK.slice)
     {

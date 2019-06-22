@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2018 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/globals.d, _globals.d)
@@ -34,7 +34,7 @@ enum TARGET : bool
     DragonFlyBSD = xversion!`DragonFlyBSD`,
 }
 
-enum Diagnostic : ubyte
+enum DiagnosticReporting : ubyte
 {
     error,        // generate an error
     inform,       // generate a warning
@@ -54,6 +54,7 @@ enum CHECKACTION : ubyte
     D,            // call D assert on failure
     C,            // call C assert on failure
     halt,         // cause program halt on failure
+    context,      // call D assert with the error context on failure
 }
 
 enum CPU
@@ -73,6 +74,13 @@ enum CPU
     // Special values that don't survive past the command line processing
     baseline,           // (default) the minimum capability CPU
     native              // the machine the compiler is being run on
+}
+
+enum PIC : ubyte
+{
+    fixed,              /// located at a specific address
+    pic,                /// Position Independent Code
+    pie,                /// Position Independent Executable
 }
 
 /**
@@ -131,19 +139,17 @@ struct Param
     bool isSolaris;         // generate code for Solaris
     bool hasObjectiveC;     // target supports Objective-C
     bool mscoff = false;    // for Win32: write MsCoff object files instead of OMF
-    Diagnostic useDeprecated = Diagnostic.inform;  // how use of deprecated features are handled
-    bool useInvariants = true;  // generate class invariant checks
-    bool useIn = true;          // generate precondition checks
-    bool useOut = true;         // generate postcondition checks
+    DiagnosticReporting useDeprecated = DiagnosticReporting.inform;  // how use of deprecated features are handled
     bool stackstomp;            // add stack stomping code
     bool useUnitTests;          // generate unittest code
     bool useInline = false;     // inline expand functions
     bool useDIP25;          // implement http://wiki.dlang.org/DIP25
+    bool noDIP25;           // revert to pre-DIP25 behavior
     bool release;           // build release version
     bool preservePaths;     // true means don't strip path from source file
-    Diagnostic warnings = Diagnostic.off;  // how compiler warnings are handled
-    bool pic;               // generate position-independent-code for shared libs
-    bool color = true;      // use ANSI colors in console output
+    DiagnosticReporting warnings = DiagnosticReporting.off;  // how compiler warnings are handled
+    PIC pic = PIC.fixed;    // generate fixed, pic or pie code
+    bool color;             // use ANSI colors in console output
     bool cov;               // generate code coverage data
     ubyte covPercent;       // 0..100 code coverage percentage required
     bool nofloat;           // code should not pull in floating point support
@@ -154,46 +160,62 @@ struct Param
     bool betterC;           // be a "better C" compiler; no dependency on D runtime
     bool addMain;           // add a default main() function
     bool allInst;           // generate code for all template instantiations
-    bool check10378;        // check for issues transitioning to 10738
-    bool bug10378;          // use pre- https://issues.dlang.org/show_bug.cgi?id=10378 search strategy
+    bool check10378;        // check for issues transitioning to 10738 @@@DEPRECATED@@@ Remove in 2010-05 or later
+    bool bug10378;          // use pre- https://issues.dlang.org/show_bug.cgi?id=10378 search strategy  @@@DEPRECATED@@@ Remove in 2010-05 or later
     bool fix16997;          // fix integral promotions for unary + - ~ operators
                             // https://issues.dlang.org/show_bug.cgi?id=16997
-    bool vsafe;             // use enhanced @safe checking
-    bool ehnogc;            // use @nogc exception handling
-    bool dtorFields;        // destruct fields of partially constructed objects
-                            // https://issues.dlang.org/show_bug.cgi?id=14246
-
-    CppStdRevision cplusplus = CppStdRevision.cpp98; // version of C++ standard to support
-
+    bool fixAliasThis;      // if the current scope has an alias this, check it before searching upper scopes
     /** The --transition=safe switch should only be used to show code with
      * silent semantics changes related to @safe improvements.  It should not be
      * used to hide a feature that will have to go through deprecate-then-error
      * before becoming default.
      */
+    bool vsafe;             // use enhanced @safe checking
+    bool ehnogc;            // use @nogc exception handling
+    bool dtorFields;        // destruct fields of partially constructed objects
+                            // https://issues.dlang.org/show_bug.cgi?id=14246
+    bool fieldwise;         // do struct equality testing field-wise rather than by memcmp()
+    bool rvalueRefParam;    // allow rvalues to be arguments to ref parameters
+
+    CppStdRevision cplusplus = CppStdRevision.cpp98;    // version of C++ standard to support
+
+    bool markdown;          // enable Markdown replacements in Ddoc
+    bool vmarkdown;         // list instances of Markdown replacements in Ddoc
 
     bool showGaggedErrors;  // print gagged errors anyway
+    bool printErrorContext;  // print errors with the error context (the error line in the source file)
     bool manual;            // open browser on compiler manual
     bool usage;             // print usage and exit
     bool mcpuUsage;         // print help on -mcpu switch
     bool transitionUsage;   // print help on -transition switch
+    bool checkUsage;        // print help on -check switch
+    bool checkActionUsage;  // print help on -checkaction switch
+    bool revertUsage;       // print help on -revert switch
+    bool previewUsage;      // print help on -preview switch
+    bool externStdUsage;    // print help on -extern-std switch
     bool logo;              // print compiler logo
 
     CPU cpu = CPU.baseline; // CPU instruction set to target
 
+    CHECKENABLE useInvariants  = CHECKENABLE._default;  // generate class invariant checks
+    CHECKENABLE useIn          = CHECKENABLE._default;  // generate precondition checks
+    CHECKENABLE useOut         = CHECKENABLE._default;  // generate postcondition checks
     CHECKENABLE useArrayBounds = CHECKENABLE._default;  // when to generate code for array bounds checks
     CHECKENABLE useAssert      = CHECKENABLE._default;  // when to generate code for assert()'s
     CHECKENABLE useSwitchError = CHECKENABLE._default;  // check for switches without a default
-    CHECKACTION checkAction;       // action to take when bounds, asserts or switch defaults are violated
+    CHECKENABLE boundscheck    = CHECKENABLE._default;  // state of -boundscheck switch
+
+    CHECKACTION checkAction = CHECKACTION.D; // action to take when bounds, asserts or switch defaults are violated
 
     uint errorLimit = 20;
 
     const(char)[] argv0;                // program name
-    Array!(const(char)*)* modFileAliasStrings; // array of char*'s of -I module filename alias strings
+    Array!(const(char)*) modFileAliasStrings; // array of char*'s of -I module filename alias strings
     Array!(const(char)*)* imppath;      // array of char*'s of where to look for import modules
     Array!(const(char)*)* fileImppath;  // array of char*'s of where to look for file import modules
-    const(char)* objdir;                // .obj/.lib file output directory
-    const(char)* objname;               // .obj file output name
-    const(char)* libname;               // .lib file output name
+    const(char)[] objdir;                // .obj/.lib file output directory
+    const(char)[] objname;               // .obj file output name
+    const(char)[] libname;               // .lib file output name
 
     bool doDocComments;                 // process embedded documentation comments
     const(char)* docdir;                // write documentation file to docdir directory
@@ -201,13 +223,17 @@ struct Param
     Array!(const(char)*) ddocfiles;     // macro include files for Ddoc
 
     bool doHdrGeneration;               // process embedded documentation comments
-    const(char)* hdrdir;                // write 'header' file to docdir directory
-    const(char)* hdrname;               // write 'header' file to docname
+    const(char)[] hdrdir;                // write 'header' file to docdir directory
+    const(char)[] hdrname;               // write 'header' file to docname
     bool hdrStripPlainFunctions = true; // strip the bodies of plain (non-template) functions
 
     bool doJsonGeneration;              // write JSON file
-    const(char)* jsonfilename;          // write JSON file to jsonfilename
+    const(char)[] jsonfilename;          // write JSON file to jsonfilename
     JsonFieldFlags jsonFieldFlags;      // JSON field flags to include
+
+    OutBuffer* mixinOut;                // write expanded mixins for debugging
+    const(char)* mixinFile;             // .mixin file output name
+    int mixinLines;                     // Number of lines in writeMixins
 
     uint debuglevel;                    // debug level
     Array!(const(char)*)* debugids;     // debug identifiers
@@ -215,11 +241,11 @@ struct Param
     uint versionlevel;                  // version level
     Array!(const(char)*)* versionids;   // version identifiers
 
-    const(char)* defaultlibname;        // default library for non-debug builds
-    const(char)* debuglibname;          // default library for debug builds
-    const(char)* mscrtlib;              // MS C runtime library
+    const(char)[] defaultlibname;        // default library for non-debug builds
+    const(char)[] debuglibname;          // default library for debug builds
+    const(char)[] mscrtlib;              // MS C runtime library
 
-    const(char)* moduleDepsFile;        // filename for deps output
+    const(char)[] moduleDepsFile;        // filename for deps output
     OutBuffer* moduleDeps;              // contents to be written to deps file
 
     // Hidden debug switches
@@ -238,10 +264,23 @@ struct Param
     Array!(const(char)*) linkswitches;
     Array!(const(char)*) libfiles;
     Array!(const(char)*) dllfiles;
-    const(char)* deffile;
-    const(char)* resfile;
-    const(char)* exefile;
-    const(char)* mapfile;
+    const(char)[] deffile;
+    const(char)[] resfile;
+    const(char)[] exefile;
+    const(char)[] mapfile;
+
+    // generate code for POSIX
+    @property bool isPOSIX() scope const pure nothrow @nogc @safe
+    out(result) { assert(result || isWindows); }
+    do
+    {
+        return isLinux
+            || isOSX
+            || isFreeBSD
+            || isOpenBSD
+            || isDragonFlyBSD
+            || isSolaris;
+    }
 }
 
 alias structalign_t = uint;
@@ -252,26 +291,26 @@ enum STRUCTALIGN_DEFAULT = (cast(structalign_t)~0);
 
 struct Global
 {
-    const(char)* inifilename;
-    const(char)* mars_ext = "d";
-    const(char)* obj_ext;
-    const(char)* lib_ext;
-    const(char)* dll_ext;
-    const(char)* doc_ext = "html";      // for Ddoc generated files
-    const(char)* ddoc_ext = "ddoc";     // for Ddoc macro include files
-    const(char)* hdr_ext = "di";        // for D 'header' import files
-    const(char)* json_ext = "json";     // for JSON files
-    const(char)* map_ext = "map";       // for .map files
+    const(char)[] inifilename;
+    string mars_ext = "d";
+    const(char)[] obj_ext;
+    const(char)[] lib_ext;
+    const(char)[] dll_ext;
+    string doc_ext = "html";      // for Ddoc generated files
+    string ddoc_ext = "ddoc";     // for Ddoc macro include files
+    string hdr_ext = "di";        // for D 'header' import files
+    string json_ext = "json";     // for JSON files
+    string map_ext = "map";       // for .map files
     bool run_noext;                     // allow -run sources without extensions.
 
-    const(char)* copyright = "Copyright (C) 1999-2018 by The D Language Foundation, All Rights Reserved";
-    const(char)* written = "written by Walter Bright";
-    const(char)* main_d = "__main.d";   // dummy filename for dummy main()
+    string copyright = "Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved";
+    string written = "written by Walter Bright";
+
     Array!(const(char)*)* path;         // Array of char*'s which form the import lookup path
     Array!(const(char)*)* filePath;     // Array of char*'s which form the file import lookup path
 
-    const(char)* _version;
-    const(char)* vendor;    // Compiler backend name
+    string _version;
+    const(char)[] vendor;    // Compiler backend name
 
     Param params;
     uint errors;            // number of errors reported so far
@@ -284,6 +323,8 @@ struct Global
 
     Array!Identifier* versionids;    // command line versions and predefined versions
     Array!Identifier* debugids;      // command line debug versions and predefined versions
+
+  nothrow:
 
     /* Start gagging. Return the current number of gagged errors
      */
@@ -319,7 +360,95 @@ struct Global
         ++errors;
     }
 
-    extern (C++) void _init();
+    extern (C++) void _init()
+    {
+        _version = import("VERSION") ~ '\0';
+
+        version (MARS)
+        {
+            vendor = "Digital Mars D";
+            static if (TARGET.Windows)
+            {
+                obj_ext = "obj";
+            }
+            else static if (TARGET.Linux || TARGET.OSX || TARGET.FreeBSD || TARGET.OpenBSD || TARGET.Solaris || TARGET.DragonFlyBSD)
+            {
+                obj_ext = "o";
+            }
+            else
+            {
+                static assert(0, "fix this");
+            }
+            static if (TARGET.Windows)
+            {
+                lib_ext = "lib";
+            }
+            else static if (TARGET.Linux || TARGET.OSX || TARGET.FreeBSD || TARGET.OpenBSD || TARGET.Solaris || TARGET.DragonFlyBSD)
+            {
+                lib_ext = "a";
+            }
+            else
+            {
+                static assert(0, "fix this");
+            }
+            static if (TARGET.Windows)
+            {
+                dll_ext = "dll";
+            }
+            else static if (TARGET.Linux || TARGET.FreeBSD || TARGET.OpenBSD || TARGET.Solaris || TARGET.DragonFlyBSD)
+            {
+                dll_ext = "so";
+            }
+            else static if (TARGET.OSX)
+            {
+                dll_ext = "dylib";
+            }
+            else
+            {
+                static assert(0, "fix this");
+            }
+            static if (TARGET.Windows)
+            {
+                run_noext = false;
+            }
+            else static if (TARGET.Linux || TARGET.OSX || TARGET.FreeBSD || TARGET.OpenBSD || TARGET.Solaris || TARGET.DragonFlyBSD)
+            {
+                // Allow 'script' D source files to have no extension.
+                run_noext = true;
+            }
+            else
+            {
+                static assert(0, "fix this");
+            }
+            static if (TARGET.Windows)
+            {
+                params.mscoff = params.is64bit;
+            }
+
+            // -color=auto is the default value
+            import dmd.console : Console;
+            params.color = Console.detectTerminal();
+        }
+        else version (IN_GCC)
+        {
+            vendor = "GNU D";
+            obj_ext = "o";
+            lib_ext = "a";
+            dll_ext = "so";
+            run_noext = true;
+        }
+    }
+
+    /**
+     * Deinitializes the global state of the compiler.
+     *
+     * This can be used to restore the state set by `_init` to its original
+     * state.
+     */
+    void deinitialize()
+    {
+        this = this.init;
+    }
 
     /**
     Returns: the version as the number that would be returned for __VERSION__
@@ -336,7 +465,7 @@ struct Global
             uint major = 0;
             uint minor = 0;
             bool point = false;
-            for (const(char)* p = _version + 1;; p++)
+            for (const(char)* p = _version.ptr + 1;; p++)
             {
                 const c = *p;
                 if (isdigit(cast(char)c))
@@ -357,6 +486,15 @@ struct Global
             cached = major * 1000 + minor;
         }
         return cached;
+    }
+
+    /**
+    Returns: the final defaultlibname based on the command-line parameters
+    */
+    const(char)[] finalDefaultlibname() const
+    {
+        return params.betterC ? null :
+            params.symdebug ? params.debuglibname : params.defaultlibname;
     }
 }
 
@@ -398,13 +536,64 @@ nothrow:
         this.filename = filename;
     }
 
-    extern (C++) const(char)* toChars() const;
+    extern (C++) const(char)* toChars(bool showColumns = global.params.showColumns) const pure nothrow
+    {
+        OutBuffer buf;
+        if (filename)
+        {
+            buf.writestring(filename);
+        }
+        if (linnum)
+        {
+            buf.writeByte('(');
+            buf.print(linnum);
+            if (showColumns && charnum)
+            {
+                buf.writeByte(',');
+                buf.print(charnum);
+            }
+            buf.writeByte(')');
+        }
+        return buf.extractChars();
+    }
 
+    /* Checks for equivalence,
+     * a) comparing the filename contents (not the pointer), case-
+     *    insensitively on Windows, and
+     * b) ignoring charnum if `global.params.showColumns` is false.
+     */
     extern (C++) bool equals(ref const(Loc) loc) const
     {
         return (!global.params.showColumns || charnum == loc.charnum) &&
                linnum == loc.linnum &&
                FileName.equals(filename, loc.filename);
+    }
+
+    /* opEquals() / toHash() for AA key usage:
+     *
+     * Compare filename contents (case-sensitively on Windows too), not
+     * the pointer - a static foreach loop repeatedly mixing in a mixin
+     * may lead to multiple equivalent filenames (`foo.d-mixin-<line>`),
+     * e.g., for test/runnable/test18880.d.
+     */
+    extern (D) bool opEquals(ref const(Loc) loc) const @trusted pure nothrow @nogc
+    {
+        import core.stdc.string : strcmp;
+
+        return charnum == loc.charnum &&
+               linnum == loc.linnum &&
+               (filename == loc.filename ||
+                (filename && loc.filename && strcmp(filename, loc.filename) == 0));
+    }
+
+    extern (D) size_t toHash() const @trusted pure nothrow
+    {
+        import dmd.utils : toDString;
+
+        auto hash = hashOf(linnum);
+        hash = hashOf(charnum, hash);
+        hash = hashOf(filename.toDString, hash);
+        return hash;
     }
 
     /******************

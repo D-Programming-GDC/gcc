@@ -2,19 +2,19 @@
 
 int magicVariable()
 {
-  if (__ctfe)
-   return 3;
+    if (__ctfe)
+        return 3;
 
-  shared int var = 2;
-  return var;
+    shared int var = 2;
+    return var;
 }
 
 static assert(magicVariable()==3);
 
 void main()
 {
-  assert(!__ctfe);
-  assert(magicVariable()==2);
+    assert(!__ctfe);
+    assert(magicVariable()==2);
 }
 
 // https://issues.dlang.org/show_bug.cgi?id=991 -- invalid.

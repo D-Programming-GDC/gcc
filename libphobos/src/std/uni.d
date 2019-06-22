@@ -703,12 +703,12 @@ CLUSTER = $(S_LINK Grapheme cluster, grapheme cluster)
 +/
 module std.uni;
 
-import std.meta; // AliasSeq
-import std.range.primitives; // back, ElementEncodingType, ElementType, empty,
-    // front, isForwardRange, isInputRange, isRandomAccessRange, popFront, put,
-    // save
-import std.traits; // isConvertibleToString, isIntegral, isSomeChar,
-    // isSomeString, Unqual
+import std.meta : AliasSeq;
+import std.range.primitives : back, ElementEncodingType, ElementType, empty,
+    front, hasLength, hasSlicing, isForwardRange, isInputRange,
+    isRandomAccessRange, popFront, put, save;
+import std.traits : isConvertibleToString, isIntegral, isSomeChar,
+    isSomeString, Unqual;
 // debug = std_uni;
 
 debug(std_uni) import std.stdio; // writefln, writeln
@@ -1830,22 +1830,20 @@ alias sharSwitchLowerBound = sharMethod!switchUniformLowerBound;
 
     static T[] alloc(T)(size_t size) @trusted
     {
-        import core.memory : pureMalloc;
-        import std.exception : enforce;
+        import std.internal.memory : enforceMalloc;
 
         import core.checkedint : mulu;
         bool overflow;
         size_t nbytes = mulu(size, T.sizeof, overflow);
         if (overflow) assert(0);
 
-        auto ptr = cast(T*) enforce(pureMalloc(nbytes), "out of memory on C heap");
+        auto ptr = cast(T*) enforceMalloc(nbytes);
         return ptr[0 .. size];
     }
 
     static T[] realloc(T)(scope T[] arr, size_t size) @trusted
     {
-        import core.memory : pureRealloc;
-        import std.exception : enforce;
+        import std.internal.memory : enforceRealloc;
         if (!size)
         {
             destroy(arr);
@@ -1857,7 +1855,7 @@ alias sharSwitchLowerBound = sharMethod!switchUniformLowerBound;
         size_t nbytes = mulu(size, T.sizeof, overflow);
         if (overflow) assert(0);
 
-        auto ptr = cast(T*) enforce(pureRealloc(arr.ptr, nbytes), "out of memory on C heap");
+        auto ptr = cast(T*) enforceRealloc(arr.ptr, nbytes);
         return ptr[0 .. size];
     }
 
@@ -2467,7 +2465,7 @@ public:
      * $(LI $(B %x) formats the intervals as a [low .. high$(RPAREN) range of lowercase hex characters)
      * $(LI $(B %X) formats the intervals as a [low .. high$(RPAREN) range of uppercase hex characters)
      */
-    void toString(Writer)(scope Writer sink, const ref FormatSpec!char fmt) /* const */
+    void toString(Writer)(scope Writer sink, scope const ref FormatSpec!char fmt) /* const */
     {
         import std.format : formatValue;
         auto range = byInterval;
@@ -2806,6 +2804,8 @@ private:
     // a random-access range of integral pairs
     static struct Intervals(Range)
     {
+        import std.range.primitives : hasAssignableElements;
+
         this(Range sp) scope
         {
             slice = sp;
@@ -2953,7 +2953,7 @@ private:
     }
 
     //
-    Marker addInterval(int a, int b, Marker hint=Marker.init)
+    Marker addInterval(int a, int b, Marker hint=Marker.init) scope
     in
     {
         assert(a <= b);
@@ -4945,6 +4945,7 @@ template Utf8Matcher()
 
         bool lookup(int size, Mode mode, Range)(ref Range inp) const
         {
+            import std.range : popFrontN;
             if (inp.length < size)
             {
                 badEncoding();
@@ -5210,6 +5211,7 @@ template Utf16Matcher()
             }
             else
             {
+                import std.range : popFrontN;
                 static if (sizeFlags & 2)
                 {
                     if (inp.length < 2)
@@ -7335,6 +7337,8 @@ if (isInputRange!Range && is(Unqual!(ElementType!Range) == Grapheme))
 auto byCodePoint(Range)(Range range)
 if (isInputRange!Range && is(Unqual!(ElementType!Range) == dchar))
 {
+    import std.range.primitives : isBidirectionalRange, popBack;
+    import std.traits : isNarrowString;
     static if (isNarrowString!Range)
     {
         static struct Result
@@ -7499,8 +7503,7 @@ public:
     {
         static if (op == "~")
         {
-            import core.exception : onOutOfMemoryError;
-            import core.memory : pureRealloc;
+            import std.internal.memory : enforceRealloc;
             if (!isBig)
             {
                 if (slen_ == small_cap)
@@ -7521,8 +7524,7 @@ public:
                 cap_ = addu(cap_, grow, overflow);
                 auto nelems = mulu(3, addu(cap_, 1, overflow), overflow);
                 if (overflow) assert(0);
-                ptr_ = cast(ubyte*) pureRealloc(ptr_, nelems);
-                if (ptr_ is null) onOutOfMemoryError();
+                ptr_ = cast(ubyte*) enforceRealloc(ptr_, nelems);
             }
             write24(ptr_, ch, len_++);
             return this;
@@ -7579,8 +7581,7 @@ public:
 
     this(this) @nogc nothrow pure @trusted
     {
-        import core.exception : onOutOfMemoryError;
-        import core.memory : pureMalloc;
+        import std.internal.memory : enforceMalloc;
         if (isBig)
         {// dup it
             import core.checkedint : addu, mulu;
@@ -7588,8 +7589,7 @@ public:
             auto raw_cap = mulu(3, addu(cap_, 1, overflow), overflow);
             if (overflow) assert(0);
 
-            auto p = cast(ubyte*) pureMalloc(raw_cap);
-            if (p is null) onOutOfMemoryError();
+            auto p = cast(ubyte*) enforceMalloc(raw_cap);
             p[0 .. raw_cap] = ptr_[0 .. raw_cap];
             ptr_ = p;
         }
@@ -7631,13 +7631,11 @@ private:
 
     void convertToBig() @nogc nothrow pure @trusted
     {
-        import core.exception : onOutOfMemoryError;
-        import core.memory : pureMalloc;
+        import std.internal.memory : enforceMalloc;
         static assert(grow.max / 3 - 1 >= grow);
         enum nbytes = 3 * (grow + 1);
         size_t k = smallLength;
-        ubyte* p = cast(ubyte*) pureMalloc(nbytes);
-        if (p is null) onOutOfMemoryError();
+        ubyte* p = cast(ubyte*) enforceMalloc(nbytes);
         for (int i=0; i<k; i++)
             write24(p, read24(small_.ptr, i), i);
         // now we can overwrite small array data
@@ -7794,7 +7792,9 @@ if (isInputRange!S1 && isSomeChar!(ElementEncodingType!S1)
     && isInputRange!S2 && isSomeChar!(ElementEncodingType!S2))
 {
     import std.internal.unicode_tables : sTable = simpleCaseTable; // generated file
+    import std.range.primitives : isInfinite;
     import std.utf : decodeFront;
+    import std.traits : isDynamicArray;
     import std.typecons : Yes;
     static import std.ascii;
 
@@ -7971,6 +7971,8 @@ int icmp(S1, S2)(S1 r1, S2 r2)
 if (isForwardRange!S1 && isSomeChar!(ElementEncodingType!S1)
     && isForwardRange!S2 && isSomeChar!(ElementEncodingType!S2))
 {
+    import std.range.primitives : isInfinite;
+    import std.traits : isDynamicArray;
     import std.utf : byDchar;
     static import std.ascii;
 

@@ -518,9 +518,18 @@ convert_expr (tree exp, Type *etype, Type *totype)
 
 	  if (fsize != tsize)
 	    {
-	      /* Conversion requires a reinterpret cast of array.  */
-	      return build_libcall (LIBCALL_ARRAYCAST, totype, 3,
-				    size_int (tsize), size_int (fsize), exp);
+	      /* Conversion requires a reinterpret cast of array.
+		 This case should have been lowered in the semantic pass.  */
+	      if (tsize != 0 && fsize % tsize == 0)
+		{
+		  /* Set array dimension to (length * (fsize / tsize)).  */
+		  tree newlength = size_mult_expr (d_array_length (exp),
+						   size_int (fsize / tsize));
+		  return d_array_value (build_ctype (totype), newlength,
+					d_array_ptr (exp));
+		}
+	      else
+		gcc_unreachable ();
 	    }
 	  else
 	    {

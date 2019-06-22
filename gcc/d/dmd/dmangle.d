@@ -1,7 +1,7 @@
 /**
  * Compiler implementation of the $(LINK2 http://www.dlang.org, D programming language)
  *
- * Copyright: Copyright (C) 1999-2018 by The D Language Foundation, All Rights Reserved
+ * Copyright: Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
  * Authors: Walter Bright, http://www.digitalmars.com
  * License:   $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:    $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/dmangle.d, _dmangle.d)
@@ -102,6 +102,7 @@ private immutable char[TMAX] mangleChar =
     Tslice       : '@',
     Treturn      : '@',
     Tvector      : '@',
+    Ttraits      : '@',
 ];
 
 unittest
@@ -388,7 +389,7 @@ public:
         if (ta.isnogc)
             buf.writestring("Ni");
 
-        if (ta.isreturn)
+        if (ta.isreturn && !ta.isreturninferred)
             buf.writestring("Nj");
         else if (ta.isscope && !ta.isscopeinferred)
             buf.writestring("Nl");
@@ -406,9 +407,9 @@ public:
         }
 
         // Write argument types
-        paramsToDecoBuffer(t.parameters);
+        paramsToDecoBuffer(t.parameterList.parameters);
         //if (buf.data[buf.offset - 1] == '@') assert(0);
-        buf.writeByte('Z' - t.varargs); // mark end of arg list
+        buf.writeByte('Z' - t.parameterList.varargs); // mark end of arg list
         if (tret !is null)
             visitWithMask(tret, 0);
         t.inuse--;
@@ -517,8 +518,8 @@ public:
         }
         else if (inParent)
         {
-            TypeFunction tf = cast(TypeFunction)fd.type;
-            TypeFunction tfo = cast(TypeFunction)fd.originalType;
+            TypeFunction tf = fd.type.isTypeFunction();
+            TypeFunction tfo = fd.originalType.isTypeFunction();
             mangleFuncType(tf, tfo, 0, null);
         }
         else
@@ -557,7 +558,7 @@ public:
                     return d.ident.toString();
                 case LINK.cpp:
                 {
-                    const p = Target.toCppMangle(d);
+                    const p = target.cpp.toMangle(d);
                     return p[0 .. strlen(p)];
                 }
                 case LINK.default_:
@@ -680,9 +681,9 @@ public:
             buf.writestring("_Dmain");
             return;
         }
-        if (fd.isWinMain() || fd.isDllMain() || fd.ident == Id.tls_get_addr)
+        if (fd.isWinMain() || fd.isDllMain())
         {
-            buf.writestring(fd.ident.toChars());
+            buf.writestring(fd.ident.toString());
             return;
         }
         visit(cast(Declaration)fd);
@@ -770,24 +771,24 @@ public:
                 // Only constfold manifest constants, not const/immutable lvalues, see https://issues.dlang.org/show_bug.cgi?id=17339.
                 enum keepLvalue = true;
                 ea = ea.optimize(WANTvalue, keepLvalue);
-                if (ea.op == TOK.variable)
+                if (auto ev = ea.isVarExp())
                 {
-                    sa = (cast(VarExp)ea).var;
+                    sa = ev.var;
                     ea = null;
                     goto Lsa;
                 }
-                if (ea.op == TOK.this_)
+                if (auto et = ea.isThisExp())
                 {
-                    sa = (cast(ThisExp)ea).var;
+                    sa = et.var;
                     ea = null;
                     goto Lsa;
                 }
-                if (ea.op == TOK.function_)
+                if (auto ef = ea.isFuncExp())
                 {
-                    if ((cast(FuncExp)ea).td)
-                        sa = (cast(FuncExp)ea).td;
+                    if (ef.td)
+                        sa = ef.td;
                     else
-                        sa = (cast(FuncExp)ea).fd;
+                        sa = ef.fd;
                     ea = null;
                     goto Lsa;
                 }
@@ -906,35 +907,42 @@ public:
          * 0X1.9P+2                 => 19P2
          */
         if (CTFloat.isNaN(value))
-            buf.writestring("NAN"); // no -NAN bugs
-        else if (CTFloat.isInfinity(value))
-            buf.writestring(value < CTFloat.zero ? "NINF" : "INF");
-        else
         {
-            enum BUFFER_LEN = 36;
-            char[BUFFER_LEN] buffer;
-            const n = CTFloat.sprint(buffer.ptr, 'A', value);
-            assert(n < BUFFER_LEN);
-            for (int i = 0; i < n; i++)
+            buf.writestring("NAN"); // no -NAN bugs
+            return;
+        }
+
+        if (value < CTFloat.zero)
+        {
+            buf.writeByte('N');
+            value = -value;
+        }
+
+        if (CTFloat.isInfinity(value))
+        {
+            buf.writestring("INF");
+            return;
+        }
+
+        char[36] buffer = void;
+        // 'A' format yields [-]0xh.hhhhp+-d
+        const n = CTFloat.sprint(buffer.ptr, 'A', value);
+        assert(n < buffer.length);
+        foreach (const c; buffer[2 .. n])
+        {
+            switch (c)
             {
-                char c = buffer[i];
-                switch (c)
-                {
                 case '-':
                     buf.writeByte('N');
                     break;
+
                 case '+':
-                case 'X':
                 case '.':
                     break;
-                case '0':
-                    if (i < 2)
-                        break; // skip leading 0X
-                    goto default;
+
                 default:
                     buf.writeByte(c);
                     break;
-                }
             }
         }
     }
@@ -1064,8 +1072,10 @@ public:
     {
         if (p.storageClass & STC.scope_ && !(p.storageClass & STC.scopeinferred))
             buf.writeByte('M');
+
         // 'return inout ref' is the same as 'inout ref'
-        if ((p.storageClass & (STC.return_ | STC.wild)) == STC.return_)
+        if ((p.storageClass & (STC.return_ | STC.wild)) == STC.return_ &&
+            !(p.storageClass & STC.returninferred))
             buf.writestring("Nk");
         switch (p.storageClass & (STC.in_ | STC.out_ | STC.ref_ | STC.lazy_))
         {
@@ -1131,7 +1141,7 @@ extern (C++) const(char)* mangleExact(FuncDeclaration fd)
         OutBuffer buf;
         scope Mangler v = new Mangler(&buf);
         v.mangleExact(fd);
-        fd.mangleString = buf.extractString();
+        fd.mangleString = buf.extractChars();
     }
     return fd.mangleString;
 }
@@ -1177,12 +1187,11 @@ extern (C++) void mangleToBuffer(TemplateInstance ti, OutBuffer* buf)
  */
 void mangleToFuncSignature(ref OutBuffer buf, FuncDeclaration fd)
 {
-    assert(fd.type.ty == Tfunction);
-    auto tf = cast(TypeFunction)fd.type;
+    auto tf = fd.type.isTypeFunction();
 
     scope Mangler v = new Mangler(&buf);
 
     MODtoDecoBuffer(&buf, tf.mod);
-    v.paramsToDecoBuffer(tf.parameters);
-    buf.writeByte('Z' - tf.varargs);
+    v.paramsToDecoBuffer(tf.parameterList.parameters);
+    buf.writeByte('Z' - tf.parameterList.varargs);
 }

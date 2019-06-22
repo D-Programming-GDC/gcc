@@ -151,7 +151,8 @@ version (CRuntime_Glibc)
             c_long __pc;
             c_long[12] __regs;
             c_long __sp;
-            double[12] __fpregs;
+            static if (__traits(getTargetInfo, "floatAbi") == "double")
+                double[12] __fpregs;
         }
         alias __jmp_buf = __riscv_jmp_buf[1];
     }

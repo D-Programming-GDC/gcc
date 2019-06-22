@@ -1,5 +1,5 @@
 /* port.d -- A mini library for doing compiler/system specific things.
- * Copyright (C) 2018 Free Software Foundation, Inc.
+ * Copyright (C) 2019 Free Software Foundation, Inc.
  *
  * GCC is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,14 +25,30 @@ extern (C++) struct Port
     nothrow @nogc:
 
     static int memicmp(scope const char* s1, scope const char* s2, size_t n) pure;
+
     static char* strupr(char* s) pure;
+
     static bool isFloat32LiteralOutOfRange(scope const(char)* s);
+
     static bool isFloat64LiteralOutOfRange(scope const(char)* s);
+
+    // Little endian
     static void writelongLE(uint value, scope void* buffer) pure;
-    static uint readlongLE(scope void* buffer) pure;
+
+    // Little endian
+    static uint readlongLE(scope const void* buffer) pure;
+
+    // Big endian
     static void writelongBE(uint value, scope void* buffer) pure;
-    static uint readlongBE(scope void* buffer) pure;
-    static uint readwordLE(scope void* buffer) pure;
-    static uint readwordBE(scope void* buffer) pure;
+
+    // Big endian
+    static uint readlongBE(scope const void* buffer) pure;
+
+    // Little endian
+    static uint readwordLE(scope const void* buffer) pure;
+
+    // Big endian
+    static uint readwordBE(scope const void* buffer) pure;
+
     static void valcpy(scope void *dst, ulong val, size_t size) pure;
 }

@@ -95,20 +95,18 @@ enum JSONType : byte
     object,   /// ditto
     true_,    /// ditto
     false_,   /// ditto
-    /// These symbols will be deprecated after 2.082.
-    NULL = null_,
-    STRING = string,
-    INTEGER = integer,
-    UINTEGER = uinteger,
-    FLOAT = float_,
-    ARRAY = array,
-    OBJECT = object,
-    TRUE = true_,
-    FALSE = false_,
+    deprecated("Use .null_")    NULL = null_,
+    deprecated("Use .string")   STRING = string,
+    deprecated("Use .integer")  INTEGER = integer,
+    deprecated("Use .uinteger") UINTEGER = uinteger,
+    deprecated("Use .float_")   FLOAT = float_,
+    deprecated("Use .array")    ARRAY = array,
+    deprecated("Use .object")   OBJECT = object,
+    deprecated("Use .true_")    TRUE = true_,
+    deprecated("Use .false_")   FALSE = false_,
 }
 
-/// This alias will be deprecated after 2.082.
-alias JSON_TYPE = JSONType;
+deprecated("Use JSONType") alias JSON_TYPE = JSONType;
 
 /**
 JSON value node
@@ -1052,6 +1050,11 @@ if (isInputRange!T && !isInfinite!T && isSomeChar!(ElementEncodingType!T))
                 JSONValue[string] obj;
                 do
                 {
+                    skipWhitespace();
+                    if (!strict && peekChar() == '}')
+                    {
+                        break;
+                    }
                     checkChar('"');
                     string name = parseString();
                     checkChar(':');
@@ -1075,6 +1078,11 @@ if (isInputRange!T && !isInfinite!T && isSomeChar!(ElementEncodingType!T))
                 JSONValue[] arr;
                 do
                 {
+                    skipWhitespace();
+                    if (!strict && peekChar() == ']')
+                    {
+                        break;
+                    }
                     JSONValue element;
                     parseValue(element);
                     arr ~= element;
@@ -2064,4 +2072,32 @@ pure nothrow @safe unittest // issue 15884
     assertThrown!JSONException(parseJSON("[]]", JSONOptions.strictParsing));
     assert(parseJSON("123 \t\r\n").integer == 123); // Trailing whitespace is OK
     assert(parseJSON("123 \t\r\n", JSONOptions.strictParsing).integer == 123);
+}
+
+@system unittest
+{
+    import std.algorithm.iteration : map;
+    import std.array : array;
+    import std.exception : assertThrown;
+
+    string s = `{ "a" : [1,2,3,], }`;
+    JSONValue j = parseJSON(s);
+    assert(j["a"].array().map!(i => i.integer()).array == [1,2,3]);
+
+    assertThrown(parseJSON(s, -1, JSONOptions.strictParsing));
+}
+
+@system unittest
+{
+    import std.algorithm.iteration : map;
+    import std.array : array;
+    import std.exception : assertThrown;
+
+    string s = `{ "a" : { }  , }`;
+    JSONValue j = parseJSON(s);
+    assert("a" in j);
+    auto t = j["a"].object();
+    assert(t.empty);
+
+    assertThrown(parseJSON(s, -1, JSONOptions.strictParsing));
 }

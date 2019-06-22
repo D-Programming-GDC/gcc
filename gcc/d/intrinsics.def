@@ -68,21 +68,21 @@ DEF_D_BUILTIN (VSTORE64, VSTORE, "volatileStore", "core.bitop", "FNbNiNfPmmZv")
 
 /* core.checkedint intrinsics.  */
 
-DEF_D_BUILTIN (ADDS, ADDS, "adds", "core.checkedint", "FNaNbNiNfiiKbZi")
-DEF_D_BUILTIN (ADDSL, ADDS, "adds", "core.checkedint", "FNaNbNiNfllKbZl")
-DEF_D_BUILTIN (ADDU, ADDS, "addu", "core.checkedint", "FNaNbNiNfkkKbZk")
-DEF_D_BUILTIN (ADDUL, ADDS, "addu", "core.checkedint", "FNaNbNiNfmmKbZm")
-DEF_D_BUILTIN (SUBS, SUBS, "subs", "core.checkedint", "FNaNbNiNfiiKbZi")
-DEF_D_BUILTIN (SUBSL, SUBS, "subs", "core.checkedint", "FNaNbNiNfllKbZl")
-DEF_D_BUILTIN (SUBU, SUBS, "subu", "core.checkedint", "FNaNbNiNfkkKbZk")
-DEF_D_BUILTIN (SUBUL, SUBS, "subu", "core.checkedint", "FNaNbNiNfmmKbZm")
-DEF_D_BUILTIN (MULS, MULS, "muls", "core.checkedint", "FNaNbNiNfiiKbZi")
-DEF_D_BUILTIN (MULSL, MULS, "muls", "core.checkedint", "FNaNbNiNfllKbZl")
-DEF_D_BUILTIN (MULU, MULS, "mulu", "core.checkedint", "FNaNbNiNfkkKbZk")
-DEF_D_BUILTIN (MULUI, MULS, "mulu", "core.checkedint", "FNaNbNiNfmkKbZm")
-DEF_D_BUILTIN (MULUL, MULS, "mulu", "core.checkedint", "FNaNbNiNfmmKbZm")
-DEF_D_BUILTIN (NEGS, NEGS, "negs", "core.checkedint", "FNaNbNiNfiKbZi")
-DEF_D_BUILTIN (NEGSL, NEGS, "negs", "core.checkedint", "FNaNbNiNflKbZl")
+DEF_D_BUILTIN (ADDS, ADDS, "adds", "core.checkedint", "FiiKbZi")
+DEF_D_BUILTIN (ADDSL, ADDS, "adds", "core.checkedint", "FllKbZl")
+DEF_D_BUILTIN (ADDU, ADDS, "addu", "core.checkedint", "FkkKbZk")
+DEF_D_BUILTIN (ADDUL, ADDS, "addu", "core.checkedint", "FllKbZl")
+DEF_D_BUILTIN (SUBS, SUBS, "subs", "core.checkedint", "FiiKbZi")
+DEF_D_BUILTIN (SUBSL, SUBS, "subs", "core.checkedint", "FllKbZl")
+DEF_D_BUILTIN (SUBU, SUBS, "subu", "core.checkedint", "FkkKbZk")
+DEF_D_BUILTIN (SUBUL, SUBS, "subu", "core.checkedint", "FmmKbZm")
+DEF_D_BUILTIN (MULS, MULS, "muls", "core.checkedint", "FiiKbZi")
+DEF_D_BUILTIN (MULSL, MULS, "muls", "core.checkedint", "FllKbZl")
+DEF_D_BUILTIN (MULU, MULS, "mulu", "core.checkedint", "FkkKbZk")
+DEF_D_BUILTIN (MULUI, MULS, "mulu", "core.checkedint", "FmmKbZm")
+DEF_D_BUILTIN (MULUL, MULS, "mulu", "core.checkedint", "FmmKbZm")
+DEF_D_BUILTIN (NEGS, NEGS, "negs", "core.checkedint", "FiKbZi")
+DEF_D_BUILTIN (NEGSL, NEGS, "negs", "core.checkedint", "FlKbZl")
 
 /* core.math intrinsics.  */
 
@@ -98,15 +98,9 @@ DEF_D_BUILTIN (SQRTL, SQRTL, "sqrt", "core.math", "FNaNbNiNfeZe")
 
 /* std.math intrinsics.  */
 
-DEF_D_BUILTIN (STD_COS, COS, "cos", "std.math", "FNaNbNiNfeZe")
-DEF_D_BUILTIN (STD_FABS, FABS, "fabs", "std.math", "FNaNbNiNfeZe")
 DEF_D_BUILTIN (STD_LDEXP, LDEXP, "ldexp", "std.math", "FNaNbNiNfeiZe")
 DEF_D_BUILTIN (STD_RINT, RINT, "rint", "std.math", "FNaNbNiNfeZe")
 DEF_D_BUILTIN (STD_RNDTOL, RNDTOL, "rndtol", "std.math", "FNaNbNiNfeZl")
-DEF_D_BUILTIN (STD_SIN, SIN, "sin", "std.math", "FNaNbNiNfeZe")
-DEF_D_BUILTIN (STD_SQRTF, SQRTF, "sqrt", "std.math", "FNaNbNiNffZf")
-DEF_D_BUILTIN (STD_SQRT, SQRT, "sqrt", "std.math", "FNaNbNiNfdZd")
-DEF_D_BUILTIN (STD_SQRTL, SQRTL, "sqrt", "std.math", "FNaNbNiNfeZe")
 
 DEF_CTFE_BUILTIN (TAN, TAN, "tan", "std.math", "FNaNbNiNeeZe")
 DEF_CTFE_BUILTIN (ISNAN, ISNAN, "isNaN", "std.math", "FNaNbNiNeI1XZb")

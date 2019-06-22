@@ -17,16 +17,16 @@ class Identifier : public RootObject
 {
 private:
     int value;
-    DArray<const char> string;
+    DString string;
 
 public:
+    static Identifier* anonymous();
     static Identifier* create(const char *string);
     bool equals(RootObject *o);
-    int compare(RootObject *o);
     const char *toChars();
     int getValue() const;
     const char *toHChars2();
-    int dyncast() const;
+    DYNCAST dyncast() const;
 
     static Identifier *generateId(const char *prefix);
     static Identifier *generateId(const char *prefix, size_t i);
@@ -34,7 +34,7 @@ public:
 
     static inline Identifier *idPool(const char *s)
     {
-        return idPool(s, strlen(s));
+        return idPool(s, static_cast<unsigned>(strlen(s)));
     }
 
     static bool isValidIdentifier(const char *p);

@@ -50,6 +50,7 @@ DEF_D_RUNTIME (ARRAY_BOUNDS, "_d_arraybounds", RT(VOID), P2(STRING, UINT),
 
 /* Used when calling new on a class.  */
 DEF_D_RUNTIME (NEWCLASS, "_d_newclass", RT(OBJECT), P1(CONST_CLASSINFO), 0)
+DEF_D_RUNTIME (NEWTHROW, "_d_newThrowable", RT(OBJECT), P1(CONST_CLASSINFO), 0)
 
 /* Used when calling delete on a class or interface.  */
 DEF_D_RUNTIME (DELCLASS, "_d_delclass", RT(VOID), P1(VOIDPTR), 0)
@@ -100,11 +101,6 @@ DEF_D_RUNTIME (DELARRAYT, "_d_delarray_t", RT(VOID),
    arrays.  Such as an array of structs or classes.  */
 DEF_D_RUNTIME (ADEQ2, "_adEq2", RT(INT),
 	       P3(ARRAY_VOID, ARRAY_VOID, CONST_TYPEINFO), 0)
-
-/* Used when casting from one array type to another where the index type
-   sizes differ.  Such as from int[] to short[].  */
-DEF_D_RUNTIME (ARRAYCAST, "_d_arraycast", RT(ARRAY_VOID),
-	       P3(SIZE_T, SIZE_T, ARRAY_VOID), 0)
 
 /* Used for (array.length = n) expressions.  The `i' variant is for when the
    initializer is nonzero.  */

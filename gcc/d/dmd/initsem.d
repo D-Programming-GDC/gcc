@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2018 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/initsem.d, _initsem.d)
@@ -121,7 +121,7 @@ extern(C++) Initializer initializerSemantic(Initializer init, Scope* sc, Type t,
             {
                 return new ErrorInitializer();
             }
-            size_t nfields = sd.fields.dim - sd.isNested();
+            const nfields = sd.nonHiddenFields();
             //expandTuples for non-identity arguments?
             auto elements = new Expressions(nfields);
             for (size_t j = 0; j < elements.dim; j++)
@@ -171,8 +171,8 @@ extern(C++) Initializer initializerSemantic(Initializer init, Scope* sc, Type t,
                 }
                 if (vd.type.hasPointers)
                 {
-                    if ((t.alignment() < Target.ptrsize ||
-                         (vd.offset & (Target.ptrsize - 1))) &&
+                    if ((t.alignment() < target.ptrsize ||
+                         (vd.offset & (target.ptrsize - 1))) &&
                         sc.func && sc.func.setUnsafe())
                     {
                         error(i.loc, "field `%s.%s` cannot assign to misaligned pointers in `@safe` code",
@@ -221,8 +221,7 @@ extern(C++) Initializer initializerSemantic(Initializer init, Scope* sc, Type t,
             TOK tok = (t.ty == Tdelegate) ? TOK.delegate_ : TOK.function_;
             /* Rewrite as empty delegate literal { }
              */
-            auto parameters = new Parameters();
-            Type tf = new TypeFunction(parameters, null, 0, LINK.d);
+            Type tf = new TypeFunction(ParameterList(), null, LINK.d);
             auto fd = new FuncLiteralDeclaration(i.loc, Loc.initial, tf, tok, null);
             fd.fbody = new CompoundStatement(i.loc, new Statements());
             fd.endloc = i.loc;
@@ -230,7 +229,8 @@ extern(C++) Initializer initializerSemantic(Initializer init, Scope* sc, Type t,
             auto ie = new ExpInitializer(i.loc, e);
             return ie.initializerSemantic(sc, t, needInterpret);
         }
-        error(i.loc, "a struct is not a valid initializer for a `%s`", t.toChars());
+        if (t.ty != Terror)
+            error(i.loc, "a struct is not a valid initializer for a `%s`", t.toChars());
         return new ErrorInitializer();
     }
 
@@ -392,6 +392,8 @@ extern(C++) Initializer initializerSemantic(Initializer init, Scope* sc, Type t,
                 return i;
             }
             i.exp = i.exp.ctfeInterpret();
+            if (i.exp.op == TOK.voidExpression)
+                error(i.loc, "variables cannot be initialized with an expression of type `void`. Use `void` initialization instead.");
         }
         else
         {

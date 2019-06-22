@@ -443,7 +443,7 @@ struct Task(alias fun, Args...)
         {
             fun(myCastedTask._args);
         }
-        else static if (is(typeof(addressOf(fun(myCastedTask._args)))))
+        else static if (is(typeof(&(fun(myCastedTask._args)))))
         {
             myCastedTask.returnVal = addressOf(fun(myCastedTask._args));
         }
@@ -480,7 +480,7 @@ struct Task(alias fun, Args...)
         static if (isFunctionPointer!(_args[0]))
         {
             private enum bool isPure =
-            functionAttributes!(Args[0]) & FunctionAttribute.pure_;
+            (functionAttributes!(Args[0]) & FunctionAttribute.pure_) != 0;
         }
         else
         {
@@ -558,10 +558,7 @@ struct Task(alias fun, Args...)
     }
     else
     {
-        @disable typeof(this) opAssign(typeof(this) rhs)
-        {
-            assert(0);
-        }
+        @disable typeof(this) opAssign(typeof(this) rhs);
     }
 
     /**
@@ -962,7 +959,7 @@ uint totalCPUsImpl() @nogc nothrow @trusted
     version (Windows)
     {
         // BUGS:  Only works on Windows 2000 and above.
-        import core.sys.windows.windows : SYSTEM_INFO, GetSystemInfo;
+        import core.sys.windows.winbase : SYSTEM_INFO, GetSystemInfo;
         import std.algorithm.comparison : max;
         SYSTEM_INFO si;
         GetSystemInfo(&si);
@@ -970,7 +967,16 @@ uint totalCPUsImpl() @nogc nothrow @trusted
     }
     else version (linux)
     {
+        import core.sys.linux.sched : CPU_COUNT, cpu_set_t, sched_getaffinity;
         import core.sys.posix.unistd : _SC_NPROCESSORS_ONLN, sysconf;
+
+        cpu_set_t set = void;
+        if (sched_getaffinity(0, cpu_set_t.sizeof, &set) == 0)
+        {
+            int count = CPU_COUNT(&set);
+            if (count > 0)
+                return cast(uint) count;
+        }
         return cast(uint) sysconf(_SC_NPROCESSORS_ONLN);
     }
     else version (Solaris)

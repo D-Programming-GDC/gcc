@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include "ast_node.h"
 #include "globals.h"
 #include "arraytypes.h"
 #include "visitor.h"
@@ -25,7 +26,7 @@ class ExpInitializer;
 
 enum NeedInterpret { INITnointerpret, INITinterpret };
 
-class Initializer : public RootObject
+class Initializer : public ASTNode
 {
 public:
     Loc loc;
@@ -39,7 +40,7 @@ public:
     ArrayInitializer   *isArrayInitializer();
     ExpInitializer     *isExpInitializer();
 
-    virtual void accept(Visitor *v) { v->visit(this); }
+    void accept(Visitor *v) { v->visit(this); }
 };
 
 class VoidInitializer : public Initializer
@@ -62,8 +63,6 @@ public:
     Identifiers field;  // of Identifier *'s
     Initializers value; // parallel array of Initializer *'s
 
-    void addInit(Identifier *field, Initializer *value);
-
     void accept(Visitor *v) { v->visit(this); }
 };
 
@@ -76,8 +75,7 @@ public:
     Type *type;         // type that array will be used to initialize
     bool sem;           // true if semantic() is run
 
-    void addInit(Expression *index, Initializer *value);
-    bool isAssociativeArray();
+    bool isAssociativeArray() const;
     Expression *toAssocArrayLiteral();
 
     void accept(Visitor *v) { v->visit(this); }

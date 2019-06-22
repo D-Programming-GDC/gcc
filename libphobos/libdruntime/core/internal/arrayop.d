@@ -141,7 +141,7 @@ template typeCheck(bool fail, T, Args...)
     {
         alias UT = Args[idx - 1];
         enum op = Args[idx][1 .. $];
-        static if (is(typeof((UT a) => mixin(op ~ " a")) RT == return))
+        static if (is(typeof((UT a) => mixin(op ~ "cast(int) a")) RT == return))
             alias typeCheck = typeCheck!(fail, T, Args[0 .. idx - 1], RT, Args[idx + 1 .. $]);
         else static if (fail)
             static assert(0, "Unary `" ~ op ~ "` not supported for type `" ~ UT.stringof ~ "`.");
@@ -258,10 +258,16 @@ bool isBinaryAssignOp(string op)
 // Generate mixin expression to perform scalar arrayOp loop expression, assumes
 // `pos` to be the current slice index, `args` to contain operand values, and
 // `res` the target slice.
-string scalarExp(Args...)()
-{
+enum scalarExp(Args...) =
+(){
     string[] stack;
     size_t argsIdx;
+
+    static if (is(Args[0] == U[], U))
+        alias Type = U;
+    else
+        alias Type = Args[0];
+
     foreach (i, arg; Args)
     {
         static if (is(arg == T[], T))
@@ -271,7 +277,12 @@ string scalarExp(Args...)()
         else static if (isUnaryOp(arg))
         {
             auto op = arg[0] == 'u' ? arg[1 .. $] : arg;
-            stack[$ - 1] = op ~ stack[$ - 1];
+            // Explicitly use the old integral promotion rules
+            // See also: https://dlang.org/changelog/2.078.0.html#fix16997
+            static if (is(Type : int))
+                stack[$ - 1] = "cast(typeof(" ~ stack[$ -1] ~ "))" ~ op ~ "cast(int)("~ stack[$ - 1] ~ ")";
+            else
+                stack[$ - 1] = op ~ stack[$ - 1];
         }
         else static if (arg == "=")
         {
@@ -291,12 +302,12 @@ string scalarExp(Args...)()
     }
     assert(stack.length == 1);
     return stack[0];
-}
+}();
 
 // Generate mixin statement to perform vector loop initialization, assumes
 // `args` to contain operand values.
-string initScalarVecs(Args...)()
-{
+enum initScalarVecs(Args...) =
+() {
     size_t scalarsIdx, argsIdx;
     string res;
     foreach (arg; Args)
@@ -310,13 +321,13 @@ string initScalarVecs(Args...)()
                 ~ argsIdx++.toString ~ "];\n";
     }
     return res;
-}
+}();
 
 // Generate mixin expression to perform vector arrayOp loop expression, assumes
 // `pos` to be the current slice index, `args` to contain operand values, and
 // `res` the target slice.
-string vectorExp(Args...)()
-{
+enum vectorExp(Args...) =
+() {
     size_t scalarsIdx, argsIdx;
     string[] stack;
     foreach (arg; Args)
@@ -352,7 +363,7 @@ string vectorExp(Args...)()
     }
     assert(stack.length == 1);
     return stack[0];
-}
+}();
 
 // other helpers
 
@@ -393,9 +404,30 @@ alias toVecType(alias op) = op;
 string toString(size_t num)
 {
     import core.internal.string : unsignedToTempString;
-
-    char[20] buf = void;
-    return unsignedToTempString(num, buf).idup;
+    version (D_BetterC)
+    {
+        // Workaround for https://issues.dlang.org/show_bug.cgi?id=19268
+        if (__ctfe)
+        {
+            char[20] fixedbuf = void;
+            char[] buf = unsignedToTempString(num, fixedbuf);
+            char[] result = new char[buf.length];
+            result[] = buf[];
+            return (() @trusted => cast(string) result)();
+        }
+        else
+        {
+            // Failing at execution rather than during compilation is
+            // not good, but this is in `core.internal` so it should
+            // not be used by the unwary.
+            assert(0, __FUNCTION__ ~ " not available in -betterC except during CTFE.");
+        }
+    }
+    else
+    {
+        char[20] buf = void;
+        return unsignedToTempString(num, buf).idup;
+    }
 }
 
 bool contains(T)(in T[] ary, in T[] vals...)
@@ -585,4 +617,14 @@ unittest
         return a[1];
     }
     enum x = bug();
+}
+
+// https://issues.dlang.org/show_bug.cgi?id=19796
+unittest
+{
+    double[] data = [0.5];
+    double[] result;
+    result.length = data.length;
+    result[] = -data[];
+    assert(result[0] == -0.5);
 }

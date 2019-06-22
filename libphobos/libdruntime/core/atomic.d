@@ -259,17 +259,37 @@ version (CoreDdoc)
 
     /**
      * Specifies the memory ordering semantics of an atomic operation.
+     *
+     * See_Also:
+     *     $(HTTP en.cppreference.com/w/cpp/atomic/memory_order)
      */
     enum MemoryOrder
     {
-        raw,    /// Not sequenced.
-        acq,    /// Hoist-load + hoist-store barrier.
-        rel,    /// Sink-load + sink-store barrier.
-        seq,    /// Fully sequenced (acquire + release).
+        /++
+        Not sequenced.
+        Corresponds to $(LINK2 https://llvm.org/docs/Atomics.html#monotonic, LLVM AtomicOrdering.Monotonic)
+        and C++11/C11 `memory_order_relaxed`.
+        +/
+        raw,
+        /++
+        Hoist-load + hoist-store barrier.
+        Corresponds to $(LINK2 https://llvm.org/docs/Atomics.html#acquire, LLVM AtomicOrdering.Acquire)
+        and C++11/C11 `memory_order_acquire`.
+        +/
+        acq,
+        /++
+        Sink-load + sink-store barrier.
+        Corresponds to $(LINK2 https://llvm.org/docs/Atomics.html#release, LLVM AtomicOrdering.Release)
+        and C++11/C11 `memory_order_release`.
+        +/
+        rel,
+        /++
+        Fully sequenced (acquire + release). Corresponds to
+        $(LINK2 https://llvm.org/docs/Atomics.html#sequentiallyconsistent, LLVM AtomicOrdering.SequentiallyConsistent)
+        and C++11/C11 `memory_order_seq_cst`.
+        +/
+        seq,
     }
-
-    deprecated("Please use MemoryOrder instead.")
-    alias MemoryOrder msync;
 
     /**
      * Inserts a full load/store memory fence (on platforms that need it). This ensures
@@ -482,9 +502,6 @@ else version (AsmX86_32)
         rel,
         seq,
     }
-
-    deprecated("Please use MemoryOrder instead.")
-    alias MemoryOrder msync;
 
 
     private
@@ -1019,9 +1036,6 @@ else version (AsmX86_64)
         rel,
         seq,
     }
-
-    deprecated("Please use MemoryOrder instead.")
-    alias MemoryOrder msync;
 
 
     private

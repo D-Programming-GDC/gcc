@@ -68,7 +68,7 @@ public:
   void visit (Module *m)
   {
     Loc loc = (m->md != NULL) ? m->md->loc
-      : Loc (m->srcfile->toChars (), 1, 0);
+      : Loc (m->srcfile.toChars (), 1, 0);
 
     m->isym = build_decl (make_location_t (loc), NAMESPACE_DECL,
 			  get_identifier (m->toPrettyChars ()),

@@ -22,9 +22,6 @@
 D_INSTALL_NAME = $(shell echo gdc|sed '$(program_transform_name)')
 D_TARGET_INSTALL_NAME = $(target_noncanonical)-$(shell echo gdc|sed '$(program_transform_name)')
 
-# Name of phobos library
-D_LIBPHOBOS = -DLIBPHOBOS=\"gphobos\"
-
 # The name for selecting d in LANGUAGES.
 d: d21$(exeext)
 
@@ -32,7 +29,7 @@ d: d21$(exeext)
 .PHONY: d
 
 # Create the compiler driver for D.
-CFLAGS-d/d-spec.o += $(DRIVER_DEFINES) $(D_LIBPHOBOS)
+CFLAGS-d/d-spec.o += $(DRIVER_DEFINES)
 
 GDC_OBJS = $(GCC_OBJS) d/d-spec.o
 gdc$(exeext): $(GDC_OBJS) $(EXTRA_GCC_OBJS) libcommon-target.a $(LIBDEPS)
@@ -83,6 +80,7 @@ D_FRONTEND_OBJS = \
 	d/arrayop.o \
 	d/arraytypes.o \
 	d/attrib.o \
+	d/ast_node.o \
 	d/astcodegen.o \
 	d/blockexit.o \
 	d/builtin.o \
@@ -150,6 +148,7 @@ D_FRONTEND_OBJS = \
 	d/parsetimevisitor.o \
 	d/permissivevisitor.o \
 	d/port.o \
+	d/printast.o \
 	d/rmem.o \
 	d/rootobject.o \
 	d/safe.o \
@@ -345,7 +344,7 @@ d.stagefeedback: stagefeedback-start
 	-mv d/*$(objext) stagefeedback/d
 
 # Include the dfrontend and build directories for headers.
-D_INCLUDES = -I$(srcdir)/d -J$(srcdir)/d/dmd/ddoc
+D_INCLUDES = -I$(srcdir)/d -J$(srcdir)/d/dmd -J$(srcdir)/d/dmd/ddoc
 
 # Override build rules for D frontend.
 d/%.o: d/dmd/%.d

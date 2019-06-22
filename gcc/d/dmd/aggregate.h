@@ -30,6 +30,7 @@ enum Sizeok
 {
     SIZEOKnone,         // size of aggregate is not yet able to compute
     SIZEOKfwd,          // size of aggregate is ready to compute
+    SIZEOKinProcess,    // in the midst of computing the size
     SIZEOKdone          // size of aggregate is set correctly
 };
 
@@ -94,6 +95,7 @@ public:
      */
     Dsymbol *enclosing;
     VarDeclaration *vthis;      // 'this' parameter if this aggregate is nested
+    VarDeclaration *vthis2;     // 'this' parameter if this aggregate is a template and is nested
     // Special member functions
     FuncDeclarations invs;              // Array of invariants
     FuncDeclaration *inv;               // invariant
@@ -120,14 +122,14 @@ public:
     virtual Scope *newScope(Scope *sc);
     void setScope(Scope *sc);
     bool determineFields();
+    size_t nonHiddenFields();
     bool determineSize(Loc loc);
     virtual void finalizeSize() = 0;
     d_uns64 size(const Loc &loc);
     bool fill(Loc loc, Expressions *elements, bool ctorinit);
     Type *getType();
-    bool isDeprecated();         // is aggregate deprecated?
-    bool isNested();
-    void makeNested();
+    bool isDeprecated() const;         // is aggregate deprecated?
+    bool isNested() const;
     bool isExport() const;
     Dsymbol *searchCtor();
 
@@ -162,6 +164,8 @@ public:
     bool hasNoFields;           // has no fields
     FuncDeclarations postblits; // Array of postblit functions
     FuncDeclaration *postblit;  // aggregate postblit
+
+    bool hasCopyCtor;           // copy constructor
 
     FuncDeclaration *xeq;       // TypeInfo_Struct.xopEquals
     FuncDeclaration *xcmp;      // TypeInfo_Struct.xopCmp
@@ -217,11 +221,7 @@ struct BaseClass
     DArray<BaseClass> baseInterfaces;   // if BaseClass is an interface, these
                                         // are a copy of the InterfaceDeclaration::interfaces
 
-    BaseClass();
-    BaseClass(Type *type);
-
     bool fillVtbl(ClassDeclaration *cd, FuncDeclarations *vtbl, int newinstance);
-    void copyBaseInterfaces(BaseClasses *);
 };
 
 struct ClassFlags
@@ -292,6 +292,7 @@ public:
     Dsymbol *search(const Loc &loc, Identifier *ident, int flags = SearchLocalsOnly);
     ClassDeclaration *searchBase(Identifier *ident);
     void finalizeSize();
+    bool hasMonitor();
     bool isFuncHidden(FuncDeclaration *fd);
     FuncDeclaration *findFunc(Identifier *ident, TypeFunction *tf);
     bool isCOMclass() const;
@@ -303,6 +304,7 @@ public:
     const char *kind() const;
 
     void addLocalClass(ClassDeclarations *);
+    void addObjcSymbols(ClassDeclarations *classes, ClassDeclarations *categories);
 
     // Back end
     Dsymbol *vtblsym;

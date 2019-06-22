@@ -1,8 +1,7 @@
 
 module gc.impl.proto.gc;
 
-import gc.config;
-import gc.gcinterface;
+import core.gc.gcinterface;
 
 import rt.util.container.array;
 
@@ -156,6 +155,12 @@ class ProtoGC : GC
     }
 
     core.memory.GC.Stats stats() nothrow
+    {
+        return typeof(return).init;
+    }
+
+
+    core.memory.GC.ProfileStats profileStats() nothrow
     {
         return typeof(return).init;
     }

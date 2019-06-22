@@ -298,7 +298,7 @@ module std.regex;
 
 import std.range.primitives, std.traits;
 import std.regex.internal.ir;
-import std.typecons; // : Flag, Yes, No;
+import std.typecons : Flag, Yes, No;
 
 /++
     `Regex` object holds regular expression pattern in compiled form.
@@ -423,6 +423,16 @@ if (isSomeString!(S))
 }
 
 
+private struct CTRegexWrapper(Char)
+{
+    private immutable(Regex!Char)* re;
+
+    // allow code that expects mutable Regex to still work
+    // we stay "logically const"
+    @property @trusted ref getRe() const { return *cast(Regex!Char*) re; }
+    alias getRe this;
+}
+
 template ctRegexImpl(alias pattern, string flags=[])
 {
     import std.regex.internal.backtracking, std.regex.internal.parser;
@@ -437,14 +447,7 @@ template ctRegexImpl(alias pattern, string flags=[])
     }
     static immutable staticRe =
         cast(immutable) r.withFactory(new CtfeFactory!(BacktrackingMatcher, Char, func));
-    struct Wrapper
-    {
-        // allow code that expects mutable Regex to still work
-        // we stay "logically const"
-        @property @trusted ref getRe() const { return *cast(Regex!Char*)&staticRe; }
-        alias getRe this;
-    }
-    enum wrapper = Wrapper();
+    enum wrapper = CTRegexWrapper!Char(&staticRe);
 }
 
 @safe unittest
@@ -455,6 +458,17 @@ template ctRegexImpl(alias pattern, string flags=[])
     }
     enum re = ctRegex!``;
     test(re);
+}
+
+@safe unittest
+{
+    auto re = ctRegex!`foo`;
+    assert(matchFirst("foo", re));
+
+    // test reassignment
+    re = ctRegex!`bar`;
+    assert(matchFirst("bar", re));
+    assert(!matchFirst("bar", ctRegex!`foo`));
 }
 
 /++
@@ -668,6 +682,7 @@ public:
 @trusted public struct RegexMatch(R)
 if (isSomeString!R)
 {
+    import std.typecons : Rebindable;
 private:
     alias Char = BasicElementOf!R;
     Matcher!Char _engine;

@@ -295,11 +295,19 @@ struct ExceptionHeader
         // over others that are inflight, unless an Error was thrown, in which
         // case, we search for error handlers instead.
         Throwable ehobject = eh.object;
+        auto currentLsd = eh.languageSpecificData;
         for (ExceptionHeader* ehn = eh.next; ehn; ehn = ehn.next)
         {
             Error e = cast(Error)ehobject;
             if (e is null || (cast(Error)ehn.object) !is null)
+            {
+                currentLsd = ehn.languageSpecificData;
                 ehobject = ehn.object;
+            }
+
+            // Don't combine when the exceptions are from different functions.
+            if (currentLsd != ehn.languageSpecificData)
+                break;
         }
         return ehobject.classinfo;
     }
@@ -457,6 +465,9 @@ extern(C) void* __gdc_begin_catch(_Unwind_Exception* unwindHeader)
     ExceptionHeader* header = ExceptionHeader.toExceptionHeader(unwindHeader);
 
     void* objectp = cast(void*)header.object;
+    // Remove our reference to the exception. We should not decrease its refcount,
+    // because we pass the object on to the caller.
+    header.object = null;
 
     // Something went wrong when stacking up chained headers...
     if (header != ExceptionHeader.pop())
@@ -970,7 +981,7 @@ private _Unwind_Reason_Code __gdc_personality(_Unwind_Action actions,
             }
 
             // Don't combine when the exceptions are from different functions.
-            if (currentLsd != nextLsd && currentCfa != nextCfa)
+            if (currentLsd != nextLsd)
                 break;
 
             // Add our object onto the end of the existing chain and replace

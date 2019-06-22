@@ -4,21 +4,14 @@
  * Copyright: Copyright Sean Kelly 2005 - 2009.
  * License:   $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Authors:   Sean Kelly
- * Source:    $(DRUNTIMESRC core/_runtime.d)
- */
-
-/*          Copyright Sean Kelly 2005 - 2009.
- * Distributed under the Boost Software License, Version 1.0.
- *    (See accompanying file LICENSE or copy at
- *          http://www.boost.org/LICENSE_1_0.txt)
+ * Source:    $(LINK2 https://github.com/dlang/druntime/blob/master/src/core/runtime.d, _runtime.d)
+ * Documentation: https://dlang.org/phobos/core_runtime.html
  */
 
 /* NOTE: This file has been patched from the original DMD distribution to
  * work with the GDC compiler.
  */
 module core.runtime;
-
-version (Windows) import core.stdc.wchar_ : wchar_t;
 
 version (OSX)
     version = Darwin;
@@ -32,7 +25,8 @@ else version (WatchOS)
 /// C interface for Runtime.loadLibrary
 extern (C) void* rt_loadLibrary(const char* name);
 /// ditto
-version (Windows) extern (C) void* rt_loadLibraryW(const wchar_t* name);
+version (Windows) extern (C) void* rt_loadLibraryW(const wchar* name);
+
 /// C interface for Runtime.unloadLibrary, returns 1/0 instead of bool
 extern (C) int rt_unloadLibrary(void* ptr);
 
@@ -157,13 +151,6 @@ struct Runtime
         return !!rt_init();
     }
 
-    deprecated("Please use the overload of Runtime.initialize that takes no argument.")
-    static bool initialize(ExceptionHandler dg = null)
-    {
-        return !!rt_init();
-    }
-
-
     /**
      * Terminates the runtime.  This call is to be used in instances where the
      * standard program termination process will not be not executed.  This is
@@ -177,13 +164,6 @@ struct Runtime
     {
         return !!rt_term();
     }
-
-    deprecated("Please use the overload of Runtime.terminate that takes no argument.")
-    static bool terminate(ExceptionHandler dg = null)
-    {
-        return !!rt_term();
-    }
-
 
     /**
      * Returns the arguments supplied when the process was started.
@@ -238,7 +218,8 @@ struct Runtime
         import core.stdc.stdlib : free, malloc;
         version (Windows)
         {
-            import core.sys.windows.windows;
+            import core.sys.windows.winnls : CP_UTF8, MultiByteToWideChar;
+            import core.sys.windows.winnt : WCHAR;
 
             if (name.length == 0) return null;
             // Load a DLL at runtime
@@ -247,7 +228,7 @@ struct Runtime
             if (len == 0)
                 return null;
 
-            auto buf = cast(wchar_t*)malloc((len+1) * wchar_t.sizeof);
+            auto buf = cast(WCHAR*)malloc((len+1) * WCHAR.sizeof);
             if (buf is null) return null;
             scope (exit) free(buf);
 
@@ -603,7 +584,7 @@ extern (C) UnitTestResult runModuleUnitTests()
     else version (CRuntime_UClibc)
         import core.sys.linux.execinfo;
 
-    static if ( __traits( compiles, new LibBacktrace(0) ) )
+    static if (__traits(compiles, new LibBacktrace(0)))
     {
         import core.sys.posix.signal; // segv handler
 
@@ -682,23 +663,42 @@ extern (C) UnitTestResult runModuleUnitTests()
     UnitTestResult results;
     foreach ( m; ModuleInfo )
     {
-        if ( m )
-        {
-            auto fp = m.unitTest;
+        if ( !m )
+            continue;
+        auto fp = m.unitTest;
+        if ( !fp )
+            continue;
 
-            if ( fp )
+        import core.exception;
+        ++results.executed;
+        try
+        {
+            fp();
+            ++results.passed;
+        }
+        catch ( Throwable e )
+        {
+            import core.stdc.stdio;
+            printf("%.*s(%zu): [unittest] %.*s\n",
+                cast(int) e.file.length, e.file.ptr, e.line,
+                cast(int) e.message.length, e.message.ptr);
+            if ( typeid(e) == typeid(AssertError) )
             {
-                ++results.executed;
-                try
+                // Crude heuristic to figure whether the assertion originates in
+                // the unittested module. TODO: improve.
+                auto moduleName = m.name;
+                if (moduleName.length && e.file.length > moduleName.length
+                    && e.file[0 .. moduleName.length] == moduleName)
                 {
-                    fp();
-                    ++results.passed;
-                }
-                catch ( Throwable e )
-                {
-                    _d_print_throwable(e);
+                    // Exception originates in the same module, don't print
+                    // the stack trace.
+                    // TODO: omit stack trace only if assert was thrown
+                    // directly by the unittest.
+                    continue;
                 }
             }
+            // TODO: perhaps indent all of this stuff.
+            _d_print_throwable(e);
         }
     }
 
@@ -733,21 +733,102 @@ extern (C) UnitTestResult runModuleUnitTests()
     return results;
 }
 
-
-///////////////////////////////////////////////////////////////////////////////
-// Default Implementations
-///////////////////////////////////////////////////////////////////////////////
-
-
 /**
+ * Get the default `Throwable.TraceInfo` implementation for the platform
  *
+ * This functions returns a trace handler, allowing to inspect the
+ * current stack trace.
+ *
+ * Params:
+ *   ptr = (Windows only) The context to get the stack trace from.
+ *         When `null` (the default), start from the current frame.
+ *
+ * Returns:
+ *   A `Throwable.TraceInfo` implementation suitable to iterate over the stack,
+ *   or `null`. If called from a finalizer (destructor), always returns `null`
+ *   as trace handlers allocate.
  */
 Throwable.TraceInfo defaultTraceHandler( void* ptr = null )
 {
-    // backtrace
+    // avoid recursive GC calls in finalizer, trace handlers should be made @nogc instead
+    import core.memory : gc_inFinalizer;
+    if (gc_inFinalizer)
+        return null;
+
     version (GNU)
         import gcc.backtrace;
-    else version (CRuntime_Glibc)
+
+    static if (__traits(compiles, new LibBacktrace(0)))
+    {
+        version (Posix)
+            static enum FIRSTFRAME = 4;
+        else version (Win64)
+            static enum FIRSTFRAME = 4;
+        else
+            static enum FIRSTFRAME = 0;
+        return new LibBacktrace(FIRSTFRAME);
+    }
+    else static if (__traits(compiles, new UnwindBacktrace(0)))
+    {
+        version (Posix)
+            static enum FIRSTFRAME = 5;
+        else version (Win64)
+            static enum FIRSTFRAME = 4;
+        else
+            static enum FIRSTFRAME = 0;
+        return new UnwindBacktrace(FIRSTFRAME);
+    }
+    else version (Windows)
+    {
+        import core.sys.windows.stacktrace;
+        static if (__traits(compiles, new StackTrace(0, null)))
+        {
+            import core.sys.windows.winnt : CONTEXT;
+            version (Win64)
+                enum FIRSTFRAME = 4;
+            else version (Win32)
+                enum FIRSTFRAME = 0;
+            return new StackTrace(FIRSTFRAME, cast(CONTEXT*)ptr);
+        }
+        else
+            return null;
+    }
+    else static if (__traits(compiles, new DefaultTraceInfo()))
+        return new DefaultTraceInfo();
+    else
+        return null;
+}
+
+/// Example of a simple program printing its stack trace
+unittest
+{
+    import core.runtime;
+    import core.stdc.stdio;
+
+    void main()
+    {
+        auto trace = defaultTraceHandler(null);
+        foreach (line; trace)
+        {
+            printf("%.*s\n", cast(int)line.length, line.ptr);
+        }
+    }
+}
+
+/// Default implementation for POSIX systems
+version (GNU)
+{
+    static if (!__traits(compiles, { import gcc.backtrace; new LibBacktrace(0); }) &&
+               !__traits(compiles, { import gcc.backtrace; new UnwindBacktrace(0); }))
+        version = DEFAULT_TRACEINFO;
+}
+else version (Posix)
+    version = DEFAULT_TRACEINFO;
+
+version (DEFAULT_TRACEINFO) private class DefaultTraceInfo : Throwable.TraceInfo
+{
+    // backtrace
+    version (CRuntime_Glibc)
         import core.sys.linux.execinfo;
     else version (Darwin)
         import core.sys.darwin.execinfo;
@@ -757,345 +838,231 @@ Throwable.TraceInfo defaultTraceHandler( void* ptr = null )
         import core.sys.netbsd.execinfo;
     else version (DragonFlyBSD)
         import core.sys.dragonflybsd.execinfo;
-    else version (Windows)
-        import core.sys.windows.stacktrace;
     else version (Solaris)
         import core.sys.solaris.execinfo;
     else version (CRuntime_UClibc)
         import core.sys.linux.execinfo;
 
-    // avoid recursive GC calls in finalizer, trace handlers should be made @nogc instead
-    import core.memory : gc_inFinalizer;
-    if (gc_inFinalizer)
-        return null;
+    import core.demangle;
+    import core.stdc.stdlib : free;
+    import core.stdc.string : strlen, memchr, memmove;
 
-    //printf("runtime.defaultTraceHandler()\n");
-    static if ( __traits( compiles, new LibBacktrace(0) ) )
+    this()
     {
-        version (Posix)
+        numframes = 0; //backtrace( callstack, MAXFRAMES );
+        if (numframes < 2) // backtrace() failed, do it ourselves
         {
-            static enum FIRSTFRAME = 4;
-        }
-        else version (Win64)
-        {
-            static enum FIRSTFRAME = 4;
-        }
-        else
-        {
-            static enum FIRSTFRAME = 0;
-        }
-        return new LibBacktrace(FIRSTFRAME);
-    }
-    else static if ( __traits( compiles, new UnwindBacktrace(0) ) )
-    {
-        version (Posix)
-        {
-            static enum FIRSTFRAME = 5;
-        }
-        else version (Win64)
-        {
-            static enum FIRSTFRAME = 4;
-        }
-        else
-        {
-            static enum FIRSTFRAME = 0;
-        }
-        return new UnwindBacktrace(FIRSTFRAME);
-    }
-    else static if ( __traits( compiles, backtrace ) )
-    {
-        import core.demangle;
-        import core.stdc.stdlib : free;
-        import core.stdc.string : strlen, memchr, memmove;
-
-        class DefaultTraceInfo : Throwable.TraceInfo
-        {
-            this()
+            static void** getBasePtr()
             {
-                numframes = 0; //backtrace( callstack, MAXFRAMES );
-                if (numframes < 2) // backtrace() failed, do it ourselves
+                version (D_InlineAsm_X86)
+                    asm { naked; mov EAX, EBP; ret; }
+                else
+                    version (D_InlineAsm_X86_64)
+                        asm { naked; mov RAX, RBP; ret; }
+                else
+                    return null;
+            }
+
+            auto  stackTop    = getBasePtr();
+            auto  stackBottom = cast(void**) thread_stackBottom();
+            void* dummy;
+
+            if ( stackTop && &dummy < stackTop && stackTop < stackBottom )
+            {
+                auto stackPtr = stackTop;
+
+                for ( numframes = 0; stackTop <= stackPtr &&
+                          stackPtr < stackBottom &&
+                          numframes < MAXFRAMES; )
                 {
-                    static void** getBasePtr()
-                    {
-                        version (D_InlineAsm_X86)
-                            asm { naked; mov EAX, EBP; ret; }
-                        else
-                        version (D_InlineAsm_X86_64)
-                            asm { naked; mov RAX, RBP; ret; }
-                        else
-                            return null;
-                    }
+                    enum CALL_INSTRUCTION_SIZE = 1; // it may not be 1 but it is good enough to get
+                    // in CALL instruction address range for backtrace
+                    callstack[numframes++] = *(stackPtr + 1) - CALL_INSTRUCTION_SIZE;
+                    stackPtr = cast(void**) *stackPtr;
+                }
+            }
+        }
+    }
 
-                    auto  stackTop    = getBasePtr();
-                    auto  stackBottom = cast(void**) thread_stackBottom();
-                    void* dummy;
-
-                    if ( stackTop && &dummy < stackTop && stackTop < stackBottom )
-                    {
-                        auto stackPtr = stackTop;
-
-                        for ( numframes = 0; stackTop <= stackPtr &&
-                                            stackPtr < stackBottom &&
-                                            numframes < MAXFRAMES; )
+    override int opApply( scope int delegate(ref const(char[])) dg ) const
+    {
+        return opApply( (ref size_t, ref const(char[]) buf)
                         {
-                            enum CALL_INSTRUCTION_SIZE = 1; // it may not be 1 but it is good enough to get
-                                                            // in CALL instruction address range for backtrace
-                            callstack[numframes++] = *(stackPtr + 1) - CALL_INSTRUCTION_SIZE;
-                            stackPtr = cast(void**) *stackPtr;
-                        }
-                    }
-                }
-            }
+                            return dg( buf );
+                        } );
+    }
 
-            override int opApply( scope int delegate(ref const(char[])) dg ) const
+    override int opApply( scope int delegate(ref size_t, ref const(char[])) dg ) const
+    {
+        // NOTE: The first 4 frames with the current implementation are
+        //       inside core.runtime and the object code, so eliminate
+        //       these for readability.  The alternative would be to
+        //       exclude the first N frames that are in a list of
+        //       mangled function names.
+        enum FIRSTFRAME = 4;
+
+        version (linux) enum enableDwarf = true;
+        else version (FreeBSD) enum enableDwarf = true;
+        else version (DragonFlyBSD) enum enableDwarf = true;
+        else version (Darwin) enum enableDwarf = true;
+        else enum enableDwarf = false;
+
+        static if (enableDwarf)
+        {
+            import core.internal.traits : externDFunc;
+
+            alias traceHandlerOpApplyImpl = externDFunc!(
+                "rt.backtrace.dwarf.traceHandlerOpApplyImpl",
+                int function(const void*[], scope int delegate(ref size_t, ref const(char[])))
+                );
+
+            if (numframes >= FIRSTFRAME)
             {
-                return opApply( (ref size_t, ref const(char[]) buf)
-                                {
-                                    return dg( buf );
-                                } );
-            }
-
-            override int opApply( scope int delegate(ref size_t, ref const(char[])) dg ) const
-            {
-                version (Posix)
-                {
-                    // NOTE: The first 4 frames with the current implementation are
-                    //       inside core.runtime and the object code, so eliminate
-                    //       these for readability.  The alternative would be to
-                    //       exclude the first N frames that are in a list of
-                    //       mangled function names.
-                    enum FIRSTFRAME = 4;
-                }
-                else version (Windows)
-                {
-                    // NOTE: On Windows, the number of frames to exclude is based on
-                    //       whether the exception is user or system-generated, so
-                    //       it may be necessary to exclude a list of function names
-                    //       instead.
-                    enum FIRSTFRAME = 0;
-                }
-
-                version (linux) enum enableDwarf = true;
-                else version (FreeBSD) enum enableDwarf = true;
-                else version (DragonFlyBSD) enum enableDwarf = true;
-                else version (Darwin) enum enableDwarf = true;
-                else enum enableDwarf = false;
-
-                static if (enableDwarf)
-                {
-                    import core.internal.traits : externDFunc;
-
-                    alias traceHandlerOpApplyImpl = externDFunc!(
-                        "rt.backtrace.dwarf.traceHandlerOpApplyImpl",
-                        int function(const void*[], scope int delegate(ref size_t, ref const(char[])))
+                return traceHandlerOpApplyImpl(
+                    callstack[FIRSTFRAME .. numframes],
+                    dg
                     );
-
-                    if (numframes >= FIRSTFRAME)
-                    {
-                        return traceHandlerOpApplyImpl(
-                            callstack[FIRSTFRAME .. numframes],
-                            dg
-                        );
-                    }
-                    else
-                    {
-                        return 0;
-                    }
-                }
-                else
-                {
-                    const framelist = backtrace_symbols( callstack.ptr, numframes );
-                    scope(exit) free(cast(void*) framelist);
-
-                    int ret = 0;
-                    for ( int i = FIRSTFRAME; i < numframes; ++i )
-                    {
-                        char[4096] fixbuf;
-                        auto buf = framelist[i][0 .. strlen(framelist[i])];
-                        auto pos = cast(size_t)(i - FIRSTFRAME);
-                        buf = fixline( buf, fixbuf );
-                        ret = dg( pos, buf );
-                        if ( ret )
-                            break;
-                    }
-                    return ret;
-                }
-
             }
-
-            override string toString() const
+            else
             {
-                string buf;
-                foreach ( i, line; this )
-                    buf ~= i ? "\n" ~ line : line;
-                return buf;
+                return 0;
             }
+        }
+        else
+        {
+            const framelist = backtrace_symbols( callstack.ptr, numframes );
+            scope(exit) free(cast(void*) framelist);
 
-        private:
-            int     numframes;
-            static enum MAXFRAMES = 128;
-            void*[MAXFRAMES]  callstack = void;
-
-        private:
-            const(char)[] fixline( const(char)[] buf, return ref char[4096] fixbuf ) const
+            int ret = 0;
+            for ( int i = FIRSTFRAME; i < numframes; ++i )
             {
-                size_t symBeg, symEnd;
-                version (Darwin)
+                char[4096] fixbuf = void;
+                auto buf = framelist[i][0 .. strlen(framelist[i])];
+                auto pos = cast(size_t)(i - FIRSTFRAME);
+                buf = fixline( buf, fixbuf );
+                ret = dg( pos, buf );
+                if ( ret )
+                    break;
+            }
+            return ret;
+        }
+    }
+
+    override string toString() const
+    {
+        string buf;
+        foreach ( i, line; this )
+            buf ~= i ? "\n" ~ line : line;
+        return buf;
+    }
+
+private:
+    int     numframes;
+    static enum MAXFRAMES = 128;
+    void*[MAXFRAMES]  callstack = void;
+
+private:
+    const(char)[] fixline( const(char)[] buf, return ref char[4096] fixbuf ) const
+    {
+        size_t symBeg, symEnd;
+        version (Darwin)
+        {
+            // format is:
+            //  1  module    0x00000000 D6module4funcAFZv + 0
+            for ( size_t i = 0, n = 0; i < buf.length; i++ )
+            {
+                if ( ' ' == buf[i] )
                 {
-                    // format is:
-                    //  1  module    0x00000000 D6module4funcAFZv + 0
-                    for ( size_t i = 0, n = 0; i < buf.length; i++ )
-                    {
-                        if ( ' ' == buf[i] )
-                        {
-                            n++;
-                            while ( i < buf.length && ' ' == buf[i] )
-                                i++;
-                            if ( 3 > n )
-                                continue;
-                            symBeg = i;
-                            while ( i < buf.length && ' ' != buf[i] )
-                                i++;
-                            symEnd = i;
-                            break;
-                        }
-                    }
+                    n++;
+                    while ( i < buf.length && ' ' == buf[i] )
+                        i++;
+                    if ( 3 > n )
+                        continue;
+                    symBeg = i;
+                    while ( i < buf.length && ' ' != buf[i] )
+                        i++;
+                    symEnd = i;
+                    break;
                 }
-                else version (CRuntime_Glibc)
+            }
+        }
+        else version (CRuntime_Glibc)
+        {
+            // format is:  module(_D6module4funcAFZv) [0x00000000]
+            // or:         module(_D6module4funcAFZv+0x78) [0x00000000]
+            auto bptr = cast(char*) memchr( buf.ptr, '(', buf.length );
+            auto eptr = cast(char*) memchr( buf.ptr, ')', buf.length );
+            auto pptr = cast(char*) memchr( buf.ptr, '+', buf.length );
+
+            if (pptr && pptr < eptr)
+                eptr = pptr;
+
+            if ( bptr++ && eptr )
+            {
+                symBeg = bptr - buf.ptr;
+                symEnd = eptr - buf.ptr;
+            }
+        }
+        else
+        {
+            // format is: 0x00000000 <_D6module4funcAFZv+0x78> at module
+            version (FreeBSD)
+                enum StartChar = '<';
+            else version (NetBSD)
+                enum StartChar = '<';
+            else version (DragonFlyBSD)
+                enum StartChar = '<';
+            // format is object'symbol+offset [pc]
+            else version (Solaris)
+                enum StartChar = '\'';
+            // fallthrough
+            else
+                enum StartChar = '\0';
+
+            if (StartChar != '\0')
+            {
+                auto bptr = cast(char*) memchr(buf.ptr, StartChar, buf.length);
+                auto eptr = cast(char*) memchr(buf.ptr, '+', buf.length);
+
+                if (bptr++ && eptr)
                 {
-                    // format is:  module(_D6module4funcAFZv) [0x00000000]
-                    // or:         module(_D6module4funcAFZv+0x78) [0x00000000]
-                    auto bptr = cast(char*) memchr( buf.ptr, '(', buf.length );
-                    auto eptr = cast(char*) memchr( buf.ptr, ')', buf.length );
-                    auto pptr = cast(char*) memchr( buf.ptr, '+', buf.length );
-
-                    if (pptr && pptr < eptr)
-                        eptr = pptr;
-
-                    if ( bptr++ && eptr )
-                    {
-                        symBeg = bptr - buf.ptr;
-                        symEnd = eptr - buf.ptr;
-                    }
-                }
-                else version (FreeBSD)
-                {
-                    // format is: 0x00000000 <_D6module4funcAFZv+0x78> at module
-                    auto bptr = cast(char*) memchr( buf.ptr, '<', buf.length );
-                    auto eptr = cast(char*) memchr( buf.ptr, '+', buf.length );
-
-                    if ( bptr++ && eptr )
-                    {
-                        symBeg = bptr - buf.ptr;
-                        symEnd = eptr - buf.ptr;
-                    }
-                }
-                else version (NetBSD)
-                {
-                    // format is: 0x00000000 <_D6module4funcAFZv+0x78> at module
-                    auto bptr = cast(char*) memchr( buf.ptr, '<', buf.length );
-                    auto eptr = cast(char*) memchr( buf.ptr, '+', buf.length );
-
-                    if ( bptr++ && eptr )
-                    {
-                        symBeg = bptr - buf.ptr;
-                        symEnd = eptr - buf.ptr;
-                    }
-                }
-                else version (DragonFlyBSD)
-                {
-                    // format is: 0x00000000 <_D6module4funcAFZv+0x78> at module
-                    auto bptr = cast(char*) memchr( buf.ptr, '<', buf.length );
-                    auto eptr = cast(char*) memchr( buf.ptr, '+', buf.length );
-
-                    if ( bptr++ && eptr )
-                    {
-                        symBeg = bptr - buf.ptr;
-                        symEnd = eptr - buf.ptr;
-                    }
-                }
-                else version (DragonFlyBSD)
-                {
-                    // format is: 0x00000000 <_D6module4funcAFZv+0x78> at module
-                    auto bptr = cast(char*) memchr( buf.ptr, '<', buf.length );
-                    auto eptr = cast(char*) memchr( buf.ptr, '+', buf.length );
-
-                    if ( bptr++ && eptr )
-                    {
-                        symBeg = bptr - buf.ptr;
-                        symEnd = eptr - buf.ptr;
-                    }
-                }
-                else version (Solaris)
-                {
-                    // format is object'symbol+offset [pc]
-                    auto bptr = cast(char*) memchr( buf.ptr, '\'', buf.length );
-                    auto eptr = cast(char*) memchr( buf.ptr, '+', buf.length );
-
-                    if ( bptr++ && eptr )
-                    {
-                        symBeg = bptr - buf.ptr;
-                        symEnd = eptr - buf.ptr;
-                    }
-                }
-                else
-                {
-                    // fallthrough
-                }
-
-                assert(symBeg < buf.length && symEnd < buf.length);
-                assert(symBeg <= symEnd);
-
-                enum min = (size_t a, size_t b) => a <= b ? a : b;
-                if (symBeg == symEnd || symBeg >= fixbuf.length)
-                {
-                    immutable len = min(buf.length, fixbuf.length);
-                    fixbuf[0 .. len] = buf[0 .. len];
-                    return fixbuf[0 .. len];
-                }
-                else
-                {
-                    fixbuf[0 .. symBeg] = buf[0 .. symBeg];
-
-                    auto sym = demangle(buf[symBeg .. symEnd], fixbuf[symBeg .. $]);
-
-                    if (sym.ptr !is fixbuf.ptr + symBeg)
-                    {
-                        // demangle reallocated the buffer, copy the symbol to fixbuf
-                        immutable len = min(fixbuf.length - symBeg, sym.length);
-                        memmove(fixbuf.ptr + symBeg, sym.ptr, len);
-                        if (symBeg + len == fixbuf.length)
-                            return fixbuf[];
-                    }
-
-                    immutable pos = symBeg + sym.length;
-                    assert(pos < fixbuf.length);
-                    immutable tail = buf.length - symEnd;
-                    immutable len = min(fixbuf.length - pos, tail);
-                    fixbuf[pos .. pos + len] = buf[symEnd .. symEnd + len];
-                    return fixbuf[0 .. pos + len];
+                    symBeg = bptr - buf.ptr;
+                    symEnd = eptr - buf.ptr;
                 }
             }
         }
 
-        return new DefaultTraceInfo;
-    }
-    else static if ( __traits( compiles, new StackTrace(0, null) ) )
-    {
-        version (Win64)
+        assert(symBeg < buf.length && symEnd < buf.length);
+        assert(symBeg <= symEnd);
+
+        enum min = (size_t a, size_t b) => a <= b ? a : b;
+        if (symBeg == symEnd || symBeg >= fixbuf.length)
         {
-            static enum FIRSTFRAME = 4;
+            immutable len = min(buf.length, fixbuf.length);
+            fixbuf[0 .. len] = buf[0 .. len];
+            return fixbuf[0 .. len];
         }
-        else version (Win32)
+        else
         {
-            static enum FIRSTFRAME = 0;
+            fixbuf[0 .. symBeg] = buf[0 .. symBeg];
+
+            auto sym = demangle(buf[symBeg .. symEnd], fixbuf[symBeg .. $]);
+
+            if (sym.ptr !is fixbuf.ptr + symBeg)
+            {
+                // demangle reallocated the buffer, copy the symbol to fixbuf
+                immutable len = min(fixbuf.length - symBeg, sym.length);
+                memmove(fixbuf.ptr + symBeg, sym.ptr, len);
+                if (symBeg + len == fixbuf.length)
+                    return fixbuf[];
+            }
+
+            immutable pos = symBeg + sym.length;
+            assert(pos < fixbuf.length);
+            immutable tail = buf.length - symEnd;
+            immutable len = min(fixbuf.length - pos, tail);
+            fixbuf[pos .. pos + len] = buf[symEnd .. symEnd + len];
+            return fixbuf[0 .. pos + len];
         }
-        import core.sys.windows.winnt : CONTEXT;
-        auto s = new StackTrace(FIRSTFRAME, cast(CONTEXT*)ptr);
-        return s;
-    }
-    else
-    {
-        return null;
     }
 }

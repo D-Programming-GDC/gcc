@@ -148,6 +148,17 @@ DRUNTIME_LIBRARIES_NET
 DRUNTIME_LIBRARIES_ZLIB
 DRUNTIME_INSTALL_DIRECTORIES
 
+AC_ARG_WITH(libdruntime-only,
+  AS_HELP_STRING([--with-libdruntime-only={yes,no}],
+                 [build only the druntime library (default: no)]),,
+            [with_libdruntime_only=no])
+
+case "$with_libdruntime_only" in
+  yes|no) ;;
+  *) AC_MSG_ERROR([Invalid argument for --with-libdruntime-only]) ;;
+esac
+AM_CONDITIONAL(ENABLE_LIBDRUNTIME_ONLY, test x$with_libdruntime_only = xyes)
+
 AC_MSG_CHECKING([for --enable-libphobos])
 AC_ARG_ENABLE(libphobos,
   [AS_HELP_STRING([--enable-libphobos], [Enable libphobos])])
@@ -201,7 +212,7 @@ SPEC_PHOBOS_DEPS="$LIBS"
 AC_SUBST(SPEC_PHOBOS_DEPS)
 
 # Libdruntime / phobos soname version
-libtool_VERSION=83:0:0
+libtool_VERSION=1:0:0
 AC_SUBST(libtool_VERSION)
 
 # Set default flags (after DRUNTIME_WERROR!)

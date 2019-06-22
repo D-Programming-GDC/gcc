@@ -66,6 +66,7 @@ d_decl_context (Dsymbol *dsym)
 {
   Dsymbol *parent = dsym;
   Declaration *decl = dsym->isDeclaration ();
+  AggregateDeclaration *ad = dsym->isAggregateDeclaration ();
 
   while ((parent = parent->toParent2 ()))
     {
@@ -74,7 +75,8 @@ d_decl_context (Dsymbol *dsym)
 	 but only for extern(D) symbols.  */
       if (parent->isModule ())
 	{
-	  if (decl != NULL && decl->linkage != LINKd)
+	  if ((decl != NULL && decl->linkage != LINKd)
+	      || (ad != NULL && ad->classKind != ClassKind::d))
 	    return NULL_TREE;
 
 	  return build_import_decl (parent);
@@ -142,7 +144,8 @@ declaration_type (Declaration *decl)
   /* Lazy declarations are converted to delegates.  */
   if (decl->storage_class & STClazy)
     {
-      TypeFunction *tf = TypeFunction::create (NULL, decl->type, false, LINKd);
+      TypeFunction *tf = TypeFunction::create (NULL, decl->type,
+					       VARARGnone, LINKd);
       TypeDelegate *t = TypeDelegate::create (tf);
       return build_ctype (t->merge2 ());
     }
@@ -195,7 +198,8 @@ type_passed_as (Parameter *arg)
   /* Lazy parameters are converted to delegates.  */
   if (arg->storageClass & STClazy)
     {
-      TypeFunction *tf = TypeFunction::create (NULL, arg->type, false, LINKd);
+      TypeFunction *tf = TypeFunction::create (NULL, arg->type,
+					       VARARGnone, LINKd);
       TypeDelegate *t = TypeDelegate::create (tf);
       return build_ctype (t->merge2 ());
     }
@@ -355,7 +359,7 @@ build_interface_binfo (tree super, ClassDeclaration *cd, unsigned& offset)
   /* Want RECORD_TYPE, not POINTER_TYPE.  */
   BINFO_TYPE (binfo) = TREE_TYPE (ctype);
   BINFO_INHERITANCE_CHAIN (binfo) = super;
-  BINFO_OFFSET (binfo) = size_int (offset * Target::ptrsize);
+  BINFO_OFFSET (binfo) = size_int (offset * target.ptrsize);
   BINFO_VIRTUAL_P (binfo) = 1;
 
   for (size_t i = 0; i < cd->baseclasses->dim; i++, offset++)
@@ -492,7 +496,7 @@ build_vindex_ref (tree object, tree fntype, size_t index)
 
   gcc_assert (POINTER_TYPE_P (fntype));
 
-  return build_memref (fntype, result, size_int (Target::ptrsize * index));
+  return build_memref (fntype, result, size_int (target.ptrsize * index));
 }
 
 /* Return TRUE if EXP is a valid lvalue.  Lvalue references cannot be
@@ -807,7 +811,7 @@ identity_compare_p (StructDeclaration *sd)
 
       /* Check for types that may have padding.  */
       if ((tb->ty == Tcomplex80 || tb->ty == Tfloat80 || tb->ty == Timaginary80)
-	  && Target::realpad != 0)
+	  && target.realpad != 0)
 	return false;
 
       if (offset <= vd->offset)
@@ -1746,6 +1750,17 @@ void_okay_p (tree t)
   return t;
 }
 
+/* Builds a CALL_EXPR to run when an array bounds check fails.  */
+
+tree
+build_array_bounds_call (const Loc &loc)
+{
+  if (global.params.checkAction == CHECKACTION_D)
+    return d_assert_call (loc, LIBCALL_ARRAY_BOUNDS);
+  else
+    return build_call_expr (builtin_decl_explicit (BUILT_IN_TRAP), 0);
+}
+
 /* Builds a bounds condition checking that INDEX is between 0 and LEN.
    The condition returns the INDEX if true, or throws a RangeError.
    If INCLUSIVE, we allow INDEX == LEN to return true also.  */
@@ -1765,9 +1780,7 @@ build_bounds_condition (const Loc& loc, tree index, tree len, bool inclusive)
   tree condition = fold_build2 (inclusive ? GT_EXPR : GE_EXPR,
 				d_bool_type, index, len);
   /* Terminate the program with a trap if no D runtime present.  */
-  tree boundserr = (global.params.checkAction == CHECKACTION_D)
-    ? d_assert_call (loc, LIBCALL_ARRAY_BOUNDS)
-    : build_call_expr (builtin_decl_explicit (BUILT_IN_TRAP), 0);
+  tree boundserr = build_array_bounds_call (loc);
 
   return build_condition (TREE_TYPE (index), condition, boundserr, index);
 }
@@ -1977,9 +1990,10 @@ d_build_call (TypeFunction *tf, tree callable, tree object,
 	    }
 	}
 
-      size_t nparams = Parameter::dim (tf->parameters);
+      size_t nparams = tf->parameterList.length ();
       /* if _arguments[] is the first argument.  */
-      size_t varargs = (tf->linkage == LINKd && tf->varargs == 1);
+      size_t varargs = (tf->linkage == LINKd
+			&& tf->parameterList.varargs == VARARGvariadic);
 
       /* Assumes arguments->dim <= formal_args->dim if (!tf->varargs).  */
       for (size_t i = 0; i < arguments->dim; ++i)
@@ -1990,7 +2004,7 @@ d_build_call (TypeFunction *tf, tree callable, tree object,
 	  if (i - varargs < nparams && i >= varargs)
 	    {
 	      /* Actual arguments for declared formal arguments.  */
-	      Parameter *parg = Parameter::getNth (tf->parameters, i - varargs);
+	      Parameter *parg = tf->parameterList[i - varargs];
 	      targ = convert_for_argument (targ, parg);
 	    }
 
@@ -2451,8 +2465,8 @@ build_frame_type (tree ffi, FuncDeclaration *fd)
      of the calling function non-locally.  So we add all parameters with nested
      refs to the function frame, this should also mean overriding methods will
      have the same frame layout when inheriting a contract.  */
-  if ((global.params.useIn && fd->frequire)
-      || (global.params.useOut && fd->fensure))
+  if ((global.params.useIn == CHECKENABLEon && fd->frequire)
+      || (global.params.useOut == CHECKENABLEon && fd->fensure))
     {
       if (fd->parameters)
 	{
@@ -2638,8 +2652,8 @@ get_frameinfo (FuncDeclaration *fd)
 
       /* In checkNestedReference, references from contracts are not added to the
 	 closureVars array, so assume all parameters referenced.  */
-      if ((global.params.useIn && fd->frequire)
-	  || (global.params.useOut && fd->fensure))
+      if ((global.params.useIn == CHECKENABLEon && fd->frequire)
+	  || (global.params.useOut == CHECKENABLEon && fd->fensure))
 	FRAMEINFO_CREATES_FRAME (ffi) = 1;
 
       /* If however `fd` is nested (deeply) in a function that creates a

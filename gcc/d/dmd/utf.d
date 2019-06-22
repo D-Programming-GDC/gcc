@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2018 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/utf.d, _utf.d)
@@ -760,9 +760,9 @@ immutable(char*) utf_decodeWchar(const(wchar)* s, size_t len, ref size_t ridx, o
     assert(s !is null);
     size_t i = ridx++;
     assert(i < len);
-    // Pre-stage results for ASCII and error cases
+    // Pre-stage results for single wchar and error cases
     dchar u = rresult = s[i];
-    if (u < 0x80) // ASCII
+    if (u < 0xD800) // Single wchar codepoint
         return UTF16_DECODE_OK;
     if (0xD800 <= u && u <= 0xDBFF) // Surrogate pair
     {

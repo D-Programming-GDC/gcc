@@ -1,3 +1,17 @@
+/*
+TEST_OUTPUT:
+---
+false
+[] = int
+[] = string
+[0] = int
+[1] = string
+[] = string
+[] = int
+[1] = string
+[0] = int
+---
+*/
 
 extern (C) int printf(const(char*) fmt, ...);
 import core.vararg;
@@ -106,7 +120,7 @@ struct Iter
     bool empty() { return true; }
     void popFront() { }
     ref Tup!(int, int) front() { return *new Tup!(int, int); }
-    ref Iter opSlice() { return this; }
+    ref Iter opSlice() return { return this; }
 }
 
 void test4()
@@ -1917,12 +1931,12 @@ struct Foo14806(T)
 void test14806()
 {
     Foo14806!int a, b;
-    assert(a != b);
+    assert(a == b);
     // ==> a.tupleof != b.tupleof
     // ==> a.bar != b.bar || a.baz.get() != b.baz.get()
 
     Foo14806!string c, d;
-    assert(c != d);
+    assert(c == d);
     // ==> c.tupleof != d.tupleof
     // ==> c.bar != d.bar || c.baz.get() != d.baz.get()
 }
@@ -2057,6 +2071,25 @@ void test19284()
     assert(t.x == 5);
 }
 
+// 16633
+
+class Item
+{
+    alias children this;
+    Item[] children;
+    void populate()
+    {
+        children ~= new Item(); // Item is seen as []
+        assert(children.length == 1);
+    }
+}
+
+void test16633()
+{
+    Item root = new Item();
+    root.populate;
+}
+
 int main()
 {
     test1();
@@ -2114,6 +2147,7 @@ int main()
     test11355();
     test14806();
     test19284();
+    test16633();
 
     printf("Success\n");
     return 0;

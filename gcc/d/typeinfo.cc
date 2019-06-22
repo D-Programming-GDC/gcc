@@ -247,7 +247,8 @@ static void
 create_frontend_tinfo_types (void)
 {
   /* If there's no Object class defined, then neither can TypeInfo be.  */
-  if (object_module == NULL || ClassDeclaration::object == NULL)
+  if (object_module == NULL
+      || (doing_semantic_analysis_p && ClassDeclaration::object == NULL))
     return;
 
   /* Create all frontend TypeInfo classes declarations.  We rely on all
@@ -376,7 +377,7 @@ class TypeInfoVisitor : public Visitor
     this->layout_field (value);
   }
 
-  /* Write out the __vptr and __monitor fields of class CD.  */
+  /* Write out the __vptr and optionally __monitor fields of class CD.  */
 
   void layout_base (ClassDeclaration *cd)
   {
@@ -387,7 +388,8 @@ class TypeInfoVisitor : public Visitor
     else
       this->layout_field (null_pointer_node);
 
-    this->layout_field (null_pointer_node);
+    if (cd->hasMonitor ())
+      this->layout_field (null_pointer_node);
   }
 
   /* Write out the interfaces field of class CD.
@@ -601,8 +603,7 @@ public:
 
   void visit (TypeInfoEnumDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Tenum);
-    TypeEnum *ti = (TypeEnum *) d->tinfo;
+    TypeEnum *ti = d->tinfo->isTypeEnum ();
     EnumDeclaration *ed = ti->sym;
 
     /* The vtable for TypeInfo_Enum.  */
@@ -634,8 +635,7 @@ public:
 
   void visit (TypeInfoPointerDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Tpointer);
-    TypePointer *ti = (TypePointer *) d->tinfo;
+    TypePointer *ti = d->tinfo->isTypePointer ();
 
     /* The vtable for TypeInfo_Pointer.  */
     this->layout_base (Type::typeinfopointer);
@@ -651,8 +651,7 @@ public:
 
   void visit (TypeInfoArrayDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Tarray);
-    TypeDArray *ti = (TypeDArray *) d->tinfo;
+    TypeDArray *ti = d->tinfo->isTypeDArray ();
 
     /* The vtable for TypeInfo_Array.  */
     this->layout_base (Type::typeinfoarray);
@@ -669,8 +668,7 @@ public:
 
   void visit (TypeInfoStaticArrayDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Tsarray);
-    TypeSArray *ti = (TypeSArray *) d->tinfo;
+    TypeSArray *ti = d->tinfo->isTypeSArray ();
 
     /* The vtable for TypeInfo_StaticArray.  */
     this->layout_base (Type::typeinfostaticarray);
@@ -690,8 +688,7 @@ public:
 
   void visit (TypeInfoAssociativeArrayDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Taarray);
-    TypeAArray *ti = (TypeAArray *) d->tinfo;
+    TypeAArray *ti = d->tinfo->isTypeAArray ();
 
     /* The vtable for TypeInfo_AssociativeArray.  */
     this->layout_base (Type::typeinfoassociativearray);
@@ -710,8 +707,7 @@ public:
 
   void visit (TypeInfoVectorDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Tvector);
-    TypeVector *ti = (TypeVector *) d->tinfo;
+    TypeVector *ti = d->tinfo->isTypeVector ();
 
     /* The vtable for TypeInfo_Vector.  */
     this->layout_base (Type::typeinfovector);
@@ -728,8 +724,8 @@ public:
 
   void visit (TypeInfoFunctionDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Tfunction && d->tinfo->deco != NULL);
-    TypeFunction *ti = (TypeFunction *) d->tinfo;
+    TypeFunction *ti = d->tinfo->isTypeFunction ();
+    gcc_assert (ti->deco != NULL);
 
     /* The vtable for TypeInfo_Function.  */
     this->layout_base (Type::typeinfofunction);
@@ -749,8 +745,8 @@ public:
 
   void visit (TypeInfoDelegateDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Tdelegate && d->tinfo->deco != NULL);
-    TypeDelegate *ti = (TypeDelegate *) d->tinfo;
+    TypeDelegate *ti = d->tinfo->isTypeDelegate();
+    gcc_assert (ti->deco != NULL);
 
     /* The vtable for TypeInfo_Delegate.  */
     this->layout_base (Type::typeinfodelegate);
@@ -783,8 +779,7 @@ public:
 
   void visit (TypeInfoClassDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Tclass);
-    TypeClass *ti = (TypeClass *) d->tinfo;
+    TypeClass *ti = d->tinfo->isTypeClass ();
     ClassDeclaration *cd = ti->sym;
 
     /* The vtable for ClassInfo.  */
@@ -978,8 +973,7 @@ public:
 
   void visit (TypeInfoInterfaceDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Tclass);
-    TypeClass *ti = (TypeClass *) d->tinfo;
+    TypeClass *ti = d->tinfo->isTypeClass ();
 
     if (!ti->sym->vclassinfo)
       ti->sym->vclassinfo = TypeInfoClassDeclaration::create (ti);
@@ -1012,8 +1006,7 @@ public:
 
   void visit (TypeInfoStructDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Tstruct);
-    TypeStruct *ti = (TypeStruct *) d->tinfo;
+    TypeStruct *ti = d->tinfo->isTypeStruct ();
     StructDeclaration *sd = ti->sym;
 
     /* The vtable for TypeInfo_Struct.  */
@@ -1038,8 +1031,7 @@ public:
 
     if (sd->xhash)
       {
-	TypeFunction *tf = (TypeFunction *) sd->xhash->type;
-	gcc_assert (tf->ty == Tfunction);
+	TypeFunction *tf = sd->xhash->type->isTypeFunction ();
 	if (!tf->isnothrow || tf->trust == TRUSTsystem)
 	  {
 	    warning (sd->xhash->loc, "toHash() must be declared as "
@@ -1112,8 +1104,7 @@ public:
 
   void visit (TypeInfoTupleDeclaration *d)
   {
-    gcc_assert (d->tinfo->ty == Ttuple);
-    TypeTuple *ti = (TypeTuple *) d->tinfo;
+    TypeTuple *ti = d->tinfo->isTypeTuple ();
 
     /* The vtable for TypeInfo_Tuple.  */
     this->layout_base (Type::typeinfotypelist);
@@ -1217,7 +1208,7 @@ layout_classinfo_interfaces (ClassDeclaration *decl)
 
 	      field = create_field_decl (vtbltype, NULL, 1, 1);
 	      insert_aggregate_field (type, field, offset);
-	      structsize += id->vtbl.dim * Target::ptrsize;
+	      structsize += id->vtbl.dim * target.ptrsize;
 	    }
 	}
     }
@@ -1241,7 +1232,7 @@ layout_classinfo_interfaces (ClassDeclaration *decl)
 
 	      tree field = create_field_decl (vtbltype, NULL, 1, 1);
 	      insert_aggregate_field (type, field, offset);
-	      structsize += id->vtbl.dim * Target::ptrsize;
+	      structsize += id->vtbl.dim * target.ptrsize;
 	    }
 	}
     }
@@ -1314,8 +1305,7 @@ public:
 
   void visit (TypeInfoClassDeclaration *tid)
   {
-    gcc_assert (tid->tinfo->ty == Tclass);
-    TypeClass *tc = (TypeClass *) tid->tinfo;
+    TypeClass *tc = tid->tinfo->isTypeClass ();
     tid->csym = get_classinfo_decl (tc->sym);
   }
 };
@@ -1403,13 +1393,21 @@ layout_cpp_typeinfo (ClassDeclaration *cd)
   /* Use the vtable of __cpp_type_info_ptr, the EH personality routine
      expects this, as it uses .classinfo identity comparison to test for
      C++ catch handlers.  */
-  tree vptr = get_vtable_decl (ClassDeclaration::cpp_type_info_ptr);
-  CONSTRUCTOR_APPEND_ELT (init, NULL_TREE, build_address (vptr));
-  CONSTRUCTOR_APPEND_ELT (init, NULL_TREE, null_pointer_node);
+  ClassDeclaration *cppti = ClassDeclaration::cpp_type_info_ptr;
+  if (have_typeinfo_p (cppti))
+    {
+      tree vptr = get_vtable_decl (cppti);
+      CONSTRUCTOR_APPEND_ELT (init, NULL_TREE, build_address (vptr));
+    }
+  else
+    CONSTRUCTOR_APPEND_ELT (init, NULL_TREE, null_pointer_node);
+
+  if (cppti->hasMonitor ())
+    CONSTRUCTOR_APPEND_ELT (init, NULL_TREE, null_pointer_node);
 
   /* Let C++ do the RTTI generation, and just reference the symbol as
      extern, knowing the underlying type is not required.  */
-  const char *ident = Target::cppTypeInfoMangle (cd);
+  const char *ident = target.cpp.typeInfoMangle (cd);
   tree typeinfo = declare_extern_var (get_identifier (ident),
 				      unknown_type_node);
   TREE_READONLY (typeinfo) = 1;

@@ -68,7 +68,7 @@ mangle_decl (Dsymbol *decl)
     {
       OutBuffer buf;
       mangleToBuffer (decl, &buf);
-      return buf.extractString ();
+      return buf.extractChars ();
     }
 }
 
@@ -291,30 +291,29 @@ public:
 
   void visit (PragmaDeclaration *d)
   {
-    if (!global.params.ignoreUnsupportedPragmas)
+    if (d->ident == Identifier::idPool ("lib")
+	|| d->ident == Identifier::idPool ("startaddress"))
       {
-	if (d->ident == Identifier::idPool ("lib")
-	    || d->ident == Identifier::idPool ("startaddress"))
+	if (!global.params.ignoreUnsupportedPragmas)
 	  {
 	    warning_at (make_location_t (d->loc), OPT_Wunknown_pragmas,
 			"pragma(%s) not implemented", d->ident->toChars ());
 	  }
       }
-
-    visit ((AttribDeclaration *) d);
-
-    /* Handle pragma(crt_constructor) and pragma(crt_destructor).  Apply flag
-       to indicate that the functions enclosed should run automatically at the
-       beginning or end of execution.  */
-    if (d->ident == Identifier::idPool ("crt_constructor")
-	|| d->ident == Identifier::idPool ("crt_destructor"))
+    else if (d->ident == Identifier::idPool ("crt_constructor")
+	     || d->ident == Identifier::idPool ("crt_destructor"))
       {
+	/* Handle pragma(crt_constructor) and pragma(crt_destructor).  Apply
+	   flag to indicate that the functions enclosed should run automatically
+	   at the beginning or end of execution.  */
 	bool isctor = (d->ident == Identifier::idPool ("crt_constructor"));
 
 	if (apply_pragma_crt (d, isctor) > 1)
 	  error_at (make_location_t (d->loc),
 		    "can only apply to a single declaration");
       }
+
+    visit ((AttribDeclaration *) d);
   }
 
   /* Conditional compilation is the process of selecting which code to compile
@@ -2074,7 +2073,7 @@ mark_needed (tree decl)
 unsigned
 base_vtable_offset (ClassDeclaration *cd, BaseClass *bc)
 {
-  unsigned csymoffset = Target::classinfosize;
+  unsigned csymoffset = target.classinfosize;
   unsigned interfacesize = int_size_in_bytes (vtbl_interface_type_node);
   csymoffset += cd->vtblInterfaces->dim * interfacesize;
 
@@ -2083,7 +2082,7 @@ base_vtable_offset (ClassDeclaration *cd, BaseClass *bc)
       BaseClass *b = (*cd->vtblInterfaces)[i];
       if (b == bc)
 	return csymoffset;
-      csymoffset += b->sym->vtbl.dim * Target::ptrsize;
+      csymoffset += b->sym->vtbl.dim * target.ptrsize;
     }
 
   /* Check all overriding interface vtbl[]s.  */
@@ -2096,7 +2095,7 @@ base_vtable_offset (ClassDeclaration *cd, BaseClass *bc)
 	    {
 	      if (bc == bs)
 		return csymoffset;
-	      csymoffset += bs->sym->vtbl.dim * Target::ptrsize;
+	      csymoffset += bs->sym->vtbl.dim * target.ptrsize;
 	    }
 	}
     }

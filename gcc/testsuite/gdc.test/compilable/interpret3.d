@@ -1,4 +1,11 @@
 // PERMUTE_ARGS: -inline
+/*
+TEST_OUTPUT:
+---
+compilable/interpret3.d(2914): Deprecation: `case` variables have to be `const` or `immutable`
+compilable/interpret3.d(6313): Deprecation: identity comparison of static arrays implicitly coerces them to slices, which are compared by reference
+---
+*/
 
 template compiles(int T)
 {
@@ -78,24 +85,24 @@ struct RetRefStruct
 
 // Return value reference tests, for D2 only.
 
-ref RetRefStruct reffunc1(ref RetRefStruct a)
+ref RetRefStruct reffunc1(return ref RetRefStruct a)
 {
     int y = a.x;
     return a;
 }
 
-ref RetRefStruct reffunc2(ref RetRefStruct a)
+ref RetRefStruct reffunc2(return ref RetRefStruct a)
 {
     RetRefStruct z = a;
     return reffunc1(a);
 }
 
-ref int reffunc7(ref RetRefStruct aa)
+ref int reffunc7(return ref RetRefStruct aa)
 {
     return reffunc1(aa).x;
 }
 
-ref int reffunc3(ref int a)
+ref int reffunc3(return ref int a)
 {
     return a;
 }
@@ -104,18 +111,18 @@ struct RefTestStruct
 {
     RetRefStruct r;
 
-    ref RefTestStruct reffunc4(ref RetRefStruct[3] a)
+    ref RefTestStruct reffunc4(ref RetRefStruct[3] a) return
     {
         return this;
     }
 
-    ref int reffunc6()
+    ref int reffunc6() return
     {
         return this.r.x;
     }
 }
 
-ref RetRefStruct reffunc5(ref RetRefStruct[3] a)
+ref RetRefStruct reffunc5(return ref RetRefStruct[3] a)
 {
     int t = 1;
     for (int i = 0; i < 10; ++i)
@@ -1320,7 +1327,7 @@ struct Zadok
 {
     int[3] z;
     char[4] s = void;
-    ref int[] fog(ref int[] q) { return q; }
+    ref int[] fog(return ref int[] q) { return q; }
     int bfg()
     {
         z[0] = 56;
@@ -5773,7 +5780,7 @@ class C10452
     bool func() { return true; }
 }
 
-bool delegate() ref10452(ref S10452 s)
+bool delegate() ref10452(return ref S10452 s)
 {
     return &s.func;
 }
@@ -7738,3 +7745,64 @@ void test19074()
 {
     auto var = S19074b.data;
 }
+
+/************************************************/
+// https://issues.dlang.org/show_bug.cgi?id=19447
+
+bool f19447()
+{
+    int[3] c=1;
+    assert(c[0]==1);
+    g19447(c[0..2]);
+    assert(c[0]!=1); //fails
+    assert(c[0]==2);
+    return true;
+}
+void g19447(ref int[2] a)
+{
+    int[2] b=2;
+    a=b;
+    //a[]=b;            // works
+    //a[] = b[];                // works
+    assert(a[0]==2);
+}
+static assert(f19447());
+
+/***/
+
+char[] mangle19447(char[] dst)
+{
+   dst.length = 10;
+   size_t i = "_D".length;
+   dst[0 .. i] = "_D";
+   return dst;
+}
+
+static char[] x19447 = mangle19447(null);
+
+/***/
+enum KindEnum
+{
+    integer,
+    arrayOf
+}
+ 
+struct FullKind
+{
+    KindEnum[] contents;
+
+    this(KindEnum ) { opAssign; }
+
+    this(KindEnum , FullKind contentKind)
+    {
+         contents = contentKind.contents;
+    }
+
+    void opAssign()
+    {
+        contents = [];
+    }
+}
+
+enum fk = FullKind(KindEnum.integer);
+enum fk2 = FullKind(KindEnum.arrayOf, fk);

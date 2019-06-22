@@ -145,7 +145,7 @@ am__installdirs = "$(DESTDIR)$(toolexeclibdir)" \
 LTLIBRARIES = $(toolexeclib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 am__dirstamp = $(am__leading_dot)dirstamp
-am__objects_1 = etc/c/curl.lo etc/c/sqlite3.lo etc/c/zlib.lo \
+am__objects_1 = etc/c/curl.lo etc/c/zlib.lo \
 	std/algorithm/comparison.lo std/algorithm/internal.lo \
 	std/algorithm/iteration.lo std/algorithm/mutation.lo \
 	std/algorithm/package.lo std/algorithm/searching.lo \
@@ -197,17 +197,17 @@ am__objects_1 = etc/c/curl.lo etc/c/sqlite3.lo etc/c/zlib.lo \
 	std/internal/cstring.lo std/internal/math/biguintcore.lo \
 	std/internal/math/biguintnoasm.lo \
 	std/internal/math/errorfunction.lo \
-	std/internal/math/gammafunction.lo std/internal/scopebuffer.lo \
-	std/internal/test/dummyrange.lo std/internal/test/range.lo \
-	std/internal/test/uda.lo std/internal/unicode_comp.lo \
-	std/internal/unicode_decomp.lo \
+	std/internal/math/gammafunction.lo std/internal/memory.lo \
+	std/internal/scopebuffer.lo std/internal/test/dummyrange.lo \
+	std/internal/test/range.lo std/internal/test/uda.lo \
+	std/internal/unicode_comp.lo std/internal/unicode_decomp.lo \
 	std/internal/unicode_grapheme.lo std/internal/unicode_norm.lo \
 	std/internal/unicode_tables.lo \
 	std/internal/windows/advapi32.lo std/json.lo std/math.lo \
 	std/mathspecial.lo std/meta.lo std/mmfile.lo std/net/curl.lo \
 	std/net/isemail.lo std/numeric.lo std/outbuffer.lo \
-	std/parallelism.lo std/path.lo std/process.lo std/random.lo \
-	std/range/interfaces.lo std/range/package.lo \
+	std/package.lo std/parallelism.lo std/path.lo std/process.lo \
+	std/random.lo std/range/interfaces.lo std/range/package.lo \
 	std/range/primitives.lo std/regex/internal/backtracking.lo \
 	std/regex/internal/generator.lo std/regex/internal/ir.lo \
 	std/regex/internal/kickstart.lo std/regex/internal/parser.lo \
@@ -463,12 +463,12 @@ libgphobos_la_DEPENDENCIES = libgphobos.spec
 # https://gist.github.com/jpf91/8744acebc9dcf1e9d1a35cdff20afbb2
 # Can't use wildcards here:
 # https://www.gnu.org/software/automake/manual/html_node/Wildcards.html
-PHOBOS_DSOURCES = etc/c/curl.d etc/c/sqlite3.d etc/c/zlib.d \
-	std/algorithm/comparison.d std/algorithm/internal.d \
-	std/algorithm/iteration.d std/algorithm/mutation.d \
-	std/algorithm/package.d std/algorithm/searching.d \
-	std/algorithm/setops.d std/algorithm/sorting.d std/array.d std/ascii.d \
-	std/base64.d std/bigint.d std/bitmanip.d std/compiler.d std/complex.d \
+PHOBOS_DSOURCES = etc/c/curl.d etc/c/zlib.d std/algorithm/comparison.d \
+	std/algorithm/internal.d std/algorithm/iteration.d \
+	std/algorithm/mutation.d std/algorithm/package.d \
+	std/algorithm/searching.d std/algorithm/setops.d \
+	std/algorithm/sorting.d std/array.d std/ascii.d std/base64.d \
+	std/bigint.d std/bitmanip.d std/compiler.d std/complex.d \
 	std/concurrency.d std/container/array.d std/container/binaryheap.d \
 	std/container/dlist.d std/container/package.d std/container/rbtree.d \
 	std/container/slist.d std/container/util.d std/conv.d std/csv.d \
@@ -509,13 +509,14 @@ PHOBOS_DSOURCES = etc/c/curl.d etc/c/sqlite3.d etc/c/zlib.d \
 	std/getopt.d std/internal/attributes.d std/internal/cstring.d \
 	std/internal/math/biguintcore.d std/internal/math/biguintnoasm.d \
 	std/internal/math/errorfunction.d std/internal/math/gammafunction.d \
-	std/internal/scopebuffer.d std/internal/test/dummyrange.d \
-	std/internal/test/range.d std/internal/test/uda.d \
-	std/internal/unicode_comp.d std/internal/unicode_decomp.d \
-	std/internal/unicode_grapheme.d std/internal/unicode_norm.d \
-	std/internal/unicode_tables.d std/internal/windows/advapi32.d \
-	std/json.d std/math.d std/mathspecial.d std/meta.d std/mmfile.d \
-	std/net/curl.d std/net/isemail.d std/numeric.d std/outbuffer.d \
+	std/internal/memory.d std/internal/scopebuffer.d \
+	std/internal/test/dummyrange.d std/internal/test/range.d \
+	std/internal/test/uda.d std/internal/unicode_comp.d \
+	std/internal/unicode_decomp.d std/internal/unicode_grapheme.d \
+	std/internal/unicode_norm.d std/internal/unicode_tables.d \
+	std/internal/windows/advapi32.d std/json.d std/math.d \
+	std/mathspecial.d std/meta.d std/mmfile.d std/net/curl.d \
+	std/net/isemail.d std/numeric.d std/outbuffer.d std/package.d \
 	std/parallelism.d std/path.d std/process.d std/random.d \
 	std/range/interfaces.d std/range/package.d std/range/primitives.d \
 	std/regex/internal/backtracking.d std/regex/internal/generator.d \
@@ -603,7 +604,6 @@ etc/c/$(am__dirstamp):
 	@$(MKDIR_P) etc/c
 	@: > etc/c/$(am__dirstamp)
 etc/c/curl.lo: etc/c/$(am__dirstamp)
-etc/c/sqlite3.lo: etc/c/$(am__dirstamp)
 etc/c/zlib.lo: etc/c/$(am__dirstamp)
 std/algorithm/$(am__dirstamp):
 	@$(MKDIR_P) std/algorithm
@@ -751,6 +751,7 @@ std/internal/math/biguintcore.lo: std/internal/math/$(am__dirstamp)
 std/internal/math/biguintnoasm.lo: std/internal/math/$(am__dirstamp)
 std/internal/math/errorfunction.lo: std/internal/math/$(am__dirstamp)
 std/internal/math/gammafunction.lo: std/internal/math/$(am__dirstamp)
+std/internal/memory.lo: std/internal/$(am__dirstamp)
 std/internal/scopebuffer.lo: std/internal/$(am__dirstamp)
 std/internal/test/$(am__dirstamp):
 	@$(MKDIR_P) std/internal/test
@@ -780,6 +781,7 @@ std/net/curl.lo: std/net/$(am__dirstamp)
 std/net/isemail.lo: std/net/$(am__dirstamp)
 std/numeric.lo: std/$(am__dirstamp)
 std/outbuffer.lo: std/$(am__dirstamp)
+std/package.lo: std/$(am__dirstamp)
 std/parallelism.lo: std/$(am__dirstamp)
 std/path.lo: std/$(am__dirstamp)
 std/process.lo: std/$(am__dirstamp)

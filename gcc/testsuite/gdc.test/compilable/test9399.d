@@ -1,4 +1,4 @@
-// REQUIRED_ARGS: -inline -Icompilable/imports
+// REQUIRED_ARGS: -c -inline -Icompilable/imports
 // EXTRA_SOURCES: imports/test9399a.d
 
 import imports.test9399a;

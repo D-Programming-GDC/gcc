@@ -1,5 +1,5 @@
 /* ctfloat.d -- Compile-time floating-pointer helper functions.
- * Copyright (C) 2018 Free Software Foundation, Inc.
+ * Copyright (C) 2019 Free Software Foundation, Inc.
  *
  * GCC is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,17 +27,33 @@ public import dmd.root.longdouble : real_t = longdouble;
 extern (C++) struct CTFloat
 {
   nothrow:
+  @nogc:
+  @safe:
+
     enum yl2x_supported = false;
-    enum yl2xp1_supported = false;
+    enum yl2xp1_supported = yl2x_supported;
 
     static real_t fabs(real_t x);
     static real_t ldexp(real_t n, int exp);
+
+    pure @trusted
     static bool isIdentical(real_t a, real_t b);
+
+    pure @trusted
     static size_t hash(real_t a);
+
+    pure
     static bool isNaN(real_t r);
+
+    pure @trusted
     static bool isSNaN(real_t r);
-    static bool isInfinity(real_t r);
+
+    static bool isInfinity(real_t r) pure;
+
+    @system
     static real_t parse(const(char)* literal, bool* isOutOfRange = null);
+
+    @system
     static int sprint(char* str, char fmt, real_t x);
 
     // Constant real values 0, 1, -1 and 0.5.
@@ -46,5 +62,6 @@ extern (C++) struct CTFloat
     __gshared real_t minusone;
     __gshared real_t half;
 
+    @trusted
     static void initialize();
 }

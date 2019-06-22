@@ -249,8 +249,8 @@ class C204 : I204
 /******************************************/
 // https://bugzilla.gdcproject.org/show_bug.cgi?id=241
 
-import imports.gdc241a;
-import imports.gdc241b : S241, C241, E241, N241;
+private import imports.gdc241a;
+public import imports.gdc241b : S241, C241, E241, N241;
 
 /******************************************/
 // https://bugzilla.gdcproject.org/show_bug.cgi?id=242

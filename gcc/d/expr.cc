@@ -477,9 +477,7 @@ public:
   void visit (InExp *e)
   {
     Type *tb2 = e->e2->type->toBasetype ();
-    gcc_assert (tb2->ty == Taarray);
-
-    Type *tkey = ((TypeAArray *) tb2)->index->toBasetype ();
+    Type *tkey = tb2->isTypeAArray ()->index->toBasetype ();
     tree key = convert_expr (build_expr (e->e1), e->e1->type, tkey);
 
     /* Build a call to _aaInX().  */
@@ -959,16 +957,47 @@ public:
 	    /* Perform a memcpy operation.  */
 	    gcc_assert (e->e2->type->ty != Tpointer);
 
-	    if (!postblit && !destructor && !array_bounds_check ())
+	    if (!postblit && !destructor)
 	      {
 		tree t1 = d_save_expr (d_array_convert (e->e1));
-		tree t2 = d_array_convert (e->e2);
-		tree tmemcpy = builtin_decl_explicit (BUILT_IN_MEMCPY);
-		tree size = size_mult_expr (d_array_length (t1),
-					    size_int (etype->size ()));
+		tree t2 = d_save_expr (d_array_convert (e->e2));
 
-		tree result = build_call_expr (tmemcpy, 3, d_array_ptr (t1),
-					       d_array_ptr (t2), size);
+		/* References to array data.  */
+		tree t1ptr = d_array_ptr (t1);
+		tree t1len = d_array_length (t1);
+		tree t2ptr = d_array_ptr (t2);
+
+		tree tmemcpy = builtin_decl_explicit (BUILT_IN_MEMCPY);
+		tree size = size_mult_expr (t1len, size_int (etype->size ()));
+		tree result = build_call_expr (tmemcpy, 3, t1ptr, t2ptr, size);
+
+		/* Insert check that array lengths match and do not overlap.  */
+		if (array_bounds_check ())
+		  {
+		    /* tlencmp = (t1len == t2len)  */
+		    tree t2len = d_array_length (t2);
+		    tree tlencmp = build_boolop (EQ_EXPR, t1len, t2len);
+
+		    /* toverlap = (t1ptr + size <= t2ptr
+		       || t2ptr + size <= t1ptr)  */
+		    tree t1ptrcmp = build_boolop (LE_EXPR,
+						  build_offset (t1ptr, size),
+						  t2ptr);
+		    tree t2ptrcmp = build_boolop (LE_EXPR,
+						  build_offset (t2ptr, size),
+						  t1ptr);
+		    tree toverlap = build_boolop (TRUTH_ORIF_EXPR, t1ptrcmp,
+						  t2ptrcmp);
+
+		    /* (tlencmp && toverlap) ? memcpy() : _d_arraybounds()  */
+		    tree tassert = build_array_bounds_call (e->loc);
+		    tree tboundscheck = build_boolop (TRUTH_ANDIF_EXPR,
+						      tlencmp, toverlap);
+
+		    result = build_condition (void_type_node, tboundscheck,
+					      result, tassert);
+		  }
+
 		this->result_ = compound_expr (result, t1);
 	      }
 	    else if ((postblit || destructor) && e->op != TOKblit)
@@ -1202,9 +1231,7 @@ public:
 
 	if (!e->indexIsInBounds && array_bounds_check ())
 	  {
-	    tree tassert = (global.params.checkAction == CHECKACTION_D)
-	      ? d_assert_call (e->loc, LIBCALL_ARRAY_BOUNDS)
-	      : build_call_expr (builtin_decl_explicit (BUILT_IN_TRAP), 0);
+	    tree tassert = build_array_bounds_call (e->loc);
 
 	    result = d_save_expr (result);
 	    result = build_condition (TREE_TYPE (result),
@@ -1726,6 +1753,9 @@ public:
 		    cleanup = TREE_OPERAND (thisexp, 0);
 		    thisexp = TREE_OPERAND (thisexp, 1);
 		  }
+
+		if (TREE_CODE (thisexp) == CONSTRUCTOR)
+		  thisexp = force_target_expr (thisexp);
 
 		/* Want reference to 'this' object.  */
 		if (!POINTER_TYPE_P (TREE_TYPE (thisexp)))
@@ -2271,9 +2301,8 @@ public:
       {
 	/* Allocating a new class.  */
 	tb = e->newtype->toBasetype ();
-	gcc_assert (tb->ty == Tclass);
 
-	ClassDeclaration *cd = ((TypeClass *) tb)->sym;
+	ClassDeclaration *cd = tb->isTypeClass ()->sym;
 	tree type = build_ctype (tb);
 	tree setup_exp = NULL_TREE;
 	tree new_call;
@@ -2300,7 +2329,9 @@ public:
 	  {
 	    /* Generate: _d_newclass()  */
 	    tree arg = build_address (get_classinfo_decl (cd));
-	    new_call = build_libcall (LIBCALL_NEWCLASS, tb, 1, arg);
+	    libcall_fn libcall = (global.params.ehnogc && e->thrownew)
+	      ? LIBCALL_NEWTHROW : LIBCALL_NEWCLASS;
+	    new_call = build_libcall (libcall, tb, 1, arg);
 	  }
 
 	/* Set the context pointer for nested classes.  */
@@ -2351,10 +2382,9 @@ public:
       {
 	/* Allocating memory for a new struct.  */
 	Type *htype = e->newtype->toBasetype ();
-	gcc_assert (htype->ty == Tstruct);
 	gcc_assert (!e->onstack);
 
-	TypeStruct *stype = (TypeStruct *) htype;
+	TypeStruct *stype = htype->isTypeStruct ();
 	StructDeclaration *sd = stype->sym;
 	tree new_call;
 
@@ -2426,8 +2456,7 @@ public:
       {
 	/* Allocating memory for a new D array.  */
 	tb = e->newtype->toBasetype ();
-	gcc_assert (tb->ty == Tarray);
-	TypeDArray *tarray = (TypeDArray *) tb;
+	TypeDArray *tarray = tb->isTypeDArray ();
 
 	gcc_assert (!e->allocator);
 	gcc_assert (e->arguments && e->arguments->dim >= 1);
@@ -2763,10 +2792,9 @@ public:
   {
     /* Want the mutable type for typeinfo reference.  */
     Type *tb = e->type->toBasetype ()->mutableOf ();
-    gcc_assert (tb->ty == Taarray);
 
     /* Handle empty assoc array literals.  */
-    TypeAArray *ta = (TypeAArray *) tb;
+    TypeAArray *ta = tb->isTypeAArray ();
     if (e->keys->dim == 0)
       {
 	this->result_ = build_constructor (build_ctype (ta), NULL);

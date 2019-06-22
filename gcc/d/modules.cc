@@ -145,7 +145,7 @@ get_internal_fn (tree ident)
 
   FuncDeclaration *fd = FuncDeclaration::genCfunc (NULL, Type::tvoid,
 						   Identifier::idPool (name));
-  fd->loc = Loc (mod->srcfile->toChars (), 1, 0);
+  fd->loc = Loc (mod->srcfile.toChars (), 1, 0);
   fd->parent = mod;
   fd->protection.kind = Prot::private_;
   fd->semanticRun = PASSsemantic3done;
@@ -738,7 +738,8 @@ build_module_tree (Module *decl)
       /* Associate the module info symbol with a mock module.  */
       const char *name = concat (GDC_PREFIX ("modtest__"),
 				 decl->ident->toChars (), NULL);
-      Module *tm = Module::create (decl->arg, Identifier::idPool (name), 0, 0);
+      Module *tm = Module::create (decl->arg.ptr, Identifier::idPool (name),
+				   0, 0);
       Dsymbols members;
 
       /* Setting parent puts module in the same package as the current, to

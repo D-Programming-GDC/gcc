@@ -19,7 +19,7 @@ void abort(scope string msg, scope string filename = __FILE__, size_t line = __L
     }
     else version (Windows)
     {
-        import core.sys.windows.windows: GetStdHandle, STD_ERROR_HANDLE, WriteFile, INVALID_HANDLE_VALUE;
+        import core.sys.windows.winbase : GetStdHandle, STD_ERROR_HANDLE, WriteFile, INVALID_HANDLE_VALUE;
         auto h = (() @trusted => GetStdHandle(STD_ERROR_HANDLE))();
         if (h == INVALID_HANDLE_VALUE)
             // attempt best we can to print the message
@@ -37,7 +37,7 @@ void abort(scope string msg, scope string filename = __FILE__, size_t line = __L
         static assert(0, "Unsupported OS");
 
     import core.internal.string;
-    UnsignedStringBuf strbuff;
+    UnsignedStringBuf strbuff = void;
 
     // write an appropriate message, then abort the program
     writeStr("Aborting from ", filename, "(", line.unsignedToTempString(strbuff, 10), ") ", msg);

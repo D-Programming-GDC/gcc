@@ -61,6 +61,9 @@ $(TR $(TH Function Name) $(TH Description)
     $(TR $(TD $(LREF split))
         $(TD Eagerly split a range or string into an array.
     ))
+    $(TR $(TD $(LREF staticArray))
+        $(TD Creates a new static array from given data.
+    ))
     $(TR $(TD $(LREF uninitializedArray))
         $(TD Returns a new array of type `T` without initializing its elements.
     ))
@@ -439,7 +442,8 @@ if (isInputRange!Range)
     import std.typecons : isTuple;
 
     alias E = ElementType!Range;
-    static assert(isTuple!E, "assocArray: argument must be a range of tuples");
+    static assert(isTuple!E, "assocArray: argument must be a range of tuples,"
+        ~" but was a range of "~E.stringof);
     static assert(E.length == 2, "assocArray: tuple dimension must be 2");
     alias KeyType = E.Types[0];
     alias ValueType = E.Types[1];
@@ -474,7 +478,7 @@ if (isInputRange!Values && isInputRange!Keys)
                     ValueElement.init.__xdtor();
             })))
             {
-                scope(failure) assert(0);
+                scope(failure) assert(false, "aaLiteral must not throw");
             }
             if (values.length > keys.length)
                 values = values[0 .. keys.length];
@@ -549,6 +553,7 @@ if (isInputRange!Values && isInputRange!Keys)
 @safe unittest
 {
     import std.typecons;
+    static assert(!__traits(compiles, [ 1, 2, 3 ].assocArray()));
     static assert(!__traits(compiles, [ tuple("foo", "bar", "baz") ].assocArray()));
     static assert(!__traits(compiles, [ tuple("foo") ].assocArray()));
     assert([ tuple("foo", "bar") ].assocArray() == ["foo": "bar"]);
@@ -906,7 +911,8 @@ private auto arrayAllocImpl(bool minimallyInitialized, T, I...)(I sizes) nothrow
 
     static if (I.length != 0)
     {
-        static assert(is(I[0] == size_t));
+        static assert(is(I[0] == size_t), "I[0] must be of type size_t not "
+                ~ I[0].stringof);
         alias size = sizes[0];
     }
 
@@ -1147,8 +1153,10 @@ if (is(typeof(a.ptr < b.ptr) == bool))
 private void copyBackwards(T)(T[] src, T[] dest)
 {
     import core.stdc.string : memmove;
+    import std.format : format;
 
-    assert(src.length == dest.length);
+    assert(src.length == dest.length, format!
+            "src.length %s must equal dest.length %s"(src.length, dest.length));
 
     if (!__ctfe || hasElaborateCopyConstructor!T)
     {
@@ -1287,7 +1295,8 @@ if (isSomeString!(T[]) && allSatisfy!(isCharOrStringOrDcharRange, U))
 
         @trusted static void moveToRight(T[] arr, size_t gap)
         {
-            static assert(!hasElaborateCopyConstructor!T);
+            static assert(!hasElaborateCopyConstructor!T,
+                    "T must not have an elaborate copy constructor");
             import core.stdc.string : memmove;
             if (__ctfe)
             {
@@ -2015,6 +2024,7 @@ if (isInputRange!RoR &&
         else
         {
             import std.conv : emplaceRef;
+            import std.format : format;
             size_t length;
             size_t rorLength;
             foreach (r; ror.save)
@@ -2038,7 +2048,8 @@ if (isInputRange!RoR &&
                 foreach (e; r)
                     emplaceRef(result[len++], e);
             }
-            assert(len == result.length);
+            assert(len == result.length, format!
+                    "len %s must equal result.lenght %s"(len, result.length));
             return (() @trusted => cast(RetType) result)();
         }
     }
@@ -2109,7 +2120,8 @@ if (isInputRange!RoR &&
         foreach (r; ror)
             foreach (e; r)
                 emplaceRef!RetTypeElement(result[len++], e);
-        assert(len == result.length);
+        assert(len == result.length,
+                "emplaced an unexpected number of elements");
         return (() @trusted => cast(RetType) result)();
     }
     else
@@ -2336,21 +2348,29 @@ if (isInputRange!RoR &&
         $(REF substitute, std,algorithm,iteration) for a lazy replace.
  +/
 E[] replace(E, R1, R2)(E[] subject, R1 from, R2 to)
-if (isDynamicArray!(E[]) && isForwardRange!R1 && isForwardRange!R2
-        && (hasLength!R2 || isSomeString!R2))
+if ((isForwardRange!R1 && isForwardRange!R2 && (hasLength!R2 || isSomeString!R2)) ||
+    is(Unqual!E : Unqual!R1))
 {
     import std.algorithm.searching : find;
     import std.range : dropOne;
 
-    if (from.empty) return subject;
+    static if (isInputRange!R1)
+    {
+        if (from.empty) return subject;
+        alias rSave = a => a.save;
+    }
+    else
+    {
+        alias rSave = a => a;
+    }
 
-    auto balance = find(subject, from.save);
+    auto balance = find(subject, rSave(from));
     if (balance.empty)
         return subject;
 
     auto app = appender!(E[])();
     app.put(subject[0 .. subject.length - balance.length]);
-    app.put(to.save);
+    app.put(rSave(to));
     // replacing an element in an array is different to a range replacement
     static if (is(Unqual!E : Unqual!R1))
         replaceInto(app, balance.dropOne, from, to);
@@ -2396,6 +2416,20 @@ if (isDynamicArray!(E[]) && isForwardRange!R1 && isForwardRange!R2
             .replace([[0], [1, 2]], [[4]]) == [[4], [0], [3], [1, 2], [4]]);
 }
 
+// https://issues.dlang.org/show_bug.cgi?id=10930
+@safe unittest
+{
+    assert([0, 1, 2].replace(1, 4) == [0, 4, 2]);
+    assert("äbö".replace('ä', 'a') == "abö");
+}
+
+// empty array
+@safe unittest
+{
+    int[] arr;
+    assert(replace(arr, 1, 2) == []);
+}
+
 /++
     Replace occurrences of `from` with `to` in `subject` and output the result into
     `sink`.
@@ -2410,28 +2444,36 @@ if (isDynamicArray!(E[]) && isForwardRange!R1 && isForwardRange!R2
         $(REF substitute, std,algorithm,iteration) for a lazy replace.
  +/
 void replaceInto(E, Sink, R1, R2)(Sink sink, E[] subject, R1 from, R2 to)
-if (isOutputRange!(Sink, E) && isDynamicArray!(E[])
-    && isForwardRange!R1 && isForwardRange!R2
-    && (hasLength!R2 || isSomeString!R2))
+if (isOutputRange!(Sink, E) &&
+    ((isForwardRange!R1 && isForwardRange!R2 && (hasLength!R2 || isSomeString!R2)) ||
+    is(Unqual!E : Unqual!R1)))
 {
     import std.algorithm.searching : find;
     import std.range : dropOne;
 
-    if (from.empty)
+    static if (isInputRange!R1)
     {
-        sink.put(subject);
-        return;
+        if (from.empty)
+        {
+            sink.put(subject);
+            return;
+        }
+        alias rSave = a => a.save;
+    }
+    else
+    {
+        alias rSave = a => a;
     }
     for (;;)
     {
-        auto balance = find(subject, from.save);
+        auto balance = find(subject, rSave(from));
         if (balance.empty)
         {
             sink.put(subject);
             break;
         }
         sink.put(subject[0 .. subject.length - balance.length]);
-        sink.put(to.save);
+        sink.put(rSave(to));
         // replacing an element in an array is different to a range replacement
         static if (is(Unqual!E : Unqual!R1))
             subject = balance.dropOne;
@@ -2451,6 +2493,15 @@ if (isOutputRange!(Sink, E) && isDynamicArray!(E[])
     replaceInto(sink, arr, from, to);
 
     assert(sink.data == [1, 4, 6, 4, 5]);
+}
+
+// empty array
+@safe unittest
+{
+    auto sink = appender!(int[])();
+    int[] arr;
+    replaceInto(sink, arr, 1, 2);
+    assert(sink.data == []);
 }
 
 @safe unittest
@@ -2506,6 +2557,18 @@ if (isOutputRange!(Sink, E) && isDynamicArray!(E[])
     }}
 }
 
+// https://issues.dlang.org/show_bug.cgi?id=10930
+@safe unittest
+{
+    auto sink = appender!(int[])();
+    replaceInto(sink, [0, 1, 2], 1, 5);
+    assert(sink.data == [0, 5, 2]);
+
+    auto sink2 = appender!(dchar[])();
+    replaceInto(sink2, "äbö", 'ä', 'a');
+    assert(sink2.data == "abö");
+}
+
 /++
     Replaces elements from `array` with indices ranging from `from`
     (inclusive) to `to` (exclusive) with the range `stuff`.
@@ -2530,7 +2593,7 @@ if (isInputRange!Range &&
     static if (hasLength!Range && is(ElementEncodingType!Range : T))
     {
         import std.algorithm.mutation : copy;
-        assert(from <= to);
+        assert(from <= to, "from must be before or equal to to");
         immutable sliceLen = to - from;
         auto retval = new Unqual!(T)[](subject.length - sliceLen + stuff.length);
         retval[0 .. from] = subject[0 .. from];
@@ -3081,7 +3144,7 @@ inout(T)[] replaceSlice(T)(inout(T)[] s, in T[] slice, in T[] replacement)
 in
 {
     // Verify that slice[] really is a slice of s[]
-    assert(overlap(s, slice) is slice);
+    assert(overlap(s, slice) is slice, "slice[] is not a subslice of s[]");
 }
 do
 {
@@ -3184,7 +3247,7 @@ if (isDynamicArray!A)
      * Params:
      *     newCapacity = the capacity the `Appender` should have
      */
-    void reserve(size_t newCapacity) @safe pure nothrow
+    void reserve(size_t newCapacity)
     {
         if (_data)
         {
@@ -3219,7 +3282,7 @@ if (isDynamicArray!A)
     }
 
     // ensure we can add nelems elements, resizing as necessary
-    private void ensureAddable(size_t nelems) @trusted pure nothrow
+    private void ensureAddable(size_t nelems)
     {
         if (!_data)
             _data = new Data;
@@ -3255,7 +3318,7 @@ if (isDynamicArray!A)
             // first, try extending the current block
             if (_data.canExtend)
             {
-                immutable u = GC.extend(_data.arr.ptr, nelems * T.sizeof, (newlen - len) * T.sizeof);
+                immutable u = (() @trusted => GC.extend(_data.arr.ptr, nelems * T.sizeof, (newlen - len) * T.sizeof))();
                 if (u)
                 {
                     // extend worked, update the capacity
@@ -3269,14 +3332,15 @@ if (isDynamicArray!A)
             import core.checkedint : mulu;
             bool overflow;
             const nbytes = mulu(newlen, T.sizeof, overflow);
-            if (overflow) assert(0);
+            if (overflow) assert(false, "the reallocation would exceed the "
+                    ~ "available pointer range");
 
-            auto bi = GC.qalloc(nbytes, blockAttribute!T);
+            auto bi = (() @trusted => GC.qalloc(nbytes, blockAttribute!T))();
             _data.capacity = bi.size / T.sizeof;
             import core.stdc.string : memcpy;
             if (len)
-                memcpy(bi.base, _data.arr.ptr, len * T.sizeof);
-            _data.arr = (cast(Unqual!T*) bi.base)[0 .. len];
+                () @trusted { memcpy(bi.base, _data.arr.ptr, len * T.sizeof); }();
+            _data.arr = (() @trusted => (cast(Unqual!T*) bi.base)[0 .. len])();
             _data.canExtend = true;
             // leave the old data, for safety reasons
         }
@@ -3285,7 +3349,7 @@ if (isDynamicArray!A)
     private template canPutItem(U)
     {
         enum bool canPutItem =
-            isImplicitlyConvertible!(U, T) ||
+            isImplicitlyConvertible!(Unqual!U, Unqual!T) ||
             isSomeChar!T && isSomeChar!U;
     }
     private template canPutConstRange(Range)
@@ -3330,7 +3394,7 @@ if (isDynamicArray!A)
             immutable len = _data.arr.length;
 
             auto bigData = (() @trusted => _data.arr.ptr[0 .. len + 1])();
-            emplaceRef!(Unqual!T)(bigData[len], cast(Unqual!T) item);
+            emplaceRef!(Unqual!T)(bigData[len], cast() item);
             //We do this at the end, in case of exceptions
             _data.arr = bigData;
         }
@@ -3371,10 +3435,10 @@ if (isDynamicArray!A)
             }
 
             // make sure we have enough space, then add the items
-            @trusted auto bigDataFun(size_t extra)
+            auto bigDataFun(size_t extra)
             {
                 ensureAddable(extra);
-                return _data.arr.ptr[0 .. _data.arr.length + extra];
+                return (() @trusted => _data.arr.ptr[0 .. _data.arr.length + extra])();
             }
             auto bigData = bigDataFun(items.length);
 
@@ -3413,16 +3477,11 @@ if (isDynamicArray!A)
     }
 
     /**
-     * Appends `rhs` to the managed array.
-     * Params:
-     *     op = the assignment operator `~`
-     *     rhs = Element or range.
+     * Appends to the managed array.
+     *
+     * See_Also: $(LREF Appender.put)
      */
-    void opOpAssign(string op : "~", U)(U rhs)
-    if (__traits(compiles, put(rhs)))
-    {
-        put(rhs);
-    }
+    alias opOpAssign(string op : "~") = put;
 
     // only allow overwriting data on non-immutable and non-const data
     static if (isMutable!T)
@@ -3495,7 +3554,7 @@ if (isDynamicArray!A)
     }
 
     /// ditto
-    void toString(Writer)(ref Writer w, const ref FormatSpec!char fmt) const
+    void toString(Writer)(ref Writer w, scope const ref FormatSpec!char fmt) const
     if (isOutputRange!(Writer, char))
     {
         import std.format : formatValue;
@@ -3566,6 +3625,61 @@ if (isDynamicArray!A)
     const(R)[1] r;
     app.put(r[0]);
     app.put(r[]);
+}
+
+@safe unittest // issue 13300
+{
+    static test(bool isPurePostblit)()
+    {
+        static if (!isPurePostblit)
+            static int i;
+
+        struct Simple
+        {
+            @disable this(); // Without this, it works.
+            static if (!isPurePostblit)
+                this(this) { i++; }
+            else
+                pure this(this) { }
+
+            private:
+            this(int tmp) { }
+        }
+
+        struct Range
+        {
+            @property Simple front() { return Simple(0); }
+            void popFront() { count++; }
+            @property empty() { return count < 3; }
+            size_t count;
+        }
+
+        Range r;
+        auto a = r.array();
+    }
+
+    static assert(__traits(compiles, () pure { test!true(); }));
+    static assert(!__traits(compiles, () pure { test!false(); }));
+}
+
+@system unittest // issue 19572
+{
+    static struct Struct
+    {
+        int value;
+
+        int fun() const { return 23; }
+
+        alias fun this;
+    }
+
+    Appender!(Struct[]) appender;
+
+    appender.put(const(Struct)(42));
+
+    auto result = appender.data[0];
+
+    assert(result.value != 23);
 }
 
 //Calculates an efficient growth scheme based on the old capacity
@@ -4482,5 +4596,5 @@ nothrow pure @safe unittest
 version (unittest) private void checkStaticArray(T, T1, T2)(T1 a, T2 b) nothrow @safe pure @nogc
 {
     static assert(is(T1 == T[T1.length]));
-    assert(a == b);
+    assert(a == b, "a must be equal to b");
 }

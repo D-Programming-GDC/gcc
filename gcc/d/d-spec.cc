@@ -61,9 +61,7 @@ enum phobos_action
   /* libgphobos is needed and should be linked in.  */
   PHOBOS_LINK,
   /* libgphobos is needed and should be linked statically.  */
-  PHOBOS_STATIC,
-  /* libgphobos is needed and should be linked dynamically.  */
-  PHOBOS_DYNAMIC
+  PHOBOS_STATIC
 };
 
 static phobos_action phobos_library = PHOBOS_DEFAULT;
@@ -102,6 +100,9 @@ lang_specific_driver (cl_decoded_option **in_decoded_options,
 
   /* True if we should add -shared-libgcc to the command-line.  */
   bool shared_libgcc = true;
+
+  /* True if we saw `-fdruntime`.  */
+  bool saw_druntime_flag = false;
 
   /* What default library to use instead of phobos.  */
   const char *defaultlib = NULL;
@@ -165,6 +166,11 @@ lang_specific_driver (cl_decoded_option **in_decoded_options,
 	case OPT_fdruntime:
 	  if (!value)
 	    need_phobos = false;
+	  else
+	    {
+	      saw_druntime_flag = true;
+	      need_spec = true;
+	    }
 	  break;
 
 	case OPT_defaultlib_:
@@ -172,7 +178,6 @@ lang_specific_driver (cl_decoded_option **in_decoded_options,
 	    free (CONST_CAST (char *, defaultlib));
 	  if (arg != NULL)
 	    {
-	      need_phobos = false;
 	      args[i] |= SKIPOPT;
 	      defaultlib = XNEWVEC (char, strlen (arg));
 	      strcpy (CONST_CAST (char *, defaultlib), arg);
@@ -184,7 +189,6 @@ lang_specific_driver (cl_decoded_option **in_decoded_options,
 	    free (CONST_CAST (char *, debuglib));
 	  if (arg != NULL)
 	    {
-	      need_phobos = false;
 	      args[i] |= SKIPOPT;
 	      debuglib = XNEWVEC (char, strlen (arg));
 	      strcpy (CONST_CAST (char *, debuglib), arg);
@@ -267,7 +271,7 @@ lang_specific_driver (cl_decoded_option **in_decoded_options,
 
 	case OPT_shared_libphobos:
 	  if (phobos_library != PHOBOS_NOLINK)
-	    phobos_library = PHOBOS_DYNAMIC;
+	    phobos_library = PHOBOS_LINK;
 	  args[i] |= SKIPOPT;
 	  break;
 
@@ -324,7 +328,7 @@ lang_specific_driver (cl_decoded_option **in_decoded_options,
      - needstdcxx might add `-lstdcxx'
      - libphobos adds `-Bstatic -lphobos -ldruntime -Bdynamic'
      - only_source adds 1 more arg, also maybe add `-o'.  */
-  num_args = argc + need_stdcxx + shared_libgcc + need_phobos * 4 + 2;
+  num_args = argc + need_stdcxx + shared_libgcc + need_phobos * 4 + 10;
   new_decoded_options = XNEWVEC (cl_decoded_option, num_args);
 
   i = 0;
@@ -418,62 +422,49 @@ lang_specific_driver (cl_decoded_option **in_decoded_options,
   /* Add `-lgphobos' if we haven't already done so.  */
   if (phobos_library != PHOBOS_NOLINK && need_phobos)
     {
-      /* Default to static linking.  */
-      if (phobos_library != PHOBOS_DYNAMIC)
-	phobos_library = PHOBOS_STATIC;
-
 #ifdef HAVE_LD_STATIC_DYNAMIC
-      if (phobos_library == PHOBOS_DYNAMIC && static_link)
-	{
-	  generate_option (OPT_Wl_, LD_DYNAMIC_OPTION, 1, CL_DRIVER,
-			   &new_decoded_options[j]);
-	  j++;
-	}
-      else if (phobos_library == PHOBOS_STATIC && !static_link)
+      if (phobos_library == PHOBOS_STATIC && !static_link)
 	{
 	  generate_option (OPT_Wl_, LD_STATIC_OPTION, 1, CL_DRIVER,
-			   &new_decoded_options[j]);
-	  j++;
+			   &new_decoded_options[j++]);
 	}
 #endif
 
-      generate_option (OPT_l,
-		       saw_profile_flag ? LIBPHOBOS_PROFILE : LIBPHOBOS, 1,
-		       CL_DRIVER, &new_decoded_options[j]);
-      added_libraries++;
-      j++;
-      generate_option (OPT_l,
-		       saw_profile_flag ? LIBDRUNTIME_PROFILE : LIBDRUNTIME, 1,
-		       CL_DRIVER, &new_decoded_options[j]);
-      added_libraries++;
-      j++;
+      if (saw_debug_flag && debuglib)
+	{
+	  generate_option (OPT_l, debuglib, 1, CL_DRIVER,
+			   &new_decoded_options[j++]);
+	  added_libraries++;
+	}
+      else if (defaultlib)
+	{
+	  generate_option (OPT_l, defaultlib, 1, CL_DRIVER,
+			   &new_decoded_options[j++]);
+	  added_libraries++;
+	}
+      else if (need_phobos || saw_druntime_flag)
+	{
+	  if (need_phobos)
+	    {
+	      generate_option (OPT_l,
+			       saw_profile_flag ? LIBPHOBOS_PROFILE : LIBPHOBOS,
+			       1, CL_DRIVER, &new_decoded_options[j++]);
+	      added_libraries++;
+	    }
+
+	  generate_option (OPT_l,
+			   saw_profile_flag ? LIBDRUNTIME_PROFILE : LIBDRUNTIME,
+			   1, CL_DRIVER, &new_decoded_options[j++]);
+	  added_libraries++;
+	}
 
 #ifdef HAVE_LD_STATIC_DYNAMIC
-      if (phobos_library == PHOBOS_DYNAMIC && static_link)
-	{
-	  generate_option (OPT_Wl_, LD_STATIC_OPTION, 1, CL_DRIVER,
-			   &new_decoded_options[j]);
-	  j++;
-	}
-      else if (phobos_library == PHOBOS_STATIC && !static_link)
+      if (phobos_library == PHOBOS_STATIC && !static_link)
 	{
 	  generate_option (OPT_Wl_, LD_DYNAMIC_OPTION, 1, CL_DRIVER,
-			   &new_decoded_options[j]);
-	  j++;
+			   &new_decoded_options[j++]);
 	}
 #endif
-    }
-  else if (saw_debug_flag && debuglib)
-    {
-      generate_option (OPT_l, debuglib, 1, CL_DRIVER,
-		       &new_decoded_options[j++]);
-      added_libraries++;
-    }
-  else if (defaultlib)
-    {
-      generate_option (OPT_l, defaultlib, 1, CL_DRIVER,
-		       &new_decoded_options[j++]);
-      added_libraries++;
     }
 
   if (saw_libcxx)

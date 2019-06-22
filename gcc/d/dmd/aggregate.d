@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2018 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/aggregate.d, _aggregate.d)
@@ -16,7 +16,7 @@ import core.stdc.stdio;
 import core.checkedint;
 
 import dmd.arraytypes;
-import dmd.gluelayer;
+import dmd.gluelayer : Symbol;
 import dmd.declaration;
 import dmd.dscope;
 import dmd.dstruct;
@@ -30,16 +30,15 @@ import dmd.globals;
 import dmd.id;
 import dmd.identifier;
 import dmd.mtype;
-import dmd.semantic2;
-import dmd.semantic3;
 import dmd.tokens;
-import dmd.typesem;
+import dmd.typesem : defaultInit;
 import dmd.visitor;
 
 enum Sizeok : int
 {
     none,           // size of aggregate is not yet able to compute
     fwd,            // size of aggregate is ready to compute
+    inProcess,      // in the midst of computing the size
     done,           // size of aggregate is set correctly
 }
 
@@ -77,7 +76,7 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
     uint structsize;        // size of struct
     uint alignsize;         // size of struct for alignment purposes
     VarDeclarations fields; // VarDeclaration fields
-    Sizeok sizeok;          // set when structsize contains valid data
+    Sizeok sizeok = Sizeok.none;  // set when structsize contains valid data
     Dsymbol deferred;       // any deferred semantic2() or semantic3() symbol
     bool isdeprecated;      // true if deprecated
 
@@ -94,6 +93,7 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
     Dsymbol enclosing;
 
     VarDeclaration vthis;   // 'this' parameter if this aggregate is nested
+    VarDeclaration vthis2;  // 'this' parameter if this aggregate is a template and is nested
 
     // Special member functions
     FuncDeclarations invs;          // Array of invariants
@@ -121,10 +121,8 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
 
     final extern (D) this(const ref Loc loc, Identifier id)
     {
-        super(id);
-        this.loc = loc;
+        super(loc, id);
         protection = Prot(Prot.Kind.public_);
-        sizeok = Sizeok.none; // size not determined yet
     }
 
     /***************************************
@@ -136,12 +134,12 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
         auto sc2 = sc.push(this);
         sc2.stc &= STC.safe | STC.trusted | STC.system;
         sc2.parent = this;
-        if (isUnionDeclaration())
-            sc2.inunion = true;
+        sc2.inunion = isUnionDeclaration();
         sc2.protection = Prot(Prot.Kind.public_);
         sc2.explicitProtection = 0;
         sc2.aligndecl = null;
         sc2.userAttribDecl = null;
+        sc2.namespace = null;
         return sc2;
     }
 
@@ -240,6 +238,15 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
     }
 
     /***************************************
+     * Returns:
+     *      The total number of fields minus the number of hidden fields.
+     */
+    final size_t nonHiddenFields()
+    {
+        return fields.dim - isNested() - (vthis2 !is null);
+    }
+
+    /***************************************
      * Collect all instance fields, then determine instance size.
      * Returns:
      *      false if failed to determine the size.
@@ -323,6 +330,8 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
             auto cd = isClassDeclaration();
             if (!cd || !cd.baseClass || !cd.baseClass.isNested())
                 nfields--;
+            if (vthis2 && !(cd && cd.baseClass && cd.baseClass.vthis2))
+                nfields--;
         }
         bool errors = false;
 
@@ -336,9 +345,7 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
                 continue;
             }
 
-            auto vx = vd;
-            if (vd._init && vd._init.isVoidInitializer())
-                vx = null;
+            const vdIsVoidInit = vd._init && vd._init.isVoidInitializer();
 
             // Find overlapped fields with the hole [vd.offset .. vd.offset.size()].
             foreach (j; 0 .. nfields)
@@ -363,15 +370,26 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
                 if (!MODimplicitConv(v2.type.mod, vd.type.mod))
                     vd.overlapUnsafe = true;
 
-                if (!vx)
-                    continue;
-                if (v2._init && v2._init.isVoidInitializer())
+                if (i > j)
                     continue;
 
-                if (vx._init && v2._init)
+                if (!v2._init)
+                    continue;
+
+                if (v2._init.isVoidInitializer())
+                    continue;
+
+                if (vd._init && !vdIsVoidInit && v2._init)
                 {
                     .error(loc, "overlapping default initialization for field `%s` and `%s`", v2.toChars(), vd.toChars());
                     errors = true;
+                }
+                else if (v2._init && i < j)
+                {
+                    // @@@DEPRECATED_v2.086@@@.
+                    .deprecation(v2.loc, "union field `%s` with default initialization `%s` must be before field `%s`",
+                        v2.toChars(), v2._init.toChars(), vd.toChars());
+                    //errors = true;
                 }
             }
         }
@@ -393,7 +411,7 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
         //printf("AggregateDeclaration::fill() %s\n", toChars());
         assert(sizeok == Sizeok.done);
         assert(elements);
-        size_t nfields = fields.dim - isNested();
+        const nfields = nonHiddenFields();
         bool errors = false;
 
         size_t dim = elements.dim;
@@ -612,7 +630,7 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
     }
 
     // is aggregate deprecated?
-    override final bool isDeprecated()
+    override final bool isDeprecated() const
     {
         return isdeprecated;
     }
@@ -621,14 +639,14 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
      * Returns true if there's an extra member which is the 'this'
      * pointer to the enclosing context (enclosing aggregate or function)
      */
-    final bool isNested()
+    final bool isNested() const
     {
         return enclosing !is null;
     }
 
     /* Append vthis field (this.tupleof[$-1]) to make this aggregate type nested.
      */
-    final void makeNested()
+    extern (D) final void makeNested()
     {
         if (enclosing) // if already nested
             return;
@@ -640,7 +658,9 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
             return;
 
         // If nested struct, add in hidden 'this' pointer to outer scope
-        auto s = toParent2();
+        auto s = toParentLocal();
+        if (!s)
+            s = toParent2();
         if (!s)
             return;
         Type t = null;
@@ -692,7 +712,50 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
 
             if (sizeok == Sizeok.fwd)
                 fields.push(vthis);
+
+            makeNested2();
         }
+    }
+
+    /* Append vthis2 field (this.tupleof[$-1]) to add a second context pointer.
+     */
+    extern (D) final void makeNested2()
+    {
+        if (vthis2)
+            return;
+        if (!vthis)
+            makeNested();   // can't add second before first
+        if (!vthis)
+            return;
+        if (sizeok == Sizeok.done)
+            return;
+        if (isUnionDeclaration() || isInterfaceDeclaration())
+            return;
+        if (storage_class & STC.static_)
+            return;
+
+        auto s0 = toParentLocal();
+        auto s = toParent2();
+        if (!s || !s0 || s == s0)
+            return;
+        auto cd = s.isClassDeclaration();
+        Type t = cd ? cd.type : Type.tvoidptr;
+
+        vthis2 = new ThisDeclaration(loc, t);
+        //vthis2.storage_class |= STC.ref_;
+
+        // Emulate vthis2.addMember()
+        members.push(vthis2);
+
+        // Emulate vthis2.dsymbolSemantic()
+        vthis2.storage_class |= STC.field;
+        vthis2.parent = this;
+        vthis2.protection = Prot(Prot.Kind.public_);
+        vthis2.alignment = t.alignment();
+        vthis2.semanticRun = PASS.semanticdone;
+
+        if (sizeok == Sizeok.fwd)
+            fields.push(vthis2);
     }
 
     override final bool isExport() const
@@ -742,7 +805,7 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
         return s;
     }
 
-    override final Prot prot()
+    override final Prot prot() pure nothrow @nogc @safe
     {
         return protection;
     }

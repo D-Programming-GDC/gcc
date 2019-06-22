@@ -336,8 +336,9 @@ target_vendor = @target_vendor@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+@ENABLE_LIBDRUNTIME_ONLY_FALSE@@ENABLE_LIBPHOBOS_TRUE@SUBDIRS = libdruntime src testsuite
+@ENABLE_LIBDRUNTIME_ONLY_TRUE@@ENABLE_LIBPHOBOS_TRUE@SUBDIRS = libdruntime testsuite
 @ENABLE_LIBPHOBOS_FALSE@SUBDIRS = 
-@ENABLE_LIBPHOBOS_TRUE@SUBDIRS = libdruntime src testsuite
 ACLOCAL_AMFLAGS = -I . -I .. -I ../config
 
 # Multilib support.

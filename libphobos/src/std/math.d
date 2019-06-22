@@ -134,7 +134,8 @@ version (Win64)
 static import core.math;
 static import core.stdc.math;
 static import core.stdc.fenv;
-import std.traits; // CommonType, isFloatingPoint, isIntegral, isSigned, isUnsigned, Largest, Unqual
+import std.traits :  CommonType, isFloatingPoint, isIntegral, isNumeric,
+    isSigned, isUnsigned, Largest, Unqual;
 
 version (LDC)
 {
@@ -2334,7 +2335,7 @@ private T expImpl(T)(T x) @safe pure nothrow @nogc
     return x;
 }
 
-@safe @nogc nothrow unittest
+version (InlineAsm_X86_Any) @safe @nogc nothrow unittest
 {
     FloatingPointControl ctrl;
     if (FloatingPointControl.hasExceptionTraps)
@@ -4126,7 +4127,7 @@ real log(real x) @safe pure nothrow @nogc
 ///
 @safe pure nothrow @nogc unittest
 {
-    assert(log(E) == 1);
+    assert(feqrel(log(E), 1) >= real.mant_dig - 1);
 }
 
 /**************************************
@@ -5112,17 +5113,20 @@ float rint(float x) @safe pure nothrow @nogc { return rint(cast(real) x); }
 ///
 @safe unittest
 {
-    resetIeeeFlags();
-    assert(rint(0.4) == 0);
-    assert(ieeeFlags.inexact);
+    version (InlineAsm_X86_Any)
+    {
+        resetIeeeFlags();
+        assert(rint(0.4) == 0);
+        assert(ieeeFlags.inexact);
 
-    assert(rint(0.5) == 0);
-    assert(rint(0.6) == 1);
-    assert(rint(100.0) == 100);
+        assert(rint(0.5) == 0);
+        assert(rint(0.6) == 1);
+        assert(rint(100.0) == 100);
 
-    assert(isNaN(rint(real.nan)));
-    assert(rint(real.infinity) == real.infinity);
-    assert(rint(-real.infinity) == -real.infinity);
+        assert(isNaN(rint(real.nan)));
+        assert(rint(real.infinity) == real.infinity);
+        assert(rint(-real.infinity) == -real.infinity);
+    }
 }
 
 @safe unittest
@@ -5792,43 +5796,36 @@ public:
 }
 
 ///
-version (GNU)
-{
-    // ieeeFlags test disabled, see LDC Issue #888.
-}
-else
 @safe unittest
 {
-    static void func() {
-        int a = 10 * 10;
+    version (InlineAsm_X86_Any)
+    {
+        static void func() {
+            int a = 10 * 10;
+        }
+
+        real a = 3.5;
+        // Set all the flags to zero
+        resetIeeeFlags();
+        assert(!ieeeFlags.divByZero);
+        // Perform a division by zero.
+        a /= 0.0L;
+        assert(a == real.infinity);
+        assert(ieeeFlags.divByZero);
+        // Create a NaN
+        a *= 0.0L;
+        assert(ieeeFlags.invalid);
+        assert(isNaN(a));
+
+        // Check that calling func() has no effect on the
+        // status flags.
+        IeeeFlags f = ieeeFlags;
+        func();
+        assert(ieeeFlags == f);
     }
-
-    real a = 3.5;
-    // Set all the flags to zero
-    resetIeeeFlags();
-    assert(!ieeeFlags.divByZero);
-    // Perform a division by zero.
-    a /= 0.0L;
-    assert(a == real.infinity);
-    assert(ieeeFlags.divByZero);
-    // Create a NaN
-    a *= 0.0L;
-    assert(ieeeFlags.invalid);
-    assert(isNaN(a));
-
-    // Check that calling func() has no effect on the
-    // status flags.
-    IeeeFlags f = ieeeFlags;
-    func();
-    assert(ieeeFlags == f);
 }
 
-version (GNU)
-{
-    // ieeeFlags test disabled, see LDC Issue #888.
-}
-else
-@safe unittest
+version (InlineAsm_X86_Any) @safe unittest
 {
     import std.meta : AliasSeq;
 
@@ -5904,14 +5901,17 @@ void resetIeeeFlags() @trusted nothrow @nogc
 ///
 @safe unittest
 {
-    resetIeeeFlags();
-    real a = 3.5;
-    a /= 0.0L;
-    assert(a == real.infinity);
-    assert(ieeeFlags.divByZero);
+    version (InlineAsm_X86_Any)
+    {
+        resetIeeeFlags();
+        real a = 3.5;
+        a /= 0.0L;
+        assert(a == real.infinity);
+        assert(ieeeFlags.divByZero);
 
-    resetIeeeFlags();
-    assert(!ieeeFlags.divByZero);
+        resetIeeeFlags();
+        assert(!ieeeFlags.divByZero);
+    }
 }
 
 /// Returns: snapshot of the current state of the floating-point status flags
@@ -5923,16 +5923,19 @@ void resetIeeeFlags() @trusted nothrow @nogc
 ///
 @safe nothrow unittest
 {
-    resetIeeeFlags();
-    real a = 3.5;
+    version (InlineAsm_X86_Any)
+    {
+        resetIeeeFlags();
+        real a = 3.5;
 
-    a /= 0.0L;
-    assert(a == real.infinity);
-    assert(ieeeFlags.divByZero);
+        a /= 0.0L;
+        assert(a == real.infinity);
+        assert(ieeeFlags.divByZero);
 
-    a *= 0.0L;
-    assert(isNaN(a));
-    assert(ieeeFlags.invalid);
+        a *= 0.0L;
+        assert(isNaN(a));
+        assert(ieeeFlags.invalid);
+    }
 }
 
 /** Control the Floating point hardware
@@ -6500,7 +6503,7 @@ private:
 ///
 @safe unittest
 {
-    version (D_HardFloat)
+    version (InlineAsm_X86_Any)
     {
         FloatingPointControl fpctrl;
 
@@ -6515,7 +6518,7 @@ private:
     }
 }
 
-version (D_HardFloat) @safe unittest
+version (InlineAsm_X86_Any) @safe unittest
 {
     void ensureDefaults()
     {
@@ -6552,7 +6555,7 @@ version (D_HardFloat) @safe unittest
     ensureDefaults();
 }
 
-version (D_HardFloat) @safe unittest // rounding
+version (InlineAsm_X86_Any) @safe unittest // rounding
 {
     import std.meta : AliasSeq;
 
@@ -6603,37 +6606,55 @@ version (D_HardFloat) @safe unittest // rounding
 bool isNaN(X)(X x) @nogc @trusted pure nothrow
 if (isFloatingPoint!(X))
 {
-    alias F = floatTraits!(X);
-    static if (F.realFormat == RealFormat.ieeeSingle)
+    version (all)
     {
-        const uint p = *cast(uint *)&x;
-        return ((p & 0x7F80_0000) == 0x7F80_0000)
-            && p & 0x007F_FFFF; // not infinity
-    }
-    else static if (F.realFormat == RealFormat.ieeeDouble)
-    {
-        const ulong  p = *cast(ulong *)&x;
-        return ((p & 0x7FF0_0000_0000_0000) == 0x7FF0_0000_0000_0000)
-            && p & 0x000F_FFFF_FFFF_FFFF; // not infinity
-    }
-    else static if (F.realFormat == RealFormat.ieeeExtended)
-    {
-        const ushort e = F.EXPMASK & (cast(ushort *)&x)[F.EXPPOS_SHORT];
-        const ulong ps = *cast(ulong *)&x;
-        return e == F.EXPMASK &&
-            ps & 0x7FFF_FFFF_FFFF_FFFF; // not infinity
-    }
-    else static if (F.realFormat == RealFormat.ieeeQuadruple)
-    {
-        const ushort e = F.EXPMASK & (cast(ushort *)&x)[F.EXPPOS_SHORT];
-        const ulong psLsb = (cast(ulong *)&x)[MANTISSA_LSB];
-        const ulong psMsb = (cast(ulong *)&x)[MANTISSA_MSB];
-        return e == F.EXPMASK &&
-            (psLsb | (psMsb& 0x0000_FFFF_FFFF_FFFF)) != 0;
+        return x != x;
     }
     else
     {
-        return x != x;
+        /*
+        Code kept for historical context. At least on Intel, the simple test
+        x != x uses one dedicated instruction (ucomiss/ucomisd) that runs in one
+        cycle. Code for 80- and 128-bits is larger but still smaller than the
+        integrals-based solutions below. Future revisions may enable the code
+        below conditionally depending on hardware.
+        */
+        alias F = floatTraits!(X);
+        static if (F.realFormat == RealFormat.ieeeSingle)
+        {
+            const uint p = *cast(uint *)&x;
+            // Sign bit (MSB) is irrelevant so mask it out.
+            // Next 8 bits should be all set.
+            // At least one bit among the least significant 23 bits should be set.
+            return (p & 0x7FFF_FFFF) > 0x7F80_0000;
+        }
+        else static if (F.realFormat == RealFormat.ieeeDouble)
+        {
+            const ulong  p = *cast(ulong *)&x;
+            // Sign bit (MSB) is irrelevant so mask it out.
+            // Next 11 bits should be all set.
+            // At least one bit among the least significant 52 bits should be set.
+            return (p & 0x7FFF_FFFF_FFFF_FFFF) > 0x7FF0_0000_0000_0000;
+        }
+        else static if (F.realFormat == RealFormat.ieeeExtended)
+        {
+            const ushort e = F.EXPMASK & (cast(ushort *)&x)[F.EXPPOS_SHORT];
+            const ulong ps = *cast(ulong *)&x;
+            return e == F.EXPMASK &&
+                ps & 0x7FFF_FFFF_FFFF_FFFF; // not infinity
+        }
+        else static if (F.realFormat == RealFormat.ieeeQuadruple)
+        {
+            const ushort e = F.EXPMASK & (cast(ushort *)&x)[F.EXPPOS_SHORT];
+            const ulong psLsb = (cast(ulong *)&x)[MANTISSA_LSB];
+            const ulong psMsb = (cast(ulong *)&x)[MANTISSA_MSB];
+            return e == F.EXPMASK &&
+                (psLsb | (psMsb& 0x0000_FFFF_FFFF_FFFF)) != 0;
+        }
+        else
+        {
+            return x != x;
+        }
     }
 }
 
@@ -7105,6 +7126,7 @@ Returns `-1` if $(D x < 0), `x` if $(D x == 0), `1` if
 $(D x > 0), and $(NAN) if x==$(NAN).
  */
 F sgn(F)(F x) @safe pure nothrow @nogc
+if (isFloatingPoint!F || isIntegral!F)
 {
     // @@@TODO@@@: make this faster
     return x > 0 ? 1 : x < 0 ? -1 : x;
@@ -7635,7 +7657,10 @@ T nextafter(T)(const T x, const T y) @safe pure nothrow @nogc
  *      $(TR $(TD x $(LT)= y) $(TD +0.0))
  *      )
  */
-real fdim(real x, real y) @safe pure nothrow @nogc { return (x > y) ? x - y : +0.0; }
+real fdim(real x, real y) @safe pure nothrow @nogc
+{
+    return (x < y) ? +0.0 : x - y;
+}
 
 ///
 @safe pure nothrow @nogc unittest
@@ -7643,8 +7668,9 @@ real fdim(real x, real y) @safe pure nothrow @nogc { return (x > y) ? x - y : +0
     assert(fdim(2.0, 0.0) == 2.0);
     assert(fdim(-2.0, 0.0) == 0.0);
     assert(fdim(real.infinity, 2.0) == real.infinity);
-    assert(fdim(real.nan, 2.0) == 0.0);
-    assert(fdim(2.0, real.nan) == 0.0);
+    assert(isNaN(fdim(real.nan, 2.0)));
+    assert(isNaN(fdim(2.0, real.nan)));
+    assert(isNaN(fdim(real.nan, real.nan)));
 }
 
 /**
@@ -8782,7 +8808,6 @@ private real polyImpl(real x, in real[] A) @trusted pure nothrow @nogc
                 fstp    ST(0)                   ; // dump x
                 align   4                       ;
         return_ST:                              ;
-                ;
             }
         }
         else version (linux)
@@ -8810,7 +8835,6 @@ private real polyImpl(real x, in real[] A) @trusted pure nothrow @nogc
                 fstp    ST(0)                   ; // dump x
                 align   4                       ;
         return_ST:                              ;
-                ;
             }
         }
         else version (OSX)
@@ -8838,7 +8862,6 @@ private real polyImpl(real x, in real[] A) @trusted pure nothrow @nogc
                 fstp    ST(0)                   ; // dump x
                 align   4                       ;
         return_ST:                              ;
-                ;
             }
         }
         else version (FreeBSD)
@@ -8866,7 +8889,6 @@ private real polyImpl(real x, in real[] A) @trusted pure nothrow @nogc
                 fstp    ST(0)                   ; // dump x
                 align   4                       ;
         return_ST:                              ;
-                ;
             }
         }
         else version (Solaris)
@@ -8894,7 +8916,6 @@ private real polyImpl(real x, in real[] A) @trusted pure nothrow @nogc
                 fstp    ST(0)                   ; // dump x
                 align   4                       ;
         return_ST:                              ;
-                ;
             }
         }
         else version (DragonFlyBSD)
@@ -8922,7 +8943,6 @@ private real polyImpl(real x, in real[] A) @trusted pure nothrow @nogc
                 fstp    ST(0)                   ; // dump x
                 align   4                       ;
         return_ST:                              ;
-                ;
             }
         }
         else

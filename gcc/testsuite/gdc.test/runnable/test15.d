@@ -1,5 +1,10 @@
-// REQUIRED_ARGS:
-// EXTRA_FILES: extra-files/test15.txt
+/*
+REQUIRED_ARGS:
+EXTRA_FILES: extra-files/test15.txt
+TEST_OUTPUT:
+---
+---
+*/
 
 import std.array;
 import core.stdc.math : cos, fabs, sin, sqrt;
@@ -47,7 +52,7 @@ void test7()
     string s = `hello"there'you`;
     printf("s = '%.*s'\n", s.length, s.ptr);
     assert(s == "hello\"there'you");
-    ubyte[] b = cast(ubyte[])x"8B 7D f4 0d";
+    ubyte[] b = cast(ubyte[])"\x8B\x7D\xf4\x0d";
     for (int i = 0; i < b.length; i++)
         printf("b[%d] = x%02x\n", i, b[i]);
     assert(b.length == 4);
@@ -900,12 +905,12 @@ void test49()
 
 void foo50(int[] f, ...)
 {
-    foreach(int i, TypeInfo ti; _arguments) { }
+    foreach(size_t i, TypeInfo ti; _arguments) { }
 }
 
 void bar50(out int[] f, ...)
 {
-    foreach(int i, TypeInfo ti; _arguments) { }
+    foreach(size_t i, TypeInfo ti; _arguments) { }
 }
 
 void test50()
@@ -1364,6 +1369,26 @@ void test72()
     assert(foos.length == 1);
 }
 
+/************************************/
+// https://issues.dlang.org/show_bug.cgi?id=19758
+
+void test19758()
+{
+    byte[1] a = [1];
+    int b = 0;
+
+    // If delete this 4 lines, the result is correct.
+    if (a[b] == 0)
+    {
+        a[b] = 0;
+        if (1 << b) { }
+    }
+
+    if ((a[b] & 0xFF) == 0)
+    {
+        assert((a[b] & 0xFF) == 0);
+    }
+}
 
 /************************************/
 
@@ -1434,6 +1459,7 @@ int main()
     test70();
     test71();
     test72();
+    test19758();
 
     printf("Success\n");
     return 0;

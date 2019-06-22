@@ -1400,7 +1400,7 @@
 #endif
 
 
-/* Define if you have the iconv() function. */
+/* Define if you have the iconv() function and it works. */
 #ifndef USED_FOR_TARGET
 #undef HAVE_ICONV
 #endif
@@ -2049,8 +2049,7 @@
 #endif
 
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
 #ifndef USED_FOR_TARGET
 #undef LT_OBJDIR
 #endif

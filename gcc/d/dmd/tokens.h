@@ -31,7 +31,8 @@ class Identifier;
         ?       &&      ||
  */
 
-enum TOK
+typedef unsigned char TOK;
+enum
 {
         TOKreserved,
 
@@ -180,7 +181,6 @@ enum TOK
         TOKshowctfecontext,
 
         TOKobjc_class_reference,
-
         TOKvectorarray,
 
         TOKMAX
@@ -225,6 +225,8 @@ struct Token
     Token() : next(NULL) {}
     int isKeyword();
     const char *toChars() const;
+
+    static const char *toChars(TOK value);
 };
 
 #if defined(__GNUC__)

@@ -16,7 +16,11 @@
 # <http://www.gnu.org/licenses/>.
 
 if ENABLE_LIBPHOBOS
+if ENABLE_LIBDRUNTIME_ONLY
+  SUBDIRS = libdruntime testsuite
+else
   SUBDIRS = libdruntime src testsuite
+endif
 else
   SUBDIRS =
 endif

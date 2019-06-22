@@ -1,5 +1,5 @@
 /*
-REQUIRED_ARGS: -mcpu=native -transition=intpromote
+REQUIRED_ARGS: -mcpu=native -preview=intpromote -preview=intpromote
 PERMUTE_ARGS: -O -inline -release
 */
 
@@ -1838,6 +1838,105 @@ void test18730() // https://issues.dlang.org/show_bug.cgi?id=18730
 
 ////////////////////////////////////////////////////////////////////////
 
+void test19497() // https://issues.dlang.org/show_bug.cgi?id=19497
+{
+    {
+        ubyte[1024] data;
+        ushort* ushortPtr = cast(ushort*) data.ptr;
+        *ushortPtr++ = 0xfe00;
+        printf("ushortPtr(%p)\n", ushortPtr);
+        fflush(stdout);
+    }
+
+    alias Seq(stuff ...) = stuff;
+    static foreach (T; Seq!(ubyte, ushort, uint, ulong, byte, short, int, long))
+    {{
+        T[2] data = 0x2A;
+        T* q = &data[0];
+        *q++ = cast(T) 0x1122334455667788;
+        if (*q != 0x2A) assert(false);
+    }}
+
+    {
+        static int toStringz(string s) { return s.length > 0 ? s[0] : 0; }
+        static void toAStringz(in string[] a, int* az)
+        {
+            foreach (string s; a)
+            {
+                *az++ = toStringz(s);
+            }
+        }
+        string[1] sa = ["abc"];
+        int[2] tgt = 0x2a;
+        toAStringz(sa[], tgt.ptr);
+        if (tgt[0] != 'a') assert(false);
+        if (tgt[1] != 0x2a) assert(false);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////
+
+// https://issues.dlang.org/show_bug.cgi?id=18794
+
+bool method18794(size_t* p)
+{
+    int bitIdx = 0;
+    func18794();
+    return (*p & (1UL << bitIdx)) != 0;
+}
+
+void func18794() {}
+
+void prep18794()
+{
+    asm {}
+    ulong[2] x = -1;
+}
+
+void test18794()
+{
+    prep18794();
+    size_t s;
+    method18794(&s);
+}
+
+////////////////////////////////////////////////////////////////////////
+
+const(char)* fastpar(string s)
+{
+    return s.ptr + s.length;
+}
+
+void testfastpar()
+{
+    string s = "abcde";
+    auto p = fastpar(s);
+    assert(*p == 0);
+}
+
+////////////////////////////////////////////////////////////////////////
+
+
+T testfooa(T)(T value)
+{
+    return 10 - (value * 57); // gets rewritten into (value*-57)+10
+}
+
+T testfoob(T)(T value)
+{
+    return (value * -57) + 10;
+}
+
+void testNegConst()
+{
+    assert(testfooa(1) == -47);
+    assert(testfoob(1) == -47);
+    assert(testfooa(1.0) == -47);
+    assert(testfoob(1.0) == -47);
+}
+
+////////////////////////////////////////////////////////////////////////
+
 int main()
 {
     testgoto();
@@ -1903,6 +2002,10 @@ int main()
     test18315();
     test18461();
     test18730();
+    test19497();
+    test18794();
+    testfastpar();
+    testNegConst();
 
     printf("Success\n");
     return 0;

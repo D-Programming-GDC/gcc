@@ -81,7 +81,8 @@ import std.traits : isIntegral, isSigned, isSomeString, Unqual, isNarrowString;
 version (Windows)
 {
     import core.stdc.time : time_t;
-    import core.sys.windows.windows;
+    import core.sys.windows.winbase;
+    import core.sys.windows.winnt;
     import core.sys.windows.winsock2;
 }
 else version (Posix)
@@ -217,11 +218,12 @@ public:
                 else
                 {
                     import core.sys.posix.sys.time : gettimeofday, timeval;
-                    timeval tv;
-                    if (gettimeofday(&tv, null) != 0)
-                        throw new TimeException("Call to gettimeofday() failed");
+                    timeval tv = void;
+                    // Posix gettimeofday called with a valid timeval address
+                    // and a null second parameter doesn't fail.
+                    gettimeofday(&tv, null);
                     return convert!("seconds", "hnsecs")(tv.tv_sec) +
-                           convert!("usecs", "hnsecs")(tv.tv_usec) +
+                           tv.tv_usec * 10 +
                            hnsecsToUnixEpoch;
                 }
             }
@@ -237,9 +239,16 @@ public:
                     else static if (clockType == ClockType.normal)  alias clockArg = CLOCK_REALTIME;
                     else static if (clockType == ClockType.precise) alias clockArg = CLOCK_REALTIME;
                     else static assert(0, "Previous static if is wrong.");
-                    timespec ts;
-                    if (clock_gettime(clockArg, &ts) != 0)
-                        throw new TimeException("Call to clock_gettime() failed");
+                    timespec ts = void;
+                    immutable error = clock_gettime(clockArg, &ts);
+                    // Posix clock_gettime called with a valid address and valid clock_id is only
+                    // permitted to fail if the number of seconds does not fit in time_t. If tv_sec
+                    // is long or larger overflow won't happen before 292 billion years A.D.
+                    static if (ts.tv_sec.max < long.max)
+                    {
+                        if (error)
+                            throw new TimeException("Call to clock_gettime() failed");
+                    }
                     return convert!("seconds", "hnsecs")(ts.tv_sec) +
                            ts.tv_nsec / 100 +
                            hnsecsToUnixEpoch;
@@ -254,9 +263,16 @@ public:
                 else static if (clockType == ClockType.precise) alias clockArg = CLOCK_REALTIME_PRECISE;
                 else static if (clockType == ClockType.second)  alias clockArg = CLOCK_SECOND;
                 else static assert(0, "Previous static if is wrong.");
-                timespec ts;
-                if (clock_gettime(clockArg, &ts) != 0)
-                    throw new TimeException("Call to clock_gettime() failed");
+                timespec ts = void;
+                immutable error = clock_gettime(clockArg, &ts);
+                // Posix clock_gettime called with a valid address and valid clock_id is only
+                // permitted to fail if the number of seconds does not fit in time_t. If tv_sec
+                // is long or larger overflow won't happen before 292 billion years A.D.
+                static if (ts.tv_sec.max < long.max)
+                {
+                    if (error)
+                        throw new TimeException("Call to clock_gettime() failed");
+                }
                 return convert!("seconds", "hnsecs")(ts.tv_sec) +
                        ts.tv_nsec / 100 +
                        hnsecsToUnixEpoch;
@@ -267,12 +283,19 @@ public:
                     return unixTimeToStdTime(core.stdc.time.time(null));
                 else
                 {
-                    import core.sys.posix.sys.time : gettimeofday, timeval;
-                    timeval tv;
-                    if (gettimeofday(&tv, null) != 0)
-                        throw new TimeException("Call to gettimeofday() failed");
-                    return convert!("seconds", "hnsecs")(tv.tv_sec) +
-                           convert!("usecs", "hnsecs")(tv.tv_usec) +
+                    import core.sys.netbsd.time : clock_gettime, CLOCK_REALTIME;
+                    timespec ts = void;
+                    immutable error = clock_gettime(CLOCK_REALTIME, &ts);
+                    // Posix clock_gettime called with a valid address and valid clock_id is only
+                    // permitted to fail if the number of seconds does not fit in time_t. If tv_sec
+                    // is long or larger overflow won't happen before 292 billion years A.D.
+                    static if (ts.tv_sec.max < long.max)
+                    {
+                        if (error)
+                            throw new TimeException("Call to clock_gettime() failed");
+                    }
+                    return convert!("seconds", "hnsecs")(ts.tv_sec) +
+                           ts.tv_nsec / 100 +
                            hnsecsToUnixEpoch;
                 }
             }
@@ -285,9 +308,16 @@ public:
                 else static if (clockType == ClockType.precise) alias clockArg = CLOCK_REALTIME_PRECISE;
                 else static if (clockType == ClockType.second)  alias clockArg = CLOCK_SECOND;
                 else static assert(0, "Previous static if is wrong.");
-                timespec ts;
-                if (clock_gettime(clockArg, &ts) != 0)
-                    throw new TimeException("Call to clock_gettime() failed");
+                timespec ts = void;
+                immutable error = clock_gettime(clockArg, &ts);
+                // Posix clock_gettime called with a valid address and valid clock_id is only
+                // permitted to fail if the number of seconds does not fit in time_t. If tv_sec
+                // is long or larger overflow won't happen before 292 billion years A.D.
+                static if (ts.tv_sec.max < long.max)
+                {
+                    if (error)
+                        throw new TimeException("Call to clock_gettime() failed");
+                }
                 return convert!("seconds", "hnsecs")(ts.tv_sec) +
                        ts.tv_nsec / 100 +
                        hnsecsToUnixEpoch;
@@ -303,9 +333,16 @@ public:
                     else static if (clockType == ClockType.normal)  alias clockArg = CLOCK_REALTIME;
                     else static if (clockType == ClockType.precise) alias clockArg = CLOCK_REALTIME;
                     else static assert(0, "Previous static if is wrong.");
-                    timespec ts;
-                    if (clock_gettime(clockArg, &ts) != 0)
-                        throw new TimeException("Call to clock_gettime() failed");
+                    timespec ts = void;
+                    immutable error = clock_gettime(clockArg, &ts);
+                    // Posix clock_gettime called with a valid address and valid clock_id is only
+                    // permitted to fail if the number of seconds does not fit in time_t. If tv_sec
+                    // is long or larger overflow won't happen before 292 billion years A.D.
+                    static if (ts.tv_sec.max < long.max)
+                    {
+                        if (error)
+                            throw new TimeException("Call to clock_gettime() failed");
+                    }
                     return convert!("seconds", "hnsecs")(ts.tv_sec) +
                            ts.tv_nsec / 100 +
                            hnsecsToUnixEpoch;
@@ -340,7 +377,7 @@ public:
 
 private:
 
-    @disable this() {}
+    @disable this();
 }
 
 /// Get the current time as a $(LREF SysTime)
@@ -10466,7 +10503,7 @@ version (unittest) private void testBadParse822(alias cr)(string str, size_t lin
                            function(string a){return cast(ubyte[]) a;},
                            function(string a){return a;},
                            function(string a){return map!(b => cast(char) b)(a.representation);}))
-    {{
+    {(){ // workaround slow optimizations for large functions @@@BUG@@@ 2396
         scope(failure) writeln(typeof(cr).stringof);
         alias test = testParse822!cr;
         alias testBad = testBadParse822!cr;
@@ -10704,7 +10741,7 @@ version (unittest) private void testBadParse822(alias cr)(string str, size_t lin
             testBad(cast(string) currStr);
             testBad((cast(string) currStr) ~ "                                    ");
         }
-    }}
+    }();}
 
     static void testScope(scope ref string str) @safe
     {
@@ -10737,7 +10774,7 @@ version (unittest) private void testBadParse822(alias cr)(string str, size_t lin
                            function(string a){return cast(ubyte[]) a;},
                            function(string a){return a;},
                            function(string a){return map!(b => cast(char) b)(a.representation);}))
-    {{
+    {(){ // workaround slow optimizations for large functions @@@BUG@@@ 2396
         scope(failure) writeln(typeof(cr).stringof);
         alias test = testParse822!cr;
         {
@@ -10927,7 +10964,7 @@ version (unittest) private void testBadParse822(alias cr)(string str, size_t lin
                 assert(collectExceptionMsg!DateTimeException(parseRFC822DateTime(value)) == tooShortMsg);
             }
         }
-    }}
+    }();}
 }
 
 
@@ -11363,9 +11400,12 @@ if (isIntegral!T && isSigned!T) // The constraints on R were already covered by 
 }
 
 
+// NOTE: all the non-simple array literals are wrapped in functions, because
+// otherwise importing causes re-evaluation of the static initializers using
+// CTFE with unittests enabled
 version (unittest)
 {
-private:
+private @safe:
     // Variables to help in testing.
     Duration currLocalDiffFromUTC;
     immutable (TimeZone)[] testTZs;
@@ -11387,31 +11427,43 @@ private:
         }
     }
 
-    MonthDay[] testMonthDays = [MonthDay(1, 1),
+    MonthDay[] testMonthDays()
+    {
+       static result = [MonthDay(1, 1),
                                 MonthDay(1, 2),
                                 MonthDay(3, 17),
                                 MonthDay(7, 4),
                                 MonthDay(10, 27),
                                 MonthDay(12, 30),
                                 MonthDay(12, 31)];
+       return result;
+    }
 
     auto testDays = [1, 2, 9, 10, 16, 20, 25, 28, 29, 30, 31];
 
-    auto testTODs = [TimeOfDay(0, 0, 0),
+    TimeOfDay[] testTODs()
+    {
+       static result = [TimeOfDay(0, 0, 0),
                      TimeOfDay(0, 0, 1),
                      TimeOfDay(0, 1, 0),
                      TimeOfDay(1, 0, 0),
                      TimeOfDay(13, 13, 13),
                      TimeOfDay(23, 59, 59)];
+       return result;
+    }
 
     auto testHours = [0, 1, 12, 22, 23];
     auto testMinSecs = [0, 1, 30, 58, 59];
 
     // Throwing exceptions is incredibly expensive, so we want to use a smaller
     // set of values for tests using assertThrown.
-    auto testTODsThrown = [TimeOfDay(0, 0, 0),
+    TimeOfDay[] testTODsThrown()
+    {
+       static result = [TimeOfDay(0, 0, 0),
                            TimeOfDay(13, 13, 13),
                            TimeOfDay(23, 59, 59)];
+       return result;
+    }
 
     Date[] testDatesBC;
     Date[] testDatesAD;
@@ -11426,7 +11478,9 @@ private:
 
     // I'd use a Tuple, but I get forward reference errors if I try.
     struct GregDay { int day; Date date; }
-    auto testGregDaysBC = [GregDay(-1_373_427, Date(-3760, 9, 7)), // Start of the Hebrew Calendar
+    GregDay[] testGregDaysBC()
+    {
+       static result = [GregDay(-1_373_427, Date(-3760, 9, 7)), // Start of the Hebrew Calendar
                            GregDay(-735_233, Date(-2012, 1, 1)),
                            GregDay(-735_202, Date(-2012, 2, 1)),
                            GregDay(-735_175, Date(-2012, 2, 28)),
@@ -11508,8 +11562,12 @@ private:
                            GregDay(-30, Date(0, 12, 1)),
                            GregDay(-1, Date(0, 12, 30)),
                            GregDay(0, Date(0, 12, 31))];
+       return result;
+    }
 
-    auto testGregDaysAD = [GregDay(1, Date(1, 1, 1)),
+    GregDay[] testGregDaysAD()
+    {
+       static result = [GregDay(1, Date(1, 1, 1)),
                            GregDay(2, Date(1, 1, 2)),
                            GregDay(32, Date(1, 2, 1)),
                            GregDay(365, Date(1, 12, 31)),
@@ -11577,10 +11635,14 @@ private:
                            GregDay(734_562, Date(2012, 2, 29)),
                            GregDay(734_563, Date(2012, 3, 1)),
                            GregDay(734_858, Date(2012, 12, 21))];
+       return result;
+    }
 
     // I'd use a Tuple, but I get forward reference errors if I try.
     struct DayOfYear { int day; MonthDay md; }
-    auto testDaysOfYear = [DayOfYear(1, MonthDay(1, 1)),
+    DayOfYear[] testDaysOfYear()
+    {
+       static result = [DayOfYear(1, MonthDay(1, 1)),
                            DayOfYear(2, MonthDay(1, 2)),
                            DayOfYear(3, MonthDay(1, 3)),
                            DayOfYear(31, MonthDay(1, 31)),
@@ -11608,8 +11670,12 @@ private:
                            DayOfYear(363, MonthDay(12, 29)),
                            DayOfYear(364, MonthDay(12, 30)),
                            DayOfYear(365, MonthDay(12, 31))];
+       return result;
+    }
 
-    auto testDaysOfLeapYear = [DayOfYear(1, MonthDay(1, 1)),
+    DayOfYear[] testDaysOfLeapYear()
+    {
+       static result = [DayOfYear(1, MonthDay(1, 1)),
                                DayOfYear(2, MonthDay(1, 2)),
                                DayOfYear(3, MonthDay(1, 3)),
                                DayOfYear(31, MonthDay(1, 31)),
@@ -11638,8 +11704,10 @@ private:
                                DayOfYear(364, MonthDay(12, 29)),
                                DayOfYear(365, MonthDay(12, 30)),
                                DayOfYear(366, MonthDay(12, 31))];
+       return result;
+    }
 
-    void initializeTests() @safe
+    void initializeTests()
     {
         import std.algorithm.sorting : sort;
         import std.typecons : Rebindable;

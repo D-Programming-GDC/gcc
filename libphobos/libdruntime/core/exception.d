@@ -6,19 +6,48 @@
     License:   $(HTTP www.boost.org/LICENSE_1_0.txt, Boost License 1.0).
     Authors:   Sean Kelly and $(HTTP jmdavisprog.com, Jonathan M Davis)
     Source:    $(DRUNTIMESRC core/_exception.d)
-*/
-
-/* NOTE: This file has been patched from the original DMD distribution to
- * work with the GDC compiler.
  */
 module core.exception;
+
+// Compiler lowers final switch default case to this (which is a runtime error)
+void __switch_errorT()(string file = __FILE__, size_t line = __LINE__) @trusted
+{
+    // Consider making this a compile time check.
+    version (D_Exceptions)
+        throw staticError!SwitchError(file, line, null);
+    else
+        assert(0, "No appropriate switch clause found");
+}
+
+version (D_BetterC)
+{
+    // When compiling with -betterC we use template functions so if they are
+    // used the bodies are copied into the user's program so there is no need
+    // for the D runtime during linking.
+
+    // In the future we might want to convert all functions in this module to
+    // templates even for ordinary builds instead of providing them as an
+    // extern(C) library.
+
+    void onOutOfMemoryError()(void* pretend_sideffect = null) @nogc nothrow pure @trusted
+    {
+        assert(0, "Memory allocation failed");
+    }
+    alias onOutOfMemoryErrorNoGC = onOutOfMemoryError;
+
+    void onInvalidMemoryOperationError()(void* pretend_sideffect = null) @nogc nothrow pure @trusted
+    {
+        assert(0, "Invalid memory operation");
+    }
+}
+else:
 
 /**
  * Thrown on a range error.
  */
 class RangeError : Error
 {
-    @safe pure nothrow this( string file = __FILE__, size_t line = __LINE__, Throwable next = null )
+    this( string file = __FILE__, size_t line = __LINE__, Throwable next = null ) @nogc nothrow pure @safe
     {
         super( "Range violation", file, line, next );
     }
@@ -183,32 +212,6 @@ unittest
         assert(fe.info == info);
     }
 }
-
-/**
- * Thrown on hidden function error.
- * $(RED Deprecated.
- *   This feature is not longer part of the language.)
- */
-deprecated class HiddenFuncError : Error
-{
-    @safe pure nothrow this( ClassInfo ci )
-    {
-        super( "Hidden method called for " ~ ci.name );
-    }
-}
-
-deprecated unittest
-{
-    ClassInfo info = new ClassInfo;
-    info.name = "testInfo";
-
-    {
-        auto hfe = new HiddenFuncError(info);
-        assert(hfe.next is null);
-        assert(hfe.msg == "Hidden method called for testInfo");
-    }
-}
-
 
 /**
  * Thrown on an out of memory error.
@@ -405,19 +408,6 @@ alias AssertHandler = void function(string file, size_t line, string msg) nothro
     _assertHandler = handler;
 }
 
-/**
- * Overrides the default assert hander with a user-supplied version.
- * $(RED Deprecated.
- *   Please use $(LREF assertHandler) instead.)
- *
- * Params:
- *  h = The new assert handler.  Set to null to use the default handler.
- */
-deprecated void setAssertHandler( AssertHandler h ) @trusted nothrow @nogc
-{
-    assertHandler = h;
-}
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // Overridable Callbacks
@@ -489,9 +479,9 @@ extern (C) void onUnittestErrorMsg( string file, size_t line, string msg ) nothr
  * Throws:
  *  $(LREF RangeError).
  */
-extern (C) void onRangeError( string file = __FILE__, size_t line = __LINE__ ) @safe pure nothrow
+extern (C) void onRangeError( string file = __FILE__, size_t line = __LINE__ ) @trusted pure nothrow @nogc
 {
-    throw new RangeError( file, line, null );
+    throw staticError!RangeError( file, line, null );
 }
 
 
@@ -513,22 +503,6 @@ extern (C) void onFinalizeError( TypeInfo info, Throwable e, string file = __FIL
     //  generating this object. So we use a preallocated instance
     throw staticError!FinalizeError(info, e, file, line);
 }
-
-
-/**
- * A callback for hidden function errors in D.  A $(LREF HiddenFuncError) will be
- * thrown.
- * $(RED Deprecated.
- *   This feature is not longer part of the language.)
- *
- * Throws:
- *  $(LREF HiddenFuncError).
- */
-deprecated extern (C) void onHiddenFuncError( Object o ) @safe pure nothrow
-{
-    throw new HiddenFuncError( typeid(o) );
-}
-
 
 /**
  * A callback for out of memory errors in D.  An $(LREF OutOfMemoryError) will be
@@ -565,35 +539,6 @@ extern (C) void onInvalidMemoryOperationError(void* pretend_sideffect = null) @t
     throw staticError!InvalidMemoryOperationError();
 }
 
-
-/**
- * A callback for switch errors in D.  A $(LREF SwitchError) will be thrown.
- *
- * Params:
- *  file = The name of the file that signaled this error.
- *  line = The line number on which this error occurred.
- *
- * Throws:
- *  $(LREF SwitchError).
- */
-extern (C) void onSwitchError( string file = __FILE__, size_t line = __LINE__ ) @safe pure nothrow
-{
-    version (D_Exceptions)
-        throw new SwitchError( file, line, null );
-    else
-        assert(0, "No appropriate switch clause found");
-}
-
-// Compiler lowers final switch default case to this (which is a runtime error)
-void __switch_errorT()(string file = __FILE__, size_t line = __LINE__) @trusted
-{
-    // Consider making this a compile time check.
-    version (D_Exceptions)
-        throw staticError!SwitchError(file, line, null);
-    else
-        assert(0, "No appropriate switch clause found");
-}
-
 /**
  * A callback for unicode errors in D.  A $(LREF UnicodeException) will be thrown.
  *
@@ -621,7 +566,6 @@ extern (C) void onAssertErrorMsg(string file, size_t line, string msg);
 extern (C) void onUnittestErrorMsg(string file, size_t line, string msg);
 extern (C) void onRangeError(string file, size_t line);
 extern (C) void onHiddenFuncError(Object o);
-extern (C) void onSwitchError(string file, size_t line);
 +/
 
 /***********************************
@@ -680,18 +624,6 @@ extern (C)
     void _d_arraybounds(string file, uint line)
     {
         onRangeError(file, line);
-    }
-
-    /* Called when a switch statement has no DefaultStatement, yet none of the cases match
-     */
-    void _d_switch_errorm(immutable(ModuleInfo)* m, uint line)
-    {
-        onSwitchError(m.name, line);
-    }
-
-    void _d_switch_error(string file, uint line)
-    {
-        onSwitchError(file, line);
     }
 }
 

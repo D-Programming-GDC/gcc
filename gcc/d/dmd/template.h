@@ -34,7 +34,7 @@ public:
     Objects objects;
 
     // kludge for template.isType()
-    int dyncast() const { return DYNCAST_TUPLE; }
+    DYNCAST dyncast() const { return DYNCAST_TUPLE; }
 
     const char *toChars() { return objects.toChars(); }
 };
@@ -85,7 +85,7 @@ public:
     TemplateDeclaration *isTemplateDeclaration() { return this; }
 
     TemplateTupleParameter *isVariadic();
-    bool isOverloadable();
+    bool isOverloadable() const;
 
     void accept(Visitor *v) { v->visit(this); }
 };
@@ -101,7 +101,7 @@ public:
  * For this-parameter:
  *  template Foo(this ident)
  */
-class TemplateParameter : public RootObject
+class TemplateParameter : public ASTNode
 {
 public:
     Loc loc;
@@ -138,7 +138,7 @@ public:
     /* Create dummy argument based on parameter.
      */
     virtual void *dummyArg() = 0;
-    virtual void accept(Visitor *v) { v->visit(this); }
+    void accept(Visitor *v) { v->visit(this); }
 };
 
 /* Syntax:
@@ -258,6 +258,9 @@ public:
     // [int, char, 100]
     Objects tdtypes;
 
+    // Modules imported by this template instance
+    Modules importedModules;
+
     Dsymbol *tempdecl;                  // referenced by foo.bar.abc
     Dsymbol *enclosing;                 // if referencing local symbols, this is the context
     Dsymbol *aliasdecl;                 // !=NULL if instance is an alias for its sole member
@@ -289,7 +292,6 @@ public:
     const char* toPrettyCharsHelper();
     void printInstantiationTrace();
     Identifier *getIdent();
-    int compare(RootObject *o);
     hash_t toHash();
 
     bool needsCodegen();

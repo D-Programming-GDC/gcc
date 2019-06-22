@@ -44,17 +44,23 @@ proc gdc-convert-args { args } {
 
 	} elseif { [string match "-boundscheck" $arg]
 		 || [string match "-boundscheck=on" $arg] } {
-	    lappend out "-fbounds-check"
+	    lappend out "-fbounds-check=on"
 
 	} elseif { [string match "-boundscheck=off" $arg]
 		   || [string match "-noboundscheck" $arg] } {
-	    lappend out "-fno-bounds-check"
+	    lappend out "-fbounds-check=off"
 
 	} elseif [string match "-boundscheck=safeonly" $arg] {
 	    lappend out "-fbounds-check=safeonly"
 
 	} elseif [string match "-c" $arg] {
 	    lappend out "-c"
+
+	} elseif [regexp -- {^-check=(\w+)=off} $arg pattern value] {
+	    lappend out "-fno-check=$value"
+
+	} elseif [string match "-checkaction=context" $arg] {
+	    lappend out "-fcheckaction=context"
 
 	} elseif [string match "-d" $arg] {
 	    lappend out "-Wno-deprecated"
@@ -70,14 +76,17 @@ proc gdc-convert-args { args } {
 	    lappend out "-fdebug=$value"
 
 	} elseif [string match "-dip1000" $arg] {
-	    lappend out "-ftransition=dip1000"
+	    lappend out "-fpreview=dip1000"
 
-	} elseif [string match "-dip25" $arg] {
-	    lappend out "-ftransition=dip25"
+	} elseif [string match "-dip1008" $arg] {
+	    lappend out "-fpreview=dip1008"
 
 	} elseif [string match "-dw" $arg] {
 	    lappend out "-Wdeprecated"
 	    lappend out "-Wno-error"
+
+	} elseif [regexp -- {^-extern-std=([\w+]+)} $arg pattern value] {
+	    lappend out "-fextern-std=$value"
 
 	} elseif [string match "-fPIC" $arg] {
 	    lappend out "-fPIC"
@@ -101,11 +110,17 @@ proc gdc-convert-args { args } {
 	} elseif [string match "-O" $arg] {
 	    lappend out "-O2"
 
+	} elseif [regexp -- {^-preview=(\w+)} $arg pattern value] {
+	    lappend out "-fpreview=[string tolower $value]"
+
 	} elseif [string match "-release" $arg] {
 	    lappend out "-frelease"
 
+	} elseif [regexp -- {^-revert=(\w+)} $arg pattern value] {
+	    lappend out "-frevert=[string tolower $value]"
+
 	} elseif [regexp -- {^-transition=(\w+)} $arg pattern value] {
-	    lappend out "-ftransition=$value"
+	    lappend out "-ftransition=[string tolower $value]"
 
 	} elseif [string match "-unittest" $arg] {
 	    lappend out "-funittest"
@@ -373,7 +388,7 @@ proc gdc-do-test { } {
     global PERMUTE_ARGS
 
     # Set if an extra option should be passed to link to shared druntime.
-    global SHARED_OPTION
+    global STATIC_OPTION
 
     # Additional arguments for gdc_load
     global GDC_EXECUTE_ARGS
@@ -416,7 +431,7 @@ proc gdc-do-test { } {
 	set filename "$subdir/[dmd2dg $base $dir/$name.$ext]"
 
 	if { $dir == "runnable" } {
-	    append PERMUTE_ARGS " $SHARED_OPTION"
+	    append PERMUTE_ARGS " $STATIC_OPTION"
 	}
 	set options [gdc-permute-options [lsort -unique $PERMUTE_ARGS]]
 
@@ -456,10 +471,10 @@ proc gdc-do-test { } {
 	}
 
 	# Cleanup test directory.
-	foreach srcfile $cleanup_extra_files {
-	    file delete $subdir/$srcfile
-	}
-	file delete $filename
+	#foreach srcfile $cleanup_extra_files {
+	#    file delete $subdir/$srcfile
+	#}
+	#file delete $filename
     }
 
     set allow_blank_lines $save_allow_blank_lines

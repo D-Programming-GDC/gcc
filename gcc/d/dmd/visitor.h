@@ -46,7 +46,7 @@ class SynchronizedStatement;
 class WithStatement;
 class TryCatchStatement;
 class TryFinallyStatement;
-class OnScopeStatement;
+class ScopeGuardStatement;
 class ThrowStatement;
 class DebugStatement;
 class GotoStatement;
@@ -81,6 +81,7 @@ class TypeClass;
 class TypeTuple;
 class TypeSlice;
 class TypeNull;
+class TypeTraits;
 
 class Dsymbol;
 
@@ -98,6 +99,7 @@ class StorageClassDeclaration;
 class DeprecatedDeclaration;
 class LinkDeclaration;
 class CPPMangleDeclaration;
+class CPPNamespaceDeclaration;
 class ProtDeclaration;
 class AlignDeclaration;
 class AnonDeclaration;
@@ -357,6 +359,7 @@ public:
     virtual void visit(AnonDeclaration *s) { visit((AttribDeclaration *)s); }
     virtual void visit(AlignDeclaration *s) { visit((AttribDeclaration *)s); }
     virtual void visit(CPPMangleDeclaration *s) { visit((AttribDeclaration *)s); }
+    virtual void visit(CPPNamespaceDeclaration *s) { visit((AttribDeclaration *)s); }
     virtual void visit(ProtDeclaration *s) { visit((AttribDeclaration *)s); }
     virtual void visit(PragmaDeclaration *s) { visit((AttribDeclaration *)s); }
     virtual void visit(StorageClassDeclaration *s) { visit((AttribDeclaration *)s); }
@@ -387,7 +390,7 @@ public:
     virtual void visit(ForeachRangeStatement *s) { visit((Statement *)s); }
     virtual void visit(ForeachStatement *s) { visit((Statement *)s); }
     virtual void visit(IfStatement *s) { visit((Statement *)s); }
-    virtual void visit(OnScopeStatement *s) { visit((Statement *)s); }
+    virtual void visit(ScopeGuardStatement *s) { visit((Statement *)s); }
     virtual void visit(ConditionalStatement *s) { visit((Statement *)s); }
     virtual void visit(StaticForeachStatement *s) { visit((Statement *)s); }
     virtual void visit(PragmaStatement *s) { visit((Statement *)s); }
@@ -428,6 +431,7 @@ public:
     virtual void visit(TypeStruct *t) { visit((Type *)t); }
     virtual void visit(TypeNext *t) { visit((Type *)t); }
     virtual void visit(TypeQualified *t) { visit((Type *)t); }
+    virtual void visit(TypeTraits *t) { visit((Type *)t); }
 
     // TypeNext
     virtual void visit(TypeReference *t) { visit((TypeNext *)t); }

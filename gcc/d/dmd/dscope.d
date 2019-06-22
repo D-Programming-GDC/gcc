@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2018 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/dscope.d, _dscope.d)
@@ -15,6 +15,7 @@ module dmd.dscope;
 import core.stdc.stdio;
 import core.stdc.string;
 import dmd.aggregate;
+import dmd.arraytypes;
 import dmd.attrib;
 import dmd.ctorflow;
 import dmd.dclass;
@@ -24,6 +25,7 @@ import dmd.doc;
 import dmd.dsymbol;
 import dmd.dsymbolsem;
 import dmd.dtemplate;
+import dmd.expression;
 import dmd.errors;
 import dmd.func;
 import dmd.globals;
@@ -75,12 +77,12 @@ struct Scope
     LabelStatement slabel;          /// enclosing labelled statement
     SwitchStatement sw;             /// enclosing switch statement
     TryFinallyStatement tf;         /// enclosing try finally statement
-    OnScopeStatement os;            /// enclosing scope(xxx) statement
+    ScopeGuardStatement os;            /// enclosing scope(xxx) statement
     Statement sbreak;               /// enclosing statement that supports "break"
     Statement scontinue;            /// enclosing statement that supports "continue"
     ForeachStatement fes;           /// if nested function for ForeachStatement, this is it
     Scope* callsc;                  /// used for __FUNCTION__, __PRETTY_FUNCTION__ and __MODULE__
-    bool inunion;                   /// true if processing members of a union
+    Dsymbol inunion;                /// != null if processing members of a union
     bool nofree;                    /// true if shouldn't free it
     bool inLoop;                    /// true if inside a loop (where constructor calls aren't allowed)
     int intypeof;                   /// in typeof(exp)
@@ -98,6 +100,9 @@ struct Scope
 
     /// alignment for struct members
     AlignDeclaration aligndecl;
+
+    /// C++ namespace this symbol is in
+    CPPNamespaceDeclaration namespace;
 
     /// linkage for external functions
     LINK linkage = LINK.d;
@@ -285,14 +290,14 @@ struct Scope
             FuncDeclaration f = func;
             if (fes)
                 f = fes.func;
-            auto ad = f.isMember2();
+            auto ad = f.isMemberDecl();
             assert(ad);
             foreach (i, v; ad.fields)
             {
                 bool mustInit = (v.storage_class & STC.nodefaultctor || v.type.needsNested());
                 auto fieldInit = &this.ctorflow.fieldinit[i];
                 const fiesCurrent = fies[i];
-                if (fieldInit.loc == Loc.init)
+                if (fieldInit.loc is Loc.init)
                     fieldInit.loc = fiesCurrent.loc;
                 if (!mergeFieldInit(this.ctorflow.fieldinit[i].csx, fiesCurrent.csx) && mustInit)
                 {
@@ -365,6 +370,70 @@ struct Scope
             return null;
         }
 
+        Dsymbol checkAliasThis(AggregateDeclaration ad, Identifier ident, int flags, Expression* exp)
+        {
+            import dmd.mtype;
+            if (!ad || !ad.aliasthis)
+                return null;
+
+            Declaration decl = ad.aliasthis.isDeclaration();
+            if (!decl)
+                return null;
+
+            Type t = decl.type;
+            ScopeDsymbol sds;
+            TypeClass tc;
+            TypeStruct ts;
+            switch(t.ty)
+            {
+                case Tstruct:
+                    ts = cast(TypeStruct)t;
+                    sds = ts.sym;
+                    break;
+                case Tclass:
+                    tc = cast(TypeClass)t;
+                    sds = tc.sym;
+                    break;
+                case Tinstance:
+                    sds = (cast(TypeInstance)t).tempinst;
+                    break;
+                case Tenum:
+                    sds = (cast(TypeEnum)t).sym;
+                    break;
+                default: break;
+            }
+
+            if (!sds)
+                return null;
+
+            Dsymbol ret = sds.search(loc, ident, flags);
+            if (ret)
+            {
+                *exp = new DotIdExp(loc, *exp, ad.aliasthis.ident);
+                *exp = new DotIdExp(loc, *exp, ident);
+                return ret;
+            }
+
+            if (!ts && !tc)
+                return null;
+
+            Dsymbol s;
+            *exp = new DotIdExp(loc, *exp, ad.aliasthis.ident);
+            if (ts && !(ts.att & AliasThisRec.tracing))
+            {
+                ts.att = cast(AliasThisRec)(ts.att | AliasThisRec.tracing);
+                s = checkAliasThis(sds.isAggregateDeclaration(), ident, flags, exp);
+                ts.att = cast(AliasThisRec)(ts.att & ~AliasThisRec.tracing);
+            }
+            else if(tc && !(tc.att & AliasThisRec.tracing))
+            {
+                tc.att = cast(AliasThisRec)(tc.att | AliasThisRec.tracing);
+                s = checkAliasThis(sds.isAggregateDeclaration(), ident, flags, exp);
+                tc.att = cast(AliasThisRec)(tc.att & ~AliasThisRec.tracing);
+            }
+            return s;
+        }
+
         Dsymbol searchScopes(int flags)
         {
             for (Scope* sc = &this; sc; sc = sc.enclosing)
@@ -390,6 +459,20 @@ struct Scope
                         *pscopesym = sc.scopesym;
                     return s;
                 }
+
+                if (global.params.fixAliasThis)
+                {
+                    Expression exp = new ThisExp(loc);
+                    Dsymbol aliasSym = checkAliasThis(sc.scopesym.isAggregateDeclaration(), ident, flags, &exp);
+                    if (aliasSym)
+                    {
+                        //printf("found aliassym: %s\n", aliasSym.toChars());
+                        if (pscopesym)
+                            *pscopesym = new ExpressionDsymbol(exp);
+                        return aliasSym;
+                    }
+                }
+
                 // Stop when we hit a module, but keep going if that is not just under the global scope
                 if (sc.scopesym.isModule() && !(sc.enclosing && !sc.enclosing.enclosing))
                     break;
@@ -400,19 +483,6 @@ struct Scope
         if (this.flags & SCOPE.ignoresymbolvisibility)
             flags |= IgnoreSymbolVisibility;
 
-        Dsymbol sold = void;
-        if (global.params.bug10378 || global.params.check10378)
-        {
-            sold = searchScopes(flags | IgnoreSymbolVisibility);
-            if (!global.params.check10378)
-                return sold;
-
-            if (ident == Id.dollar) // https://issues.dlang.org/show_bug.cgi?id=15825
-                return sold;
-
-            // Search both ways
-        }
-
         // First look in local scopes
         Dsymbol s = searchScopes(flags | SearchLocalsOnly);
         version (LOGSEARCH) if (s) printMsg("-Scope.search() found local", s);
@@ -421,69 +491,11 @@ struct Scope
             // Second look in imported modules
             s = searchScopes(flags | SearchImportsOnly);
             version (LOGSEARCH) if (s) printMsg("-Scope.search() found import", s);
-
-            /** Still find private symbols, so that symbols that weren't access
-             * checked by the compiler remain usable.  Once the deprecation is over,
-             * this should be moved to search_correct instead.
-             */
-            if (!s && !(flags & IgnoreSymbolVisibility))
-            {
-                s = searchScopes(flags | SearchLocalsOnly | IgnoreSymbolVisibility);
-                if (!s)
-                    s = searchScopes(flags | SearchImportsOnly | IgnoreSymbolVisibility);
-
-                if (s && !(flags & IgnoreErrors))
-                    .deprecation(loc, "`%s` is not visible from module `%s`", s.toPrettyChars(), _module.toChars());
-                version (LOGSEARCH) if (s) printMsg("-Scope.search() found imported private symbol", s);
-            }
-        }
-        if (global.params.check10378)
-        {
-            alias snew = s;
-            if (sold !is snew)
-                deprecation10378(loc, sold, snew);
-            if (global.params.bug10378)
-                s = sold;
         }
         return s;
     }
 
-    /* A helper function to show deprecation message for new name lookup rule.
-     */
-    extern (D) static void deprecation10378(Loc loc, Dsymbol sold, Dsymbol snew)
-    {
-        // https://issues.dlang.org/show_bug.cgi?id=15857
-        //
-        // The overloadset found via the new lookup rules is either
-        // equal or a subset of the overloadset found via the old
-        // lookup rules, so it suffices to compare the dimension to
-        // check for equality.
-        OverloadSet osold, osnew;
-        if (sold && (osold = sold.isOverloadSet()) !is null &&
-            snew && (osnew = snew.isOverloadSet()) !is null &&
-            osold.a.dim == osnew.a.dim)
-            return;
-
-        OutBuffer buf;
-        buf.writestring("local import search method found ");
-        if (osold)
-            buf.printf("%s `%s` (%d overloads)", sold.kind(), sold.toPrettyChars(), cast(int) osold.a.dim);
-        else if (sold)
-            buf.printf("%s `%s`", sold.kind(), sold.toPrettyChars());
-        else
-            buf.writestring("nothing");
-        buf.writestring(" instead of ");
-        if (osnew)
-            buf.printf("%s `%s` (%d overloads)", snew.kind(), snew.toPrettyChars(), cast(int) osnew.a.dim);
-        else if (snew)
-            buf.printf("%s `%s`", snew.kind(), snew.toPrettyChars());
-        else
-            buf.writestring("nothing");
-
-        deprecation(loc, buf.peekString());
-    }
-
-    extern (C++) Dsymbol search_correct(Identifier ident)
+    extern (D) Dsymbol search_correct(Identifier ident)
     {
         if (global.gag)
             return null; // don't do it for speculative compiles; too time consuming
@@ -492,16 +504,15 @@ struct Scope
          * Given the failed search attempt, try to find
          * one with a close spelling.
          */
-        extern (D) void* scope_search_fp(const(char)* seed, ref int cost)
+        extern (D) Dsymbol scope_search_fp(const(char)[] seed, ref int cost)
         {
             //printf("scope_search_fp('%s')\n", seed);
             /* If not in the lexer's string table, it certainly isn't in the symbol table.
              * Doing this first is a lot faster.
              */
-            size_t len = strlen(seed);
-            if (!len)
+            if (!seed.length)
                 return null;
-            Identifier id = Identifier.lookup(seed, len);
+            Identifier id = Identifier.lookup(seed);
             if (!id)
                 return null;
             Scope* sc = &this;
@@ -520,10 +531,14 @@ struct Scope
                         return null;
                 }
             }
-            return cast(void*)s;
+            return s;
         }
 
-        return cast(Dsymbol)speller(ident.toChars(), &scope_search_fp, idchars);
+        Dsymbol scopesym = null;
+        // search for exact name first
+        if (auto s = search(Loc.initial, ident, &scopesym, IgnoreErrors))
+            return s;
+        return speller!scope_search_fp(ident.toString());
     }
 
     /************************************
@@ -552,7 +567,7 @@ struct Scope
         return Token.toChars(tok);
     }
 
-    extern (C++) Dsymbol insert(Dsymbol s)
+    extern (D) Dsymbol insert(Dsymbol s)
     {
         if (VarDeclaration vd = s.isVarDeclaration())
         {
@@ -624,7 +639,7 @@ struct Scope
      * where it was declared. So mark the Scope as not
      * to be free'd.
      */
-    extern (C++) void setNoFree()
+    extern (D) void setNoFree()
     {
         //int i = 0;
         //printf("Scope::setNoFree(this = %p)\n", this);
@@ -691,14 +706,14 @@ struct Scope
     *
     * Returns: `true` if this or any parent scope is deprecated, `false` otherwise`
     */
-    extern(C++) bool isDeprecated()
+    extern(C++) bool isDeprecated() const
     {
-        for (Dsymbol sp = this.parent; sp; sp = sp.parent)
+        for (const(Dsymbol)* sp = &(this.parent); *sp; sp = &(sp.parent))
         {
             if (sp.isDeprecated())
                 return true;
         }
-        for (Scope* sc2 = &this; sc2; sc2 = sc2.enclosing)
+        for (const(Scope)* sc2 = &this; sc2; sc2 = sc2.enclosing)
         {
             if (sc2.scopesym && sc2.scopesym.isDeprecated())
                 return true;
