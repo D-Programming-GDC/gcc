@@ -1816,7 +1816,8 @@ public:
     /***************************************
      * Support for unary operator ~ for `BitArray`.
      */
-    BitArray opCom() const pure nothrow
+    BitArray opUnary(string op)() const pure nothrow
+        if (op == "~")
     {
         auto dim = this.dim;
 
@@ -2075,8 +2076,8 @@ public:
      * shared between BitArray objects. i.e. D dynamic array
      * concatenation semantics are not followed)
      */
-
-    BitArray opCatAssign(bool b) pure nothrow
+    BitArray opOpAssign(string op)(bool b) pure nothrow
+        if (op == "~")
     {
         length = _len + 1;
         this[_len - 1] = b;
@@ -2105,8 +2106,8 @@ public:
     /***************************************
      * ditto
      */
-
-    BitArray opCatAssign(BitArray b) pure nothrow
+    BitArray opOpAssign(string op)(BitArray b) pure nothrow
+        if (op == "~")
     {
         auto istart = _len;
         length = _len + b.length;
@@ -2139,7 +2140,8 @@ public:
     /***************************************
      * Support for binary operator ~ for `BitArray`.
      */
-    BitArray opCat(bool b) const pure nothrow
+    BitArray opBinary(string op)(bool b) const pure nothrow
+        if (op == "~")
     {
         BitArray r;
 
@@ -2150,7 +2152,8 @@ public:
     }
 
     /** ditto */
-    BitArray opCat_r(bool b) const pure nothrow
+    BitArray opBinaryRight(string op)(bool b) const pure nothrow
+        if (op == "~")
     {
         BitArray r;
 
@@ -2162,7 +2165,8 @@ public:
     }
 
     /** ditto */
-    BitArray opCat(BitArray b) const pure nothrow
+    BitArray opBinary(string op)(BitArray b) const pure nothrow
+        if (op == "~")
     {
         BitArray r;
 

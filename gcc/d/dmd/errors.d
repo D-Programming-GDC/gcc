@@ -384,6 +384,20 @@ extern (C++) void message(const(char)* format, ...)
 }
 
 /**
+ * Print a tip message with the prefix and highlighting.
+ * Params:
+ *      format = printf-style format specification
+ *      ...    = printf-style variadic arguments
+ */
+extern (C++) void tip(const(char)* format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vtip(format, ap);
+    va_end(ap);
+}
+
+/**
  * Same as $(D error), but takes a va_list parameter, and optionally additional message prefixes.
  * Params:
  *      loc    = location of error
@@ -441,6 +455,14 @@ extern (C++) void vdeprecation(const ref Loc loc, const(char)* format, va_list a
  *      ap        = printf-style variadic arguments
  */
 extern (C++) void vmessage(const ref Loc loc, const(char)* format, va_list ap);
+
+/**
+ * Same as $(D tip), but takes a va_list parameter.
+ * Params:
+ *      format    = printf-style format specification
+ *      ap        = printf-style variadic arguments
+ */
+extern (C++) void vtip(const(char)* format, va_list ap);
 
 /**
  * Same as $(D deprecationSupplemental), but takes a va_list parameter.

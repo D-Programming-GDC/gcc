@@ -148,11 +148,16 @@ DRUNTIME_CSOURCES = core/stdc/errno_.c
 DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	core/checkedint.d core/cpuid.d core/demangle.d core/exception.d \
 	core/gc/config.d core/gc/gcinterface.d core/gc/registry.d \
-	core/internal/abort.d core/internal/arrayop.d core/internal/convert.d \
-	core/internal/dassert.d core/internal/hash.d core/internal/lifetime.d \
-	core/internal/parseoptions.d core/internal/spinlock.d \
-	core/internal/string.d core/internal/traits.d core/internal/utf.d \
-	core/lifetime.d core/math.d core/memory.d core/runtime.d core/simd.d \
+	core/internal/abort.d core/internal/array/appending.d \
+	core/internal/array/capacity.d core/internal/array/casting.d \
+	core/internal/array/comparison.d core/internal/array/concatenation.d \
+	core/internal/array/construction.d core/internal/array/equality.d \
+	core/internal/array/utils.d core/internal/arrayop.d \
+	core/internal/convert.d core/internal/dassert.d core/internal/hash.d \
+	core/internal/lifetime.d core/internal/parseoptions.d \
+	core/internal/spinlock.d core/internal/string.d core/internal/traits.d \
+	core/internal/utf.d core/internal/util/array.d core/lifetime.d \
+	core/math.d core/memory.d core/runtime.d core/simd.d \
 	core/stdc/assert_.d core/stdc/complex.d core/stdc/config.d \
 	core/stdc/ctype.d core/stdc/errno.d core/stdc/fenv.d \
 	core/stdc/float_.d core/stdc/inttypes.d core/stdc/limits.d \
@@ -169,11 +174,10 @@ DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	gcc/sections/package.d gcc/sections/win32.d gcc/sections/win64.d \
 	gcc/unwind/arm.d gcc/unwind/arm_common.d gcc/unwind/c6x.d \
 	gcc/unwind/generic.d gcc/unwind/package.d gcc/unwind/pe.d object.d \
-	rt/aApply.d rt/aApplyR.d rt/aaA.d rt/adi.d rt/array/capacity.d \
-	rt/array/casting.d rt/array/comparison.d rt/array/equality.d \
-	rt/arrayassign.d rt/arraycat.d rt/cast_.d rt/config.d rt/critical_.d \
-	rt/deh.d rt/dmain2.d rt/ehalloc.d rt/invariant.d rt/lifetime.d \
-	rt/memory.d rt/minfo.d rt/monitor_.d rt/qsort.d rt/sections.d \
+	rt/aApply.d rt/aApplyR.d rt/aaA.d rt/adi.d rt/arrayassign.d \
+	rt/arraycat.d rt/cast_.d rt/config.d rt/critical_.d rt/deh.d \
+	rt/dmain2.d rt/ehalloc.d rt/invariant.d rt/lifetime.d rt/memory.d \
+	rt/minfo.d rt/monitor_.d rt/profilegc.d rt/qsort.d rt/sections.d \
 	rt/tlsgc.d rt/typeinfo/ti_Acdouble.d rt/typeinfo/ti_Acfloat.d \
 	rt/typeinfo/ti_Acreal.d rt/typeinfo/ti_Adouble.d \
 	rt/typeinfo/ti_Afloat.d rt/typeinfo/ti_Ag.d rt/typeinfo/ti_Aint.d \
@@ -188,7 +192,7 @@ DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	rt/typeinfo/ti_real.d rt/typeinfo/ti_short.d rt/typeinfo/ti_ubyte.d \
 	rt/typeinfo/ti_ucent.d rt/typeinfo/ti_uint.d rt/typeinfo/ti_ulong.d \
 	rt/typeinfo/ti_ushort.d rt/typeinfo/ti_void.d rt/typeinfo/ti_wchar.d \
-	rt/util/array.d rt/util/container/array.d rt/util/container/common.d \
+	rt/util/container/array.d rt/util/container/common.d \
 	rt/util/container/hashtab.d rt/util/container/treap.d rt/util/random.d \
 	rt/util/typeinfo.d
 

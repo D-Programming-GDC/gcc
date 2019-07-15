@@ -278,6 +278,14 @@ vmessage (const Loc& loc, const char *format, va_list ap)
   d_diagnostic_report_diagnostic (loc, 0, format, ap, DK_NOTE, true);
 }
 
+/* Print a tip message with prefix and highlighing.  */
+void ATTRIBUTE_GCC_DIAG(1,0)
+vtip (const char *format, va_list ap)
+{
+  if (!global.gag)
+    d_diagnostic_report_diagnostic (Loc (), 0, format, ap, DK_DEBUG, true);
+}
+
 /* Call this after printing out fatal error messages to clean up and
    exit the compiler.  */
 

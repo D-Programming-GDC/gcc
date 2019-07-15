@@ -75,7 +75,6 @@ D_FRONTEND_OBJS = \
 	d/aggregate.o \
 	d/aliasthis.o \
 	d/apply.o \
-	d/argtypes.o \
 	d/array.o \
 	d/arrayop.o \
 	d/arraytypes.o \

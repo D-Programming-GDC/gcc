@@ -2839,9 +2839,6 @@ FuncDeclaration resolveFuncCall(const ref Loc loc, Scope* sc, Dsymbol s,
     if (tthis)
         tthis.modToBuffer(&fargsBuf);
 
-    // max num of overloads to print (-v overrides this).
-    enum int numOverloadsDisplay = 5;
-
     if (!m.lastf && !(flags & FuncResolveFlag.quiet)) // no match
     {
         if (!fd && !td && !od)
@@ -2964,6 +2961,7 @@ if (is(Decl == TemplateDeclaration) || is(Decl == FuncDeclaration))
 {
     // max num of overloads to print (-v overrides this).
     int numToDisplay = 5;
+    const(char)* constraintsTip;
 
     overloadApply(declaration, (Dsymbol s)
     {
@@ -2981,7 +2979,14 @@ if (is(Decl == TemplateDeclaration) || is(Decl == FuncDeclaration))
         }
         else if (auto td = s.isTemplateDeclaration())
         {
-            .errorSupplemental(td.loc, "`%s`", td.toPrettyChars());
+            import dmd.staticcond;
+
+            const tmsg = td.toCharsNoConstraints();
+            const cmsg = td.getConstraintEvalError(constraintsTip);
+            if (cmsg)
+                .errorSupplemental(td.loc, "`%s`\n%s", tmsg, cmsg);
+            else
+                .errorSupplemental(td.loc, "`%s`", tmsg);
             nextOverload = td.overnext;
         }
 
@@ -2997,6 +3002,9 @@ if (is(Decl == TemplateDeclaration) || is(Decl == FuncDeclaration))
             .errorSupplemental(loc, "... (%d more, -v to show) ...", num);
         return 1;   // stop iterating
     });
+    // should be only in verbose mode
+    if (constraintsTip)
+        .tip(constraintsTip);
 }
 
 /**************************************

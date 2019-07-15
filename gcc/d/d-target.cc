@@ -374,6 +374,18 @@ Target::systemLinkage (void)
   return LINKc;
 }
 
+/* Generate a TypeTuple of the equivalent types used to determine if a
+   function argument of the given type can be passed in registers.
+   The results of this are highly platform dependent, and intended
+   primarly for use in implementing va_arg() with RTTI.  */
+
+TypeTuple *
+Target::toArgTypes (Type *)
+{
+  /* Not implemented, however this is not currently used anywhere.  */
+  return NULL;
+}
+
 /* Determine return style of function, whether in registers or through a
    hidden pointer to the caller's stack.  */
 

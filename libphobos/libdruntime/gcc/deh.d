@@ -285,34 +285,6 @@ struct ExceptionHeader
     }
 
     /**
-     * Look at the chain of inflight exceptions and pick the class type that'll
-     * be looked for in catch clauses.
-     */
-    static ClassInfo getClassInfo(_Unwind_Exception* unwindHeader) @nogc
-    {
-        ExceptionHeader* eh = toExceptionHeader(unwindHeader);
-        // The first thrown Exception at the top of the stack takes precedence
-        // over others that are inflight, unless an Error was thrown, in which
-        // case, we search for error handlers instead.
-        Throwable ehobject = eh.object;
-        auto currentLsd = eh.languageSpecificData;
-        for (ExceptionHeader* ehn = eh.next; ehn; ehn = ehn.next)
-        {
-            Error e = cast(Error)ehobject;
-            if (e is null || (cast(Error)ehn.object) !is null)
-            {
-                currentLsd = ehn.languageSpecificData;
-                ehobject = ehn.object;
-            }
-
-            // Don't combine when the exceptions are from different functions.
-            if (currentLsd != ehn.languageSpecificData)
-                break;
-        }
-        return ehobject.classinfo;
-    }
-
-    /**
      * Convert from pointer to unwindHeader to pointer to ExceptionHeader
      * that it is embedded inside of.
      */
@@ -688,7 +660,7 @@ _Unwind_Reason_Code scanLSDA(const(ubyte)* lsda, _Unwind_Exception_Class excepti
     {
         // Otherwise we have a catch handler or exception specification.
         handler = actionTableLookup(actions, unwindHeader, actionRecord,
-                                    exceptionClass, TTypeBase,
+                                    lsda, exceptionClass, TTypeBase,
                                     TType, TTypeEncoding,
                                     saw_handler, saw_cleanup);
     }
@@ -716,7 +688,8 @@ _Unwind_Reason_Code scanLSDA(const(ubyte)* lsda, _Unwind_Exception_Class excepti
  * Look up and return the handler index of the classType in Action Table.
  */
 int actionTableLookup(_Unwind_Action actions, _Unwind_Exception* unwindHeader,
-                      const(ubyte)* actionRecord, _Unwind_Exception_Class exceptionClass,
+                      const(ubyte)* actionRecord, const(ubyte)* lsda,
+                      _Unwind_Exception_Class exceptionClass,
                       _Unwind_Ptr TTypeBase, const(ubyte)* TType,
                       ubyte TTypeEncoding,
                       out bool saw_handler, out bool saw_cleanup)
@@ -724,7 +697,7 @@ int actionTableLookup(_Unwind_Action actions, _Unwind_Exception* unwindHeader,
     ClassInfo thrownType;
     if (isGdcExceptionClass(exceptionClass))
     {
-        thrownType = ExceptionHeader.getClassInfo(unwindHeader);
+        thrownType = getClassInfo(unwindHeader, lsda);
     }
 
     while (1)
@@ -798,6 +771,34 @@ int actionTableLookup(_Unwind_Action actions, _Unwind_Exception* unwindHeader,
     }
 
     return 0;
+}
+
+/**
+ * Look at the chain of inflight exceptions and pick the class type that'll
+ * be looked for in catch clauses.
+ */
+ClassInfo getClassInfo(_Unwind_Exception* unwindHeader,
+                       const(ubyte)* currentLsd) @nogc
+{
+    ExceptionHeader* eh = ExceptionHeader.toExceptionHeader(unwindHeader);
+    // The first thrown Exception at the top of the stack takes precedence
+    // over others that are inflight, unless an Error was thrown, in which
+    // case, we search for error handlers instead.
+    Throwable ehobject = eh.object;
+    for (ExceptionHeader* ehn = eh.next; ehn; ehn = ehn.next)
+    {
+        // Don't combine when the exceptions are from different functions.
+        if (currentLsd != ehn.languageSpecificData)
+            break;
+
+        Error e = cast(Error)ehobject;
+        if (e is null || (cast(Error)ehn.object) !is null)
+        {
+            currentLsd = ehn.languageSpecificData;
+            ehobject = ehn.object;
+        }
+    }
+    return ehobject.classinfo;
 }
 
 /**

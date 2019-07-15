@@ -1,3 +1,4 @@
+// { dg-prune-output "Warning: struct HasNonConstToHash has method toHash" }
 void main()
 {
     issue19562();
@@ -8,6 +9,8 @@ void main()
     issue19005();
     issue19204();
     issue19262();
+    issue19282();
+    issue19332(); // Support might be removed in the future!
     issue19568();
     issue19582();
     testTypeInfoArrayGetHash1();
@@ -128,6 +131,30 @@ void issue19262() nothrow
     int[int] aa;
     auto h = hashOf(aa);
     h = hashOf(aa, h);
+}
+
+extern(C++) class Issue19282CppClass {}
+
+/// test that hashOf doesn't crash for non-null C++ objects.
+void issue19282()
+{
+    Issue19282CppClass c = new Issue19282CppClass();
+    size_t h = hashOf(c);
+    h = hashOf(c, h);
+}
+
+/// Ensure hashOf works for const struct that has non-const toHash & has all
+/// fields bitwise-hashable. (Support might be removed in the future!)
+void issue19332()
+{
+    static struct HasNonConstToHash
+    {
+        int a;
+        size_t toHash() { return a; }
+    }
+    const HasNonConstToHash val;
+    size_t h = hashOf(val);
+    h = hashOf!(const HasNonConstToHash)(val); // Ensure doesn't match more than one overload.
 }
 
 /// hashOf should not unnecessarily call a struct's fields' postblits & dtors in CTFE

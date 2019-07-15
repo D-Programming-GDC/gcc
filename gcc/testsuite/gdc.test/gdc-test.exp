@@ -219,11 +219,11 @@ proc dmd2dg { base test } {
     # print "Filename: $base - $test"
 
     set fdin [open $base/$test r]
-    #fconfigure $fdin -encoding binary
+    fconfigure $fdin -encoding binary
 
     file mkdir $type
     set fdout [open $test w]
-    #fconfigure $fdout -encoding binary
+    fconfigure $fdout -encoding binary
 
     while { [gets $fdin copy_line] >= 0 } {
 	set out_line $copy_line

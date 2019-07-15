@@ -34,7 +34,7 @@ dg-init
 # Main loop.
 foreach test $tests {
     set libphobos_test_name "$subdir/[dg-trim-dirname $srcdir/../src $test]"
-    dg-runtest $test "" "-fmain -fbuilding-libphobos-tests"
+    dg-runtest $test "-static-libphobos" "-fmain -fbuilding-libphobos-tests"
     set libphobos_test_name ""
 }
 

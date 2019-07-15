@@ -18,7 +18,6 @@
 
 module dmd.target;
 
-import dmd.argtypes;
 import dmd.dclass;
 import dmd.dsymbol;
 import dmd.expression;
@@ -168,12 +167,7 @@ struct Target
      *      empty tuple if type is always passed on the stack
      *      null if the type is a `void` or argtypes aren't supported by the target
      */
-    extern (C++) TypeTuple toArgTypes(Type t)
-    {
-        if (global.params.is64bit && global.params.isWindows)
-            return null;
-        return .toArgTypes(t);
-    }
+    extern (C++) TypeTuple toArgTypes(Type t);
 
     /**
      * Determine return style of function - whether in registers or
@@ -228,7 +222,6 @@ struct TargetCPP
     bool reverseOverloads;    /// set if overloaded functions are grouped and in reverse order (such as in dmc and cl)
     bool exceptions;          /// set if catching C++ exceptions is supported
     bool twoDtorInVtable;     /// target C++ ABI puts deleting and non-deleting destructor into vtable
-    bool ctorReturnsVoid;     /// set if C++ constructors return void results.
 
     /**
      * Mangle the given symbol for C++ ABI.

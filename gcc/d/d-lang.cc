@@ -1188,15 +1188,16 @@ d_parse_file (void)
     }
 
   /* Load the module containing D main.  */
+  Module *main_module = NULL;
   if (global.params.addMain)
     {
       unsigned errors = global.startGagging ();
-      Module *m = Module::load (Loc (), NULL, Identifier::idPool ("__main"));
+      main_module = Module::load (Loc (), NULL, Identifier::idPool ("__main"));
 
       if (! global.endGagging (errors))
 	{
-	  m->importedFrom = m;
-	  modules.push (m);
+	  main_module->importedFrom = main_module;
+	  modules.push (main_module);
 	}
     }
 
@@ -1417,7 +1418,8 @@ d_parse_file (void)
   for (size_t i = 0; i < modules.dim; i++)
     {
       Module *m = modules[i];
-      if (m->isHdrFile || (d_option.fonly && m != Module::rootModule))
+      if ((m->isHdrFile && m != main_module)
+	  || (d_option.fonly && m != Module::rootModule))
 	continue;
 
       if (global.params.verbose)

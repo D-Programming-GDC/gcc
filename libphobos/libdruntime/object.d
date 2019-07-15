@@ -38,21 +38,33 @@ alias dstring = immutable(dchar)[];
 
 version (D_ObjectiveC) public import core.attribute : selector;
 
-/// See $(REF __cmp, rt,array,comparison)
-public import rt.array.comparison : __cmp;
-/// See $(REF __equals, rt,array,equality)
-public import rt.array.equality : __equals;
-/// See $(REF __ArrayEq, rt,array,equality)
-public import rt.array.equality : __ArrayEq;
-/// See $(REF __ArrayCast, rt,array,casting)
-public import rt.array.casting: __ArrayCast;
+/// See $(REF _d_arrayappendTImpl, core,internal,array,appending)
+public import core.internal.array.appending : _d_arrayappendTImpl;
+/// See $(REF _d_arrayappendcTXImpl, core,internal,array,appending)
+public import core.internal.array.appending : _d_arrayappendcTXImpl;
+/// See $(REF __cmp, core,internal,array,comparison)
+public import core.internal.array.comparison : __cmp;
+/// See $(REF __equals, core,internal,array,equality)
+public import core.internal.array.equality : __equals;
+/// See $(REF __ArrayEq, core,internal,array,equality)
+public import core.internal.array.equality : __ArrayEq;
+/// See $(REF __ArrayCast, core,internal,array,casting)
+public import core.internal.array.casting: __ArrayCast;
+/// See $(REF _d_arraycatnTXImpl, core,internal,array,concatenation)
+public import core.internal.array.concatenation : _d_arraycatnTXImpl;
+/// See $(REF _d_arrayctor, core,internal,array,construction)
+public import core.internal.array.construction : _d_arrayctor;
+/// See $(REF _d_arraysetctor, core,internal,array,construction)
+public import core.internal.array.construction : _d_arraysetctor;
 
-/// See $(REF capacity, rt,array,capacity)
-public import rt.array.capacity: capacity;
-/// See $(REF reserve, rt,array,capacity)
-public import rt.array.capacity: reserve;
-/// See $(REF assumeSafeAppend, rt,array,capacity)
-public import rt.array.capacity: assumeSafeAppend;
+/// See $(REF capacity, core,internal,array,capacity)
+public import core.internal.array.capacity: capacity;
+/// See $(REF reserve, core,internal,array,capacity)
+public import core.internal.array.capacity: reserve;
+/// See $(REF assumeSafeAppend, core,internal,array,capacity)
+public import core.internal.array.capacity: assumeSafeAppend;
+/// See $(REF _d_arraysetlengthTImpl, core,internal,array,capacity)
+public import core.internal.array.capacity: _d_arraysetlengthTImpl;
 
 // Compare class and interface objects for ordering.
 private int __cmp(Obj)(Obj lhs, Obj rhs)
@@ -125,6 +137,85 @@ if (is(Obj : Object))
     assert(a <= "hello");
     assert(a >= "hello");
     assert(a <  "я");
+}
+
+/**
+ * Recursively calls the `opPostMove` callbacks of a struct and its members if
+ * they're defined.
+ *
+ * When moving a struct instance, the compiler emits a call to this function
+ * after blitting the instance and before releasing the original instance's
+ * memory.
+ *
+ * Params:
+ *      newLocation = reference to struct instance being moved into
+ *      oldLocation = reference to the original instance
+ *
+ * Note:
+ *      This function is tentatively defined as `nothrow` to prevent
+ *      `opPostMove` from being defined without `nothrow`, which would allow
+ *      for possibly confusing changes in program flow.
+ */
+void __move_post_blt(S)(ref S newLocation, ref S oldLocation) nothrow
+    if (is(S == struct))
+{
+    static foreach (memberName; __traits(allMembers, S))
+    {
+        static if (is(typeof(__traits(getMember, S, memberName)) == struct))
+        {
+            __move_post_blt(__traits(getMember, newLocation, memberName), __traits(getMember, oldLocation, memberName));
+        }
+    }
+
+    static if (__traits(hasMember, S, "opPostMove"))
+    {
+        import core.internal.traits : lvalueOf, rvalueOf;
+        static assert( is(typeof(S.init.opPostMove(lvalueOf!S))) &&
+                      !is(typeof(S.init.opPostMove(rvalueOf!S))),
+                "`" ~ S.stringof ~ ".opPostMove` must take exactly one argument of type `" ~ S.stringof ~ "` by reference");
+
+        newLocation.opPostMove(oldLocation);
+    }
+}
+
+@safe nothrow unittest
+{
+    struct A
+    {
+        bool movedInto;
+        void opPostMove(const ref A oldLocation)
+        {
+            movedInto = true;
+        }
+    }
+    A src, dest;
+    __move_post_blt(dest, src);
+    assert(dest.movedInto);
+}
+
+@safe nothrow unittest
+{
+    struct A
+    {
+        bool movedInto;
+        void opPostMove(const ref A oldLocation)
+        {
+            movedInto = true;
+        }
+    }
+    struct B
+    {
+        A a;
+
+        bool movedInto;
+        void opPostMove(const ref B oldLocation)
+        {
+            movedInto = true;
+        }
+    }
+    B src, dest;
+    __move_post_blt(dest, src);
+    assert(dest.movedInto && dest.a.movedInto);
 }
 
 /**
@@ -546,11 +637,9 @@ void destroy(bool initialize = true, T : U[n], U, size_t n)(ref T obj) if (!is(T
     }
 }
 
-import core.internal.traits: isStaticArray;
-
 /// ditto
 void destroy(bool initialize = true, T)(ref T obj)
-    if (!is(T == struct) && !is(T == interface) && !is(T == class) && !isStaticArray!T)
+    if (!is(T == struct) && !is(T == interface) && !is(T == class) && !__traits(isStaticArray, T))
 {
     static if (initialize)
         obj = T.init;

@@ -1438,11 +1438,26 @@ public:
     Type *tbtype = e->to->toBasetype ();
     tree result = build_expr (e->e1, this->constp_);
 
-    /* Just evaluate e1 if it has any side effects.  */
     if (tbtype->ty == Tvoid)
-      this->result_ = build_nop (build_ctype (tbtype), result);
+      {
+	/* Just evaluate e1 if it has any side effects.  */
+	this->result_ = build_nop (build_ctype (tbtype), result);
+      }
     else
-      this->result_ = convert_expr (result, ebtype, tbtype);
+      {
+	result = convert_expr (result, ebtype, tbtype);
+
+	/* If casting from bool, the result is either 0 or 1, any other value
+	   violates @safe code, so enforce that it is never invalid.  */
+	if (ebtype->ty == Tbool)
+	  {
+	    tree restype = TREE_TYPE (result);
+	    result = fold_build2 (NE_EXPR, restype, result,
+				  d_convert (restype, integer_zero_node));
+	  }
+
+	this->result_ = result;
+      }
   }
 
   /* Build a delete expression.  */
@@ -1704,6 +1719,7 @@ public:
     tree callee = NULL_TREE;
     tree object = NULL_TREE;
     tree cleanup = NULL_TREE;
+    tree returnvalue = NULL_TREE;
     TypeFunction *tf = NULL;
 
     /* Calls to delegates can sometimes look like this.  */
@@ -1772,6 +1788,15 @@ public:
 		else
 		  fndecl = build_address (fndecl);
 
+		/* C++ constructors return void, even though front-end semantic
+		   treats them as implicitly returning 'this'.  Set returnvalue
+		   to override the result of this expression.  */
+		if (fd->isCtorDeclaration () && fd->linkage == LINKcpp)
+		  {
+		    thisexp = d_save_expr (thisexp);
+		    returnvalue = thisexp;
+		  }
+
 		callee = build_method_call (fndecl, thisexp, fd->type);
 	      }
 	  }
@@ -1837,6 +1862,9 @@ public:
     /* Now we have the type, callee and maybe object reference,
        build the call expression.  */
     tree exp = d_build_call (tf, callee, object, e->arguments);
+
+    if (returnvalue)
+      exp = compound_expr (exp, returnvalue);
 
     if (tf->isref)
       exp = build_deref (exp);
@@ -1977,7 +2005,8 @@ public:
     tree assert_fail;
 
     if (global.params.useAssert == CHECKENABLEon
-	&& global.params.checkAction == CHECKACTION_D)
+	&& (global.params.checkAction == CHECKACTION_D
+	    || global.params.checkAction == CHECKACTION_context))
       {
 	/* Generate: ((bool) e1  ? (void)0 : _d_assert (...))
 		 or: (e1 != null ? e1._invariant() : _d_assert (...))  */
@@ -2022,7 +2051,8 @@ public:
 	  }
       }
     else if (global.params.useAssert == CHECKENABLEon
-	     && global.params.checkAction == CHECKACTION_C)
+	     && (global.params.checkAction == CHECKACTION_C
+		 || global.params.checkAction == CHECKACTION_halt))
       {
 	/* Generate: __builtin_trap()  */
 	tree fn = builtin_decl_explicit (BUILT_IN_TRAP);
