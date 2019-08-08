@@ -489,7 +489,7 @@ nothrow:
                         case '~':
                             if (!home)
                                 home = getenv("HOME");
-                            if (home)
+                            if (!buf.offset && p[1] == '/' && home)
                                 buf.writestring(home);
                             else
                                 buf.writeByte('~');

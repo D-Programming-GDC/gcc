@@ -136,7 +136,7 @@ $(TR $(TD Objects) $(TD
     $(REG_ROW \W, Matches any non-word character.)
     $(REG_ROW \s, Matches whitespace, same as \p{White_Space}.)
     $(REG_ROW \S, Matches any character except those recognized as $(I \s ). )
-    $(REG_ROW \\, Matches \ character. )
+    $(REG_ROW \\\\, Matches \ character. )
     $(REG_ROW \c where c is one of [|*+?(), Matches the character c itself. )
     $(REG_ROW \p{PropertyName}, Matches a character that belongs
         to the Unicode PropertyName set.
@@ -261,7 +261,7 @@ $(TR $(TD Objects) $(TD
         $(REG_ROW $', part of input $(I following) the match. )
         $(REG_ROW $$, '$' character. )
         $(REG_ROW \c $(COMMA) where c is any character, the character c itself. )
-        $(REG_ROW \\, '\' character. )
+        $(REG_ROW \\\\, '\\' character. )
         $(REG_ROW $(DOLLAR)1 .. $(DOLLAR)99, submatch number 1 to 99 respectively. )
     )
 
@@ -411,6 +411,18 @@ if (isSomeString!(S))
     m.popFront();
     assert(m.front.whichPattern == 2);
     assert(m.front[1] == "12");
+}
+
+@system unittest
+{
+    import std.conv : to;
+    import std.string : indexOf;
+
+    immutable pattern = "s+";
+    auto regexString = to!string(regex(pattern, "U"));
+    assert(regexString.length <= pattern.length + 100, "String representation shouldn't be unreasonably bloated.");
+    assert(indexOf(regexString, "s+") >= 0, "String representation should include pattern.");
+    assert(indexOf(regexString, 'U') >= 0, "String representation should include flags.");
 }
 
 public auto regexImpl(S)(S pattern, const(char)[] flags="")

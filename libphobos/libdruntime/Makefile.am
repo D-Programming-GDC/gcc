@@ -153,38 +153,38 @@ DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	core/internal/array/comparison.d core/internal/array/concatenation.d \
 	core/internal/array/construction.d core/internal/array/equality.d \
 	core/internal/array/utils.d core/internal/arrayop.d \
-	core/internal/convert.d core/internal/dassert.d core/internal/hash.d \
-	core/internal/lifetime.d core/internal/parseoptions.d \
-	core/internal/spinlock.d core/internal/string.d core/internal/traits.d \
-	core/internal/utf.d core/internal/util/array.d core/lifetime.d \
-	core/math.d core/memory.d core/runtime.d core/simd.d \
-	core/stdc/assert_.d core/stdc/complex.d core/stdc/config.d \
-	core/stdc/ctype.d core/stdc/errno.d core/stdc/fenv.d \
-	core/stdc/float_.d core/stdc/inttypes.d core/stdc/limits.d \
-	core/stdc/locale.d core/stdc/math.d core/stdc/signal.d \
-	core/stdc/stdarg.d core/stdc/stddef.d core/stdc/stdint.d \
-	core/stdc/stdio.d core/stdc/stdlib.d core/stdc/string.d \
-	core/stdc/tgmath.d core/stdc/time.d core/stdc/wchar_.d \
-	core/stdc/wctype.d core/sync/barrier.d core/sync/condition.d \
-	core/sync/config.d core/sync/event.d core/sync/exception.d \
-	core/sync/mutex.d core/sync/rwmutex.d core/sync/semaphore.d \
-	core/thread.d core/time.d core/vararg.d gcc/attribute.d \
-	gcc/backtrace.d gcc/builtins.d gcc/deh.d gcc/emutls.d gcc/gthread.d \
-	gcc/sections/android.d gcc/sections/elf_shared.d gcc/sections/osx.d \
-	gcc/sections/package.d gcc/sections/win32.d gcc/sections/win64.d \
-	gcc/unwind/arm.d gcc/unwind/arm_common.d gcc/unwind/c6x.d \
-	gcc/unwind/generic.d gcc/unwind/package.d gcc/unwind/pe.d object.d \
-	rt/aApply.d rt/aApplyR.d rt/aaA.d rt/adi.d rt/arrayassign.d \
-	rt/arraycat.d rt/cast_.d rt/config.d rt/critical_.d rt/deh.d \
-	rt/dmain2.d rt/ehalloc.d rt/invariant.d rt/lifetime.d rt/memory.d \
-	rt/minfo.d rt/monitor_.d rt/profilegc.d rt/qsort.d rt/sections.d \
-	rt/tlsgc.d rt/typeinfo/ti_Acdouble.d rt/typeinfo/ti_Acfloat.d \
-	rt/typeinfo/ti_Acreal.d rt/typeinfo/ti_Adouble.d \
-	rt/typeinfo/ti_Afloat.d rt/typeinfo/ti_Ag.d rt/typeinfo/ti_Aint.d \
-	rt/typeinfo/ti_Along.d rt/typeinfo/ti_Areal.d rt/typeinfo/ti_Ashort.d \
-	rt/typeinfo/ti_C.d rt/typeinfo/ti_byte.d rt/typeinfo/ti_cdouble.d \
-	rt/typeinfo/ti_cent.d rt/typeinfo/ti_cfloat.d rt/typeinfo/ti_char.d \
-	rt/typeinfo/ti_creal.d rt/typeinfo/ti_dchar.d \
+	core/internal/attributes.d core/internal/convert.d \
+	core/internal/dassert.d core/internal/hash.d core/internal/lifetime.d \
+	core/internal/parseoptions.d core/internal/spinlock.d \
+	core/internal/string.d core/internal/traits.d core/internal/utf.d \
+	core/internal/util/array.d core/lifetime.d core/math.d core/memory.d \
+	core/runtime.d core/simd.d core/stdc/assert_.d core/stdc/complex.d \
+	core/stdc/config.d core/stdc/ctype.d core/stdc/errno.d \
+	core/stdc/fenv.d core/stdc/float_.d core/stdc/inttypes.d \
+	core/stdc/limits.d core/stdc/locale.d core/stdc/math.d \
+	core/stdc/signal.d core/stdc/stdarg.d core/stdc/stddef.d \
+	core/stdc/stdint.d core/stdc/stdio.d core/stdc/stdlib.d \
+	core/stdc/string.d core/stdc/tgmath.d core/stdc/time.d \
+	core/stdc/wchar_.d core/stdc/wctype.d core/sync/barrier.d \
+	core/sync/condition.d core/sync/config.d core/sync/event.d \
+	core/sync/exception.d core/sync/mutex.d core/sync/rwmutex.d \
+	core/sync/semaphore.d core/thread.d core/time.d core/vararg.d \
+	gcc/attribute.d gcc/backtrace.d gcc/builtins.d gcc/deh.d gcc/emutls.d \
+	gcc/gthread.d gcc/sections/android.d gcc/sections/elf_shared.d \
+	gcc/sections/osx.d gcc/sections/package.d gcc/sections/win32.d \
+	gcc/sections/win64.d gcc/unwind/arm.d gcc/unwind/arm_common.d \
+	gcc/unwind/c6x.d gcc/unwind/generic.d gcc/unwind/package.d \
+	gcc/unwind/pe.d object.d rt/aApply.d rt/aApplyR.d rt/aaA.d rt/adi.d \
+	rt/arrayassign.d rt/arraycat.d rt/cast_.d rt/config.d rt/critical_.d \
+	rt/deh.d rt/dmain2.d rt/ehalloc.d rt/invariant.d rt/lifetime.d \
+	rt/memory.d rt/minfo.d rt/monitor_.d rt/profilegc.d rt/qsort.d \
+	rt/sections.d rt/tlsgc.d rt/typeinfo/ti_Acdouble.d \
+	rt/typeinfo/ti_Acfloat.d rt/typeinfo/ti_Acreal.d \
+	rt/typeinfo/ti_Adouble.d rt/typeinfo/ti_Afloat.d rt/typeinfo/ti_Ag.d \
+	rt/typeinfo/ti_Aint.d rt/typeinfo/ti_Along.d rt/typeinfo/ti_Areal.d \
+	rt/typeinfo/ti_Ashort.d rt/typeinfo/ti_C.d rt/typeinfo/ti_byte.d \
+	rt/typeinfo/ti_cdouble.d rt/typeinfo/ti_cent.d rt/typeinfo/ti_cfloat.d \
+	rt/typeinfo/ti_char.d rt/typeinfo/ti_creal.d rt/typeinfo/ti_dchar.d \
 	rt/typeinfo/ti_delegate.d rt/typeinfo/ti_double.d \
 	rt/typeinfo/ti_float.d rt/typeinfo/ti_idouble.d \
 	rt/typeinfo/ti_ifloat.d rt/typeinfo/ti_int.d rt/typeinfo/ti_ireal.d \
@@ -194,12 +194,12 @@ DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	rt/typeinfo/ti_ushort.d rt/typeinfo/ti_void.d rt/typeinfo/ti_wchar.d \
 	rt/util/container/array.d rt/util/container/common.d \
 	rt/util/container/hashtab.d rt/util/container/treap.d rt/util/random.d \
-	rt/util/typeinfo.d
+	rt/util/typeinfo.d rt/util/utility.d
 
 DRUNTIME_DSOURCES_STDCXX = core/stdcpp/allocator.d core/stdcpp/array.d \
-	core/stdcpp/exception.d core/stdcpp/new_.d core/stdcpp/string_view.d \
-	core/stdcpp/type_traits.d core/stdcpp/typeinfo.d \
-	core/stdcpp/xutility.d
+	core/stdcpp/exception.d core/stdcpp/new_.d core/stdcpp/string.d \
+	core/stdcpp/string_view.d core/stdcpp/type_traits.d \
+	core/stdcpp/typeinfo.d core/stdcpp/vector.d core/stdcpp/xutility.d
 
 DRUNTIME_DSOURCES_GC = gc/bits.d gc/impl/conservative/gc.d \
 	gc/impl/manual/gc.d gc/impl/proto/gc.d gc/os.d gc/pooltable.d \

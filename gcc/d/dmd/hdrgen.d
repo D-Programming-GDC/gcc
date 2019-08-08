@@ -1602,10 +1602,20 @@ public:
             buf.writeByte(' ');
         }
         TypeFunction tf = cast(TypeFunction)f.type;
-        // Don't print tf.mod, tf.trust, and tf.linkage
+
         if (!f.inferRetType && tf.next)
             typeToBuffer(tf.next, null, buf, hgs);
         parametersToBuffer(tf.parameterList, buf, hgs);
+
+        // https://issues.dlang.org/show_bug.cgi?id=20074
+        void printAttribute(string str)
+        {
+            buf.writeByte(' ');
+            buf.writestring(str);
+        }
+        tf.attributesApply(&printAttribute);
+
+
         CompoundStatement cs = f.fbody.isCompoundStatement();
         Statement s1;
         if (f.semanticRun >= PASS.semantic3done && cs)
@@ -1614,7 +1624,7 @@ public:
         }
         else
             s1 = !cs ? f.fbody : null;
-        ReturnStatement rs = s1 ? s1.isReturnStatement() : null;
+        ReturnStatement rs = s1 ? s1.endsWithReturnStatement() : null;
         if (rs && rs.exp)
         {
             buf.writestring(" => ");
@@ -1772,7 +1782,7 @@ public:
                     if (hgs.fullDump)
                     {
                         auto sym = te.sym;
-                        if (hgs.inEnumDecl != sym)  foreach(i;0 .. sym.members.dim)
+                        if (hgs.inEnumDecl && sym && hgs.inEnumDecl != sym)  foreach(i;0 .. sym.members.dim)
                         {
                             EnumMember em = cast(EnumMember) (*sym.members)[i];
                             if (em.value.toInteger == v)
@@ -3727,6 +3737,13 @@ private void typeToBufferx(Type t, OutBuffer* buf, HdrGenState* hgs)
         buf.writestring("typeof(null)");
     }
 
+    void visitMixin(TypeMixin t)
+    {
+        buf.writestring("mixin(");
+        argsToBuffer(t.exps, buf, hgs, null);
+        buf.writeByte(')');
+    }
+
     switch (t.ty)
     {
         default:        return t.isTypeBasic() ?
@@ -3753,5 +3770,6 @@ private void typeToBufferx(Type t, OutBuffer* buf, HdrGenState* hgs)
         case Ttuple:     return visitTuple (cast(TypeTuple)t);
         case Tslice:     return visitSlice(cast(TypeSlice)t);
         case Tnull:      return visitNull(cast(TypeNull)t);
+        case Tmixin:     return visitMixin(cast(TypeMixin)t);
     }
 }

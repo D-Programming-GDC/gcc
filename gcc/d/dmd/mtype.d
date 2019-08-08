@@ -286,6 +286,7 @@ enum ENUMTY : int
     Tint128,
     Tuns128,
     TTraits,
+    Tmixin,
     TMAX,
 }
 
@@ -334,6 +335,7 @@ alias Tvector = ENUMTY.Tvector;
 alias Tint128 = ENUMTY.Tint128;
 alias Tuns128 = ENUMTY.Tuns128;
 alias Ttraits = ENUMTY.TTraits;
+alias Tmixin = ENUMTY.Tmixin;
 alias TMAX = ENUMTY.TMAX;
 
 alias TY = ubyte;
@@ -488,6 +490,7 @@ extern (C++) abstract class Type : ASTNode
             sizeTy[Tnull] = __traits(classInstanceSize, TypeNull);
             sizeTy[Tvector] = __traits(classInstanceSize, TypeVector);
             sizeTy[Ttraits] = __traits(classInstanceSize, TypeTraits);
+            sizeTy[Tmixin] = __traits(classInstanceSize, TypeMixin);
             return sizeTy;
         }();
 
@@ -2021,7 +2024,7 @@ extern (C++) abstract class Type : ASTNode
         if (!ad || !ad.aliasthis)
             return null;
 
-        auto s = ad.aliasthis;
+        auto s = ad.aliasthis.sym;
         if (s.isAliasDeclaration())
             s = s.toAlias();
 
@@ -2431,7 +2434,8 @@ extern (C++) abstract class Type : ASTNode
         char[128] namebuf;
         const namelen = 19 + size_t.sizeof * 3 + slice.length + 1;
         auto name = namelen <= namebuf.length ? namebuf.ptr : cast(char*)malloc(namelen);
-        assert(name);
+        if (!name)
+            Mem.error();
 
         const length = sprintf(name, "_D%lluTypeInfo_%.*s6__initZ",
                 cast(ulong)(9 + slice.length), cast(int)slice.length, slice.ptr);
@@ -2663,6 +2667,8 @@ extern (C++) abstract class Type : ASTNode
         inout(TypeTuple)      isTypeTuple()      { return ty == Ttuple     ? cast(typeof(return))this : null; }
         inout(TypeSlice)      isTypeSlice()      { return ty == Tslice     ? cast(typeof(return))this : null; }
         inout(TypeNull)       isTypeNull()       { return ty == Tnull      ? cast(typeof(return))this : null; }
+        inout(TypeMixin)      isTypeMixin()      { return ty == Tmixin     ? cast(typeof(return))this : null; }
+        inout(TypeTraits)     isTypeTraits()     { return ty == Ttraits    ? cast(typeof(return))this : null; }
     }
 
     override void accept(Visitor v)
@@ -5117,8 +5123,6 @@ extern (C++) final class TypeTraits : Type
     TraitsExp exp;
     /// After `typeSemantic` the symbol when `exp` doesn't represent a type.
     Dsymbol sym;
-    /// Indicates wether we are in an alias or not.
-    bool inAliasDeclaration;
 
     final extern (D) this(const ref Loc loc, TraitsExp exp)
     {
@@ -5143,6 +5147,37 @@ extern (C++) final class TypeTraits : Type
     override d_uns64 size(const ref Loc loc)
     {
         return SIZE_INVALID;
+    }
+}
+
+/******
+ * Implements mixin types.
+ *
+ * Semantic analysis will convert it to a real type.
+ */
+extern (C++) final class TypeMixin : Type
+{
+    Expressions* exps;
+
+    extern (D) this(Expressions* exps)
+    {
+        super(Tmixin);
+        this.exps = exps;
+    }
+
+    override const(char)* kind() const
+    {
+        return "mixin";
+    }
+
+    override Type syntaxCopy()
+    {
+        return new TypeMixin(Expression.arraySyntaxCopy(exps));
+    }
+
+    override void accept(Visitor v)
+    {
+        v.visit(this);
     }
 }
 

@@ -213,7 +213,7 @@ struct Runtime
      * Returns:
      *  A reference to the library or null on error.
      */
-    static void* loadLibrary()(in char[] name)
+    static void* loadLibrary()(const scope char[] name)
     {
         import core.stdc.stdlib : free, malloc;
         version (Windows)
@@ -679,8 +679,8 @@ extern (C) UnitTestResult runModuleUnitTests()
         catch ( Throwable e )
         {
             import core.stdc.stdio;
-            printf("%.*s(%zu): [unittest] %.*s\n",
-                cast(int) e.file.length, e.file.ptr, e.line,
+            printf("%.*s(%llu): [unittest] %.*s\n",
+                cast(int) e.file.length, e.file.ptr, cast(ulong) e.line,
                 cast(int) e.message.length, e.message.ptr);
             if ( typeid(e) == typeid(AssertError) )
             {

@@ -290,7 +290,7 @@ extern (C++) TupleDeclaration isAliasThisTuple(Expression e)
         {
             if (auto ad = s.isAggregateDeclaration())
             {
-                s = ad.aliasthis;
+                s = ad.aliasthis ? ad.aliasthis.sym : null;
                 if (s && s.isVarDeclaration())
                 {
                     TupleDeclaration td = s.isVarDeclaration().toAlias().isTupleDeclaration();
@@ -2813,6 +2813,11 @@ extern (C++) final class ArrayLiteralExp : Expression
 
     Expression getElement(size_t i)
     {
+        return this[i];
+    }
+
+    Expression opIndex(size_t i)
+    {
         auto el = (*elements)[i];
         return el ? el : basis;
     }
@@ -2840,7 +2845,7 @@ extern (C++) final class ArrayLiteralExp : Expression
             {
                 foreach (i; 0 .. elements.dim)
                 {
-                    auto ch = getElement(i);
+                    auto ch = this[i];
                     if (ch.op != TOK.int64)
                         return null;
                     if (sz == 1)
@@ -4277,6 +4282,13 @@ extern (C++) abstract class BinExp : Expression
         return (r1 || r2);
     }
 
+    extern (D) final bool checkSharedAccessBin(Scope* sc)
+    {
+        const r1 = e1.checkSharedAccess(sc);
+        const r2 = e2.checkSharedAccess(sc);
+        return (r1 || r2);
+    }
+
     /*********************
      * Mark the operands as will never be dereferenced,
      * which is useful info for @safe checks.
@@ -5105,19 +5117,6 @@ extern (C++) final class CastExp : UnaExp
     override Expression syntaxCopy()
     {
         return to ? new CastExp(loc, e1.syntaxCopy(), to.syntaxCopy()) : new CastExp(loc, e1.syntaxCopy(), mod);
-    }
-
-    override bool isLvalue()
-    {
-        //printf("e1.type = %s, to.type = %s\n", e1.type.toChars(), to.toChars());
-        return e1.isLvalue() && e1.type.mutableOf().unSharedOf().equals(to.mutableOf().unSharedOf());
-    }
-
-    override Expression toLvalue(Scope* sc, Expression e)
-    {
-        if (isLvalue())
-            return this;
-        return Expression.toLvalue(sc, e);
     }
 
     override Expression addDtorHook(Scope* sc)

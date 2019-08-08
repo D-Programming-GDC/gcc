@@ -5813,8 +5813,8 @@ $(D (n - State.length)).
 
 If the function is passed in string form, the state has name `"a"`
 and the zero-based index in the recurrence has name `"n"`. The
-given string must return the desired value for `a[n]` given $(D a[n
-- 1]), $(D a[n - 2]), $(D a[n - 3]),..., $(D a[n - stateSize]). The
+given string must return the desired value for `a[n]` given
+`a[n - 1]`, `a[n - 2]`, `a[n - 3]`,..., `a[n - stateSize]`. The
 state size is dictated by the number of arguments passed to the call
 to `recurrence`. The `Recurrence` struct itself takes care of
 managing the recurrence's state and shifting it appropriately.
@@ -10163,7 +10163,7 @@ do
         private:
         alias ElemType = Tuple!(Enumerator, "index", ElementType!Range, "value");
         Range range;
-        Enumerator index;
+        Unqual!Enumerator index;
 
         public:
         ElemType front() @property
@@ -10270,6 +10270,14 @@ pure @safe nothrow unittest
     assert(aa[-1]);
     assert(aa[0]);
     assert(aa[1]);
+}
+
+// Make sure passing qualified types works
+pure @safe nothrow unittest
+{
+    char[4] v;
+    immutable start = 2;
+    v[2 .. $].enumerate(start);
 }
 
 pure @safe nothrow unittest

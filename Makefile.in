@@ -1237,7 +1237,9 @@ all-target: maybe-all-target-libtermcap
 all-target: maybe-all-target-winsup
 all-target: maybe-all-target-libgloss
 all-target: maybe-all-target-libffi
+@if target-zlib-no-bootstrap
 all-target: maybe-all-target-zlib
+@endif target-zlib-no-bootstrap
 all-target: maybe-all-target-rda
 all-target: maybe-all-target-libada
 @if target-libgomp-no-bootstrap
@@ -52582,7 +52584,6 @@ configure-target-zlib: stage_current
 @if target-zlib
 maybe-configure-target-zlib: configure-target-zlib
 configure-target-zlib: 
-	@: $(MAKE); $(unstage)
 	@r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	echo "Checking multilib configuration for zlib..."; \
@@ -52620,6 +52621,412 @@ configure-target-zlib:
 
 
 
+.PHONY: configure-stage1-target-zlib maybe-configure-stage1-target-zlib
+maybe-configure-stage1-target-zlib:
+@if target-zlib-bootstrap
+maybe-configure-stage1-target-zlib: configure-stage1-target-zlib
+configure-stage1-target-zlib:
+	@[ $(current_stage) = stage1 ] || $(MAKE) stage1-start
+	@$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGE1_TFLAGS)"; \
+	echo "Checking multilib configuration for zlib..."; \
+	$(CC_FOR_TARGET) --print-multi-lib > $(TARGET_SUBDIR)/zlib/multilib.tmp 2> /dev/null; \
+	if test -r $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	  if cmp -s $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	    rm -f $(TARGET_SUBDIR)/zlib/multilib.tmp; \
+	  else \
+	    rm -f $(TARGET_SUBDIR)/zlib/Makefile; \
+	    mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	  fi; \
+	else \
+	  mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	fi; \
+	test ! -f $(TARGET_SUBDIR)/zlib/Makefile || exit 0; \
+	$(NORMAL_TARGET_EXPORTS) \
+	CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+	CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+	LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)"; export LIBCFLAGS;  \
+	echo Configuring stage 1 in $(TARGET_SUBDIR)/zlib; \
+	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib; \
+	cd $(TARGET_SUBDIR)/zlib || exit 1; \
+	case $(srcdir) in \
+	  /* | [A-Za-z]:[\\/]*) topdir=$(srcdir) ;; \
+	  *) topdir=`echo $(TARGET_SUBDIR)/zlib/ | \
+		sed -e 's,\./,,g' -e 's,[^/]*/,../,g' `$(srcdir) ;; \
+	esac; \
+	module_srcdir=zlib; \
+	$(SHELL) $$s/$$module_srcdir/configure \
+	  --srcdir=$${topdir}/$$module_srcdir \
+	  $(TARGET_CONFIGARGS) --build=${build_alias} --host=${target_alias} \
+	  --target=${target_alias} \
+	   \
+	  $(STAGE1_CONFIGURE_FLAGS)
+@endif target-zlib-bootstrap
+
+.PHONY: configure-stage2-target-zlib maybe-configure-stage2-target-zlib
+maybe-configure-stage2-target-zlib:
+@if target-zlib-bootstrap
+maybe-configure-stage2-target-zlib: configure-stage2-target-zlib
+configure-stage2-target-zlib:
+	@[ $(current_stage) = stage2 ] || $(MAKE) stage2-start
+	@$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGE2_TFLAGS)"; \
+	echo "Checking multilib configuration for zlib..."; \
+	$(CC_FOR_TARGET) --print-multi-lib > $(TARGET_SUBDIR)/zlib/multilib.tmp 2> /dev/null; \
+	if test -r $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	  if cmp -s $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	    rm -f $(TARGET_SUBDIR)/zlib/multilib.tmp; \
+	  else \
+	    rm -f $(TARGET_SUBDIR)/zlib/Makefile; \
+	    mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	  fi; \
+	else \
+	  mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	fi; \
+	test ! -f $(TARGET_SUBDIR)/zlib/Makefile || exit 0; \
+	$(NORMAL_TARGET_EXPORTS) \
+	 \
+	CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+	CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+	LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)"; export LIBCFLAGS;  \
+	echo Configuring stage 2 in $(TARGET_SUBDIR)/zlib; \
+	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib; \
+	cd $(TARGET_SUBDIR)/zlib || exit 1; \
+	case $(srcdir) in \
+	  /* | [A-Za-z]:[\\/]*) topdir=$(srcdir) ;; \
+	  *) topdir=`echo $(TARGET_SUBDIR)/zlib/ | \
+		sed -e 's,\./,,g' -e 's,[^/]*/,../,g' `$(srcdir) ;; \
+	esac; \
+	module_srcdir=zlib; \
+	$(SHELL) $$s/$$module_srcdir/configure \
+	  --srcdir=$${topdir}/$$module_srcdir \
+	  $(TARGET_CONFIGARGS) --build=${build_alias} --host=${target_alias} \
+	  --target=${target_alias} \
+	  --with-build-libsubdir=$(HOST_SUBDIR) \
+	  $(STAGE2_CONFIGURE_FLAGS)
+@endif target-zlib-bootstrap
+
+.PHONY: configure-stage3-target-zlib maybe-configure-stage3-target-zlib
+maybe-configure-stage3-target-zlib:
+@if target-zlib-bootstrap
+maybe-configure-stage3-target-zlib: configure-stage3-target-zlib
+configure-stage3-target-zlib:
+	@[ $(current_stage) = stage3 ] || $(MAKE) stage3-start
+	@$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGE3_TFLAGS)"; \
+	echo "Checking multilib configuration for zlib..."; \
+	$(CC_FOR_TARGET) --print-multi-lib > $(TARGET_SUBDIR)/zlib/multilib.tmp 2> /dev/null; \
+	if test -r $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	  if cmp -s $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	    rm -f $(TARGET_SUBDIR)/zlib/multilib.tmp; \
+	  else \
+	    rm -f $(TARGET_SUBDIR)/zlib/Makefile; \
+	    mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	  fi; \
+	else \
+	  mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	fi; \
+	test ! -f $(TARGET_SUBDIR)/zlib/Makefile || exit 0; \
+	$(NORMAL_TARGET_EXPORTS) \
+	 \
+	CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+	CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+	LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)"; export LIBCFLAGS;  \
+	echo Configuring stage 3 in $(TARGET_SUBDIR)/zlib; \
+	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib; \
+	cd $(TARGET_SUBDIR)/zlib || exit 1; \
+	case $(srcdir) in \
+	  /* | [A-Za-z]:[\\/]*) topdir=$(srcdir) ;; \
+	  *) topdir=`echo $(TARGET_SUBDIR)/zlib/ | \
+		sed -e 's,\./,,g' -e 's,[^/]*/,../,g' `$(srcdir) ;; \
+	esac; \
+	module_srcdir=zlib; \
+	$(SHELL) $$s/$$module_srcdir/configure \
+	  --srcdir=$${topdir}/$$module_srcdir \
+	  $(TARGET_CONFIGARGS) --build=${build_alias} --host=${target_alias} \
+	  --target=${target_alias} \
+	  --with-build-libsubdir=$(HOST_SUBDIR) \
+	  $(STAGE3_CONFIGURE_FLAGS)
+@endif target-zlib-bootstrap
+
+.PHONY: configure-stage4-target-zlib maybe-configure-stage4-target-zlib
+maybe-configure-stage4-target-zlib:
+@if target-zlib-bootstrap
+maybe-configure-stage4-target-zlib: configure-stage4-target-zlib
+configure-stage4-target-zlib:
+	@[ $(current_stage) = stage4 ] || $(MAKE) stage4-start
+	@$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGE4_TFLAGS)"; \
+	echo "Checking multilib configuration for zlib..."; \
+	$(CC_FOR_TARGET) --print-multi-lib > $(TARGET_SUBDIR)/zlib/multilib.tmp 2> /dev/null; \
+	if test -r $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	  if cmp -s $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	    rm -f $(TARGET_SUBDIR)/zlib/multilib.tmp; \
+	  else \
+	    rm -f $(TARGET_SUBDIR)/zlib/Makefile; \
+	    mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	  fi; \
+	else \
+	  mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	fi; \
+	test ! -f $(TARGET_SUBDIR)/zlib/Makefile || exit 0; \
+	$(NORMAL_TARGET_EXPORTS) \
+	 \
+	CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+	CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+	LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)"; export LIBCFLAGS;  \
+	echo Configuring stage 4 in $(TARGET_SUBDIR)/zlib; \
+	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib; \
+	cd $(TARGET_SUBDIR)/zlib || exit 1; \
+	case $(srcdir) in \
+	  /* | [A-Za-z]:[\\/]*) topdir=$(srcdir) ;; \
+	  *) topdir=`echo $(TARGET_SUBDIR)/zlib/ | \
+		sed -e 's,\./,,g' -e 's,[^/]*/,../,g' `$(srcdir) ;; \
+	esac; \
+	module_srcdir=zlib; \
+	$(SHELL) $$s/$$module_srcdir/configure \
+	  --srcdir=$${topdir}/$$module_srcdir \
+	  $(TARGET_CONFIGARGS) --build=${build_alias} --host=${target_alias} \
+	  --target=${target_alias} \
+	  --with-build-libsubdir=$(HOST_SUBDIR) \
+	  $(STAGE4_CONFIGURE_FLAGS)
+@endif target-zlib-bootstrap
+
+.PHONY: configure-stageprofile-target-zlib maybe-configure-stageprofile-target-zlib
+maybe-configure-stageprofile-target-zlib:
+@if target-zlib-bootstrap
+maybe-configure-stageprofile-target-zlib: configure-stageprofile-target-zlib
+configure-stageprofile-target-zlib:
+	@[ $(current_stage) = stageprofile ] || $(MAKE) stageprofile-start
+	@$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGEprofile_TFLAGS)"; \
+	echo "Checking multilib configuration for zlib..."; \
+	$(CC_FOR_TARGET) --print-multi-lib > $(TARGET_SUBDIR)/zlib/multilib.tmp 2> /dev/null; \
+	if test -r $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	  if cmp -s $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	    rm -f $(TARGET_SUBDIR)/zlib/multilib.tmp; \
+	  else \
+	    rm -f $(TARGET_SUBDIR)/zlib/Makefile; \
+	    mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	  fi; \
+	else \
+	  mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	fi; \
+	test ! -f $(TARGET_SUBDIR)/zlib/Makefile || exit 0; \
+	$(NORMAL_TARGET_EXPORTS) \
+	 \
+	CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+	CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+	LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)"; export LIBCFLAGS;  \
+	echo Configuring stage profile in $(TARGET_SUBDIR)/zlib; \
+	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib; \
+	cd $(TARGET_SUBDIR)/zlib || exit 1; \
+	case $(srcdir) in \
+	  /* | [A-Za-z]:[\\/]*) topdir=$(srcdir) ;; \
+	  *) topdir=`echo $(TARGET_SUBDIR)/zlib/ | \
+		sed -e 's,\./,,g' -e 's,[^/]*/,../,g' `$(srcdir) ;; \
+	esac; \
+	module_srcdir=zlib; \
+	$(SHELL) $$s/$$module_srcdir/configure \
+	  --srcdir=$${topdir}/$$module_srcdir \
+	  $(TARGET_CONFIGARGS) --build=${build_alias} --host=${target_alias} \
+	  --target=${target_alias} \
+	  --with-build-libsubdir=$(HOST_SUBDIR) \
+	  $(STAGEprofile_CONFIGURE_FLAGS)
+@endif target-zlib-bootstrap
+
+.PHONY: configure-stagetrain-target-zlib maybe-configure-stagetrain-target-zlib
+maybe-configure-stagetrain-target-zlib:
+@if target-zlib-bootstrap
+maybe-configure-stagetrain-target-zlib: configure-stagetrain-target-zlib
+configure-stagetrain-target-zlib:
+	@[ $(current_stage) = stagetrain ] || $(MAKE) stagetrain-start
+	@$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGEtrain_TFLAGS)"; \
+	echo "Checking multilib configuration for zlib..."; \
+	$(CC_FOR_TARGET) --print-multi-lib > $(TARGET_SUBDIR)/zlib/multilib.tmp 2> /dev/null; \
+	if test -r $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	  if cmp -s $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	    rm -f $(TARGET_SUBDIR)/zlib/multilib.tmp; \
+	  else \
+	    rm -f $(TARGET_SUBDIR)/zlib/Makefile; \
+	    mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	  fi; \
+	else \
+	  mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	fi; \
+	test ! -f $(TARGET_SUBDIR)/zlib/Makefile || exit 0; \
+	$(NORMAL_TARGET_EXPORTS) \
+	 \
+	CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+	CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+	LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)"; export LIBCFLAGS;  \
+	echo Configuring stage train in $(TARGET_SUBDIR)/zlib; \
+	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib; \
+	cd $(TARGET_SUBDIR)/zlib || exit 1; \
+	case $(srcdir) in \
+	  /* | [A-Za-z]:[\\/]*) topdir=$(srcdir) ;; \
+	  *) topdir=`echo $(TARGET_SUBDIR)/zlib/ | \
+		sed -e 's,\./,,g' -e 's,[^/]*/,../,g' `$(srcdir) ;; \
+	esac; \
+	module_srcdir=zlib; \
+	$(SHELL) $$s/$$module_srcdir/configure \
+	  --srcdir=$${topdir}/$$module_srcdir \
+	  $(TARGET_CONFIGARGS) --build=${build_alias} --host=${target_alias} \
+	  --target=${target_alias} \
+	  --with-build-libsubdir=$(HOST_SUBDIR) \
+	  $(STAGEtrain_CONFIGURE_FLAGS)
+@endif target-zlib-bootstrap
+
+.PHONY: configure-stagefeedback-target-zlib maybe-configure-stagefeedback-target-zlib
+maybe-configure-stagefeedback-target-zlib:
+@if target-zlib-bootstrap
+maybe-configure-stagefeedback-target-zlib: configure-stagefeedback-target-zlib
+configure-stagefeedback-target-zlib:
+	@[ $(current_stage) = stagefeedback ] || $(MAKE) stagefeedback-start
+	@$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGEfeedback_TFLAGS)"; \
+	echo "Checking multilib configuration for zlib..."; \
+	$(CC_FOR_TARGET) --print-multi-lib > $(TARGET_SUBDIR)/zlib/multilib.tmp 2> /dev/null; \
+	if test -r $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	  if cmp -s $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	    rm -f $(TARGET_SUBDIR)/zlib/multilib.tmp; \
+	  else \
+	    rm -f $(TARGET_SUBDIR)/zlib/Makefile; \
+	    mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	  fi; \
+	else \
+	  mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	fi; \
+	test ! -f $(TARGET_SUBDIR)/zlib/Makefile || exit 0; \
+	$(NORMAL_TARGET_EXPORTS) \
+	 \
+	CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+	CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+	LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)"; export LIBCFLAGS;  \
+	echo Configuring stage feedback in $(TARGET_SUBDIR)/zlib; \
+	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib; \
+	cd $(TARGET_SUBDIR)/zlib || exit 1; \
+	case $(srcdir) in \
+	  /* | [A-Za-z]:[\\/]*) topdir=$(srcdir) ;; \
+	  *) topdir=`echo $(TARGET_SUBDIR)/zlib/ | \
+		sed -e 's,\./,,g' -e 's,[^/]*/,../,g' `$(srcdir) ;; \
+	esac; \
+	module_srcdir=zlib; \
+	$(SHELL) $$s/$$module_srcdir/configure \
+	  --srcdir=$${topdir}/$$module_srcdir \
+	  $(TARGET_CONFIGARGS) --build=${build_alias} --host=${target_alias} \
+	  --target=${target_alias} \
+	  --with-build-libsubdir=$(HOST_SUBDIR) \
+	  $(STAGEfeedback_CONFIGURE_FLAGS)
+@endif target-zlib-bootstrap
+
+.PHONY: configure-stageautoprofile-target-zlib maybe-configure-stageautoprofile-target-zlib
+maybe-configure-stageautoprofile-target-zlib:
+@if target-zlib-bootstrap
+maybe-configure-stageautoprofile-target-zlib: configure-stageautoprofile-target-zlib
+configure-stageautoprofile-target-zlib:
+	@[ $(current_stage) = stageautoprofile ] || $(MAKE) stageautoprofile-start
+	@$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGEautoprofile_TFLAGS)"; \
+	echo "Checking multilib configuration for zlib..."; \
+	$(CC_FOR_TARGET) --print-multi-lib > $(TARGET_SUBDIR)/zlib/multilib.tmp 2> /dev/null; \
+	if test -r $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	  if cmp -s $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	    rm -f $(TARGET_SUBDIR)/zlib/multilib.tmp; \
+	  else \
+	    rm -f $(TARGET_SUBDIR)/zlib/Makefile; \
+	    mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	  fi; \
+	else \
+	  mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	fi; \
+	test ! -f $(TARGET_SUBDIR)/zlib/Makefile || exit 0; \
+	$(NORMAL_TARGET_EXPORTS) \
+	 \
+	CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+	CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+	LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)"; export LIBCFLAGS;  \
+	echo Configuring stage autoprofile in $(TARGET_SUBDIR)/zlib; \
+	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib; \
+	cd $(TARGET_SUBDIR)/zlib || exit 1; \
+	case $(srcdir) in \
+	  /* | [A-Za-z]:[\\/]*) topdir=$(srcdir) ;; \
+	  *) topdir=`echo $(TARGET_SUBDIR)/zlib/ | \
+		sed -e 's,\./,,g' -e 's,[^/]*/,../,g' `$(srcdir) ;; \
+	esac; \
+	module_srcdir=zlib; \
+	$(SHELL) $$s/$$module_srcdir/configure \
+	  --srcdir=$${topdir}/$$module_srcdir \
+	  $(TARGET_CONFIGARGS) --build=${build_alias} --host=${target_alias} \
+	  --target=${target_alias} \
+	  --with-build-libsubdir=$(HOST_SUBDIR) \
+	  $(STAGEautoprofile_CONFIGURE_FLAGS)
+@endif target-zlib-bootstrap
+
+.PHONY: configure-stageautofeedback-target-zlib maybe-configure-stageautofeedback-target-zlib
+maybe-configure-stageautofeedback-target-zlib:
+@if target-zlib-bootstrap
+maybe-configure-stageautofeedback-target-zlib: configure-stageautofeedback-target-zlib
+configure-stageautofeedback-target-zlib:
+	@[ $(current_stage) = stageautofeedback ] || $(MAKE) stageautofeedback-start
+	@$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGEautofeedback_TFLAGS)"; \
+	echo "Checking multilib configuration for zlib..."; \
+	$(CC_FOR_TARGET) --print-multi-lib > $(TARGET_SUBDIR)/zlib/multilib.tmp 2> /dev/null; \
+	if test -r $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	  if cmp -s $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; then \
+	    rm -f $(TARGET_SUBDIR)/zlib/multilib.tmp; \
+	  else \
+	    rm -f $(TARGET_SUBDIR)/zlib/Makefile; \
+	    mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	  fi; \
+	else \
+	  mv $(TARGET_SUBDIR)/zlib/multilib.tmp $(TARGET_SUBDIR)/zlib/multilib.out; \
+	fi; \
+	test ! -f $(TARGET_SUBDIR)/zlib/Makefile || exit 0; \
+	$(NORMAL_TARGET_EXPORTS) \
+	 \
+	CFLAGS="$(CFLAGS_FOR_TARGET)"; export CFLAGS; \
+	CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
+	LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)"; export LIBCFLAGS;  \
+	echo Configuring stage autofeedback in $(TARGET_SUBDIR)/zlib; \
+	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/zlib; \
+	cd $(TARGET_SUBDIR)/zlib || exit 1; \
+	case $(srcdir) in \
+	  /* | [A-Za-z]:[\\/]*) topdir=$(srcdir) ;; \
+	  *) topdir=`echo $(TARGET_SUBDIR)/zlib/ | \
+		sed -e 's,\./,,g' -e 's,[^/]*/,../,g' `$(srcdir) ;; \
+	esac; \
+	module_srcdir=zlib; \
+	$(SHELL) $$s/$$module_srcdir/configure \
+	  --srcdir=$${topdir}/$$module_srcdir \
+	  $(TARGET_CONFIGARGS) --build=${build_alias} --host=${target_alias} \
+	  --target=${target_alias} \
+	  --with-build-libsubdir=$(HOST_SUBDIR) \
+	  $(STAGEautofeedback_CONFIGURE_FLAGS)
+@endif target-zlib-bootstrap
+
+
+
 
 
 .PHONY: all-target-zlib maybe-all-target-zlib
@@ -52631,7 +53038,6 @@ all-target-zlib: stage_current
 TARGET-target-zlib=all
 maybe-all-target-zlib: all-target-zlib
 all-target-zlib: configure-target-zlib
-	@: $(MAKE); $(unstage)
 	@r=`${PWD_COMMAND}`; export r; \
 	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
 	$(NORMAL_TARGET_EXPORTS)  \
@@ -52639,6 +53045,387 @@ all-target-zlib: configure-target-zlib
 	  $(MAKE) $(BASE_FLAGS_TO_PASS) $(EXTRA_TARGET_FLAGS)   \
 		$(TARGET-target-zlib))
 @endif target-zlib
+
+
+
+.PHONY: all-stage1-target-zlib maybe-all-stage1-target-zlib
+.PHONY: clean-stage1-target-zlib maybe-clean-stage1-target-zlib
+maybe-all-stage1-target-zlib:
+maybe-clean-stage1-target-zlib:
+@if target-zlib-bootstrap
+maybe-all-stage1-target-zlib: all-stage1-target-zlib
+all-stage1: all-stage1-target-zlib
+TARGET-stage1-target-zlib = $(TARGET-target-zlib)
+all-stage1-target-zlib: configure-stage1-target-zlib
+	@[ $(current_stage) = stage1 ] || $(MAKE) stage1-start
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGE1_TFLAGS)"; \
+	$(NORMAL_TARGET_EXPORTS)  \
+	cd $(TARGET_SUBDIR)/zlib && \
+	 \
+	$(MAKE) $(BASE_FLAGS_TO_PASS) \
+		CFLAGS="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)" \
+		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
+		$(EXTRA_TARGET_FLAGS)  \
+		  \
+		TFLAGS="$(STAGE1_TFLAGS)"  \
+		$(TARGET-stage1-target-zlib)
+
+maybe-clean-stage1-target-zlib: clean-stage1-target-zlib
+clean-stage1: clean-stage1-target-zlib
+clean-stage1-target-zlib:
+	@if [ $(current_stage) = stage1 ]; then \
+	  [ -f $(TARGET_SUBDIR)/zlib/Makefile ] || exit 0; \
+	else \
+	  [ -f $(TARGET_SUBDIR)/stage1-zlib/Makefile ] || exit 0; \
+	  $(MAKE) stage1-start; \
+	fi; \
+	cd $(TARGET_SUBDIR)/zlib && \
+	$(MAKE) $(EXTRA_TARGET_FLAGS)  \
+	  clean
+@endif target-zlib-bootstrap
+
+
+.PHONY: all-stage2-target-zlib maybe-all-stage2-target-zlib
+.PHONY: clean-stage2-target-zlib maybe-clean-stage2-target-zlib
+maybe-all-stage2-target-zlib:
+maybe-clean-stage2-target-zlib:
+@if target-zlib-bootstrap
+maybe-all-stage2-target-zlib: all-stage2-target-zlib
+all-stage2: all-stage2-target-zlib
+TARGET-stage2-target-zlib = $(TARGET-target-zlib)
+all-stage2-target-zlib: configure-stage2-target-zlib
+	@[ $(current_stage) = stage2 ] || $(MAKE) stage2-start
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGE2_TFLAGS)"; \
+	$(NORMAL_TARGET_EXPORTS) \
+	  \
+	cd $(TARGET_SUBDIR)/zlib && \
+	 \
+	$(MAKE) $(BASE_FLAGS_TO_PASS) \
+		CFLAGS="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)" \
+		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
+		$(EXTRA_TARGET_FLAGS)   \
+		TFLAGS="$(STAGE2_TFLAGS)"  \
+		$(TARGET-stage2-target-zlib)
+
+maybe-clean-stage2-target-zlib: clean-stage2-target-zlib
+clean-stage2: clean-stage2-target-zlib
+clean-stage2-target-zlib:
+	@if [ $(current_stage) = stage2 ]; then \
+	  [ -f $(TARGET_SUBDIR)/zlib/Makefile ] || exit 0; \
+	else \
+	  [ -f $(TARGET_SUBDIR)/stage2-zlib/Makefile ] || exit 0; \
+	  $(MAKE) stage2-start; \
+	fi; \
+	cd $(TARGET_SUBDIR)/zlib && \
+	$(MAKE) $(EXTRA_TARGET_FLAGS)   clean
+@endif target-zlib-bootstrap
+
+
+.PHONY: all-stage3-target-zlib maybe-all-stage3-target-zlib
+.PHONY: clean-stage3-target-zlib maybe-clean-stage3-target-zlib
+maybe-all-stage3-target-zlib:
+maybe-clean-stage3-target-zlib:
+@if target-zlib-bootstrap
+maybe-all-stage3-target-zlib: all-stage3-target-zlib
+all-stage3: all-stage3-target-zlib
+TARGET-stage3-target-zlib = $(TARGET-target-zlib)
+all-stage3-target-zlib: configure-stage3-target-zlib
+	@[ $(current_stage) = stage3 ] || $(MAKE) stage3-start
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGE3_TFLAGS)"; \
+	$(NORMAL_TARGET_EXPORTS) \
+	  \
+	cd $(TARGET_SUBDIR)/zlib && \
+	 \
+	$(MAKE) $(BASE_FLAGS_TO_PASS) \
+		CFLAGS="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)" \
+		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
+		$(EXTRA_TARGET_FLAGS)   \
+		TFLAGS="$(STAGE3_TFLAGS)"  \
+		$(TARGET-stage3-target-zlib)
+
+maybe-clean-stage3-target-zlib: clean-stage3-target-zlib
+clean-stage3: clean-stage3-target-zlib
+clean-stage3-target-zlib:
+	@if [ $(current_stage) = stage3 ]; then \
+	  [ -f $(TARGET_SUBDIR)/zlib/Makefile ] || exit 0; \
+	else \
+	  [ -f $(TARGET_SUBDIR)/stage3-zlib/Makefile ] || exit 0; \
+	  $(MAKE) stage3-start; \
+	fi; \
+	cd $(TARGET_SUBDIR)/zlib && \
+	$(MAKE) $(EXTRA_TARGET_FLAGS)   clean
+@endif target-zlib-bootstrap
+
+
+.PHONY: all-stage4-target-zlib maybe-all-stage4-target-zlib
+.PHONY: clean-stage4-target-zlib maybe-clean-stage4-target-zlib
+maybe-all-stage4-target-zlib:
+maybe-clean-stage4-target-zlib:
+@if target-zlib-bootstrap
+maybe-all-stage4-target-zlib: all-stage4-target-zlib
+all-stage4: all-stage4-target-zlib
+TARGET-stage4-target-zlib = $(TARGET-target-zlib)
+all-stage4-target-zlib: configure-stage4-target-zlib
+	@[ $(current_stage) = stage4 ] || $(MAKE) stage4-start
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGE4_TFLAGS)"; \
+	$(NORMAL_TARGET_EXPORTS) \
+	  \
+	cd $(TARGET_SUBDIR)/zlib && \
+	 \
+	$(MAKE) $(BASE_FLAGS_TO_PASS) \
+		CFLAGS="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)" \
+		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
+		$(EXTRA_TARGET_FLAGS)   \
+		TFLAGS="$(STAGE4_TFLAGS)"  \
+		$(TARGET-stage4-target-zlib)
+
+maybe-clean-stage4-target-zlib: clean-stage4-target-zlib
+clean-stage4: clean-stage4-target-zlib
+clean-stage4-target-zlib:
+	@if [ $(current_stage) = stage4 ]; then \
+	  [ -f $(TARGET_SUBDIR)/zlib/Makefile ] || exit 0; \
+	else \
+	  [ -f $(TARGET_SUBDIR)/stage4-zlib/Makefile ] || exit 0; \
+	  $(MAKE) stage4-start; \
+	fi; \
+	cd $(TARGET_SUBDIR)/zlib && \
+	$(MAKE) $(EXTRA_TARGET_FLAGS)   clean
+@endif target-zlib-bootstrap
+
+
+.PHONY: all-stageprofile-target-zlib maybe-all-stageprofile-target-zlib
+.PHONY: clean-stageprofile-target-zlib maybe-clean-stageprofile-target-zlib
+maybe-all-stageprofile-target-zlib:
+maybe-clean-stageprofile-target-zlib:
+@if target-zlib-bootstrap
+maybe-all-stageprofile-target-zlib: all-stageprofile-target-zlib
+all-stageprofile: all-stageprofile-target-zlib
+TARGET-stageprofile-target-zlib = $(TARGET-target-zlib)
+all-stageprofile-target-zlib: configure-stageprofile-target-zlib
+	@[ $(current_stage) = stageprofile ] || $(MAKE) stageprofile-start
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGEprofile_TFLAGS)"; \
+	$(NORMAL_TARGET_EXPORTS) \
+	  \
+	cd $(TARGET_SUBDIR)/zlib && \
+	 \
+	$(MAKE) $(BASE_FLAGS_TO_PASS) \
+		CFLAGS="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)" \
+		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
+		$(EXTRA_TARGET_FLAGS)   \
+		TFLAGS="$(STAGEprofile_TFLAGS)"  \
+		$(TARGET-stageprofile-target-zlib)
+
+maybe-clean-stageprofile-target-zlib: clean-stageprofile-target-zlib
+clean-stageprofile: clean-stageprofile-target-zlib
+clean-stageprofile-target-zlib:
+	@if [ $(current_stage) = stageprofile ]; then \
+	  [ -f $(TARGET_SUBDIR)/zlib/Makefile ] || exit 0; \
+	else \
+	  [ -f $(TARGET_SUBDIR)/stageprofile-zlib/Makefile ] || exit 0; \
+	  $(MAKE) stageprofile-start; \
+	fi; \
+	cd $(TARGET_SUBDIR)/zlib && \
+	$(MAKE) $(EXTRA_TARGET_FLAGS)   clean
+@endif target-zlib-bootstrap
+
+
+.PHONY: all-stagetrain-target-zlib maybe-all-stagetrain-target-zlib
+.PHONY: clean-stagetrain-target-zlib maybe-clean-stagetrain-target-zlib
+maybe-all-stagetrain-target-zlib:
+maybe-clean-stagetrain-target-zlib:
+@if target-zlib-bootstrap
+maybe-all-stagetrain-target-zlib: all-stagetrain-target-zlib
+all-stagetrain: all-stagetrain-target-zlib
+TARGET-stagetrain-target-zlib = $(TARGET-target-zlib)
+all-stagetrain-target-zlib: configure-stagetrain-target-zlib
+	@[ $(current_stage) = stagetrain ] || $(MAKE) stagetrain-start
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGEtrain_TFLAGS)"; \
+	$(NORMAL_TARGET_EXPORTS) \
+	  \
+	cd $(TARGET_SUBDIR)/zlib && \
+	 \
+	$(MAKE) $(BASE_FLAGS_TO_PASS) \
+		CFLAGS="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)" \
+		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
+		$(EXTRA_TARGET_FLAGS)   \
+		TFLAGS="$(STAGEtrain_TFLAGS)"  \
+		$(TARGET-stagetrain-target-zlib)
+
+maybe-clean-stagetrain-target-zlib: clean-stagetrain-target-zlib
+clean-stagetrain: clean-stagetrain-target-zlib
+clean-stagetrain-target-zlib:
+	@if [ $(current_stage) = stagetrain ]; then \
+	  [ -f $(TARGET_SUBDIR)/zlib/Makefile ] || exit 0; \
+	else \
+	  [ -f $(TARGET_SUBDIR)/stagetrain-zlib/Makefile ] || exit 0; \
+	  $(MAKE) stagetrain-start; \
+	fi; \
+	cd $(TARGET_SUBDIR)/zlib && \
+	$(MAKE) $(EXTRA_TARGET_FLAGS)   clean
+@endif target-zlib-bootstrap
+
+
+.PHONY: all-stagefeedback-target-zlib maybe-all-stagefeedback-target-zlib
+.PHONY: clean-stagefeedback-target-zlib maybe-clean-stagefeedback-target-zlib
+maybe-all-stagefeedback-target-zlib:
+maybe-clean-stagefeedback-target-zlib:
+@if target-zlib-bootstrap
+maybe-all-stagefeedback-target-zlib: all-stagefeedback-target-zlib
+all-stagefeedback: all-stagefeedback-target-zlib
+TARGET-stagefeedback-target-zlib = $(TARGET-target-zlib)
+all-stagefeedback-target-zlib: configure-stagefeedback-target-zlib
+	@[ $(current_stage) = stagefeedback ] || $(MAKE) stagefeedback-start
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGEfeedback_TFLAGS)"; \
+	$(NORMAL_TARGET_EXPORTS) \
+	  \
+	cd $(TARGET_SUBDIR)/zlib && \
+	 \
+	$(MAKE) $(BASE_FLAGS_TO_PASS) \
+		CFLAGS="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)" \
+		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
+		$(EXTRA_TARGET_FLAGS)   \
+		TFLAGS="$(STAGEfeedback_TFLAGS)"  \
+		$(TARGET-stagefeedback-target-zlib)
+
+maybe-clean-stagefeedback-target-zlib: clean-stagefeedback-target-zlib
+clean-stagefeedback: clean-stagefeedback-target-zlib
+clean-stagefeedback-target-zlib:
+	@if [ $(current_stage) = stagefeedback ]; then \
+	  [ -f $(TARGET_SUBDIR)/zlib/Makefile ] || exit 0; \
+	else \
+	  [ -f $(TARGET_SUBDIR)/stagefeedback-zlib/Makefile ] || exit 0; \
+	  $(MAKE) stagefeedback-start; \
+	fi; \
+	cd $(TARGET_SUBDIR)/zlib && \
+	$(MAKE) $(EXTRA_TARGET_FLAGS)   clean
+@endif target-zlib-bootstrap
+
+
+.PHONY: all-stageautoprofile-target-zlib maybe-all-stageautoprofile-target-zlib
+.PHONY: clean-stageautoprofile-target-zlib maybe-clean-stageautoprofile-target-zlib
+maybe-all-stageautoprofile-target-zlib:
+maybe-clean-stageautoprofile-target-zlib:
+@if target-zlib-bootstrap
+maybe-all-stageautoprofile-target-zlib: all-stageautoprofile-target-zlib
+all-stageautoprofile: all-stageautoprofile-target-zlib
+TARGET-stageautoprofile-target-zlib = $(TARGET-target-zlib)
+all-stageautoprofile-target-zlib: configure-stageautoprofile-target-zlib
+	@[ $(current_stage) = stageautoprofile ] || $(MAKE) stageautoprofile-start
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGEautoprofile_TFLAGS)"; \
+	$(NORMAL_TARGET_EXPORTS) \
+	  \
+	cd $(TARGET_SUBDIR)/zlib && \
+	$$s/gcc/config/i386/$(AUTO_PROFILE) \
+	$(MAKE) $(BASE_FLAGS_TO_PASS) \
+		CFLAGS="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)" \
+		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
+		$(EXTRA_TARGET_FLAGS)   \
+		TFLAGS="$(STAGEautoprofile_TFLAGS)"  \
+		$(TARGET-stageautoprofile-target-zlib)
+
+maybe-clean-stageautoprofile-target-zlib: clean-stageautoprofile-target-zlib
+clean-stageautoprofile: clean-stageautoprofile-target-zlib
+clean-stageautoprofile-target-zlib:
+	@if [ $(current_stage) = stageautoprofile ]; then \
+	  [ -f $(TARGET_SUBDIR)/zlib/Makefile ] || exit 0; \
+	else \
+	  [ -f $(TARGET_SUBDIR)/stageautoprofile-zlib/Makefile ] || exit 0; \
+	  $(MAKE) stageautoprofile-start; \
+	fi; \
+	cd $(TARGET_SUBDIR)/zlib && \
+	$(MAKE) $(EXTRA_TARGET_FLAGS)   clean
+@endif target-zlib-bootstrap
+
+
+.PHONY: all-stageautofeedback-target-zlib maybe-all-stageautofeedback-target-zlib
+.PHONY: clean-stageautofeedback-target-zlib maybe-clean-stageautofeedback-target-zlib
+maybe-all-stageautofeedback-target-zlib:
+maybe-clean-stageautofeedback-target-zlib:
+@if target-zlib-bootstrap
+maybe-all-stageautofeedback-target-zlib: all-stageautofeedback-target-zlib
+all-stageautofeedback: all-stageautofeedback-target-zlib
+TARGET-stageautofeedback-target-zlib = $(TARGET-target-zlib)
+all-stageautofeedback-target-zlib: configure-stageautofeedback-target-zlib
+	@[ $(current_stage) = stageautofeedback ] || $(MAKE) stageautofeedback-start
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	TFLAGS="$(STAGEautofeedback_TFLAGS)"; \
+	$(NORMAL_TARGET_EXPORTS) \
+	  \
+	cd $(TARGET_SUBDIR)/zlib && \
+	 \
+	$(MAKE) $(BASE_FLAGS_TO_PASS) \
+		CFLAGS="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)" \
+		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
+		CXXFLAGS_FOR_TARGET="$(CXXFLAGS_FOR_TARGET)" \
+		LIBCFLAGS_FOR_TARGET="$(LIBCFLAGS_FOR_TARGET)" \
+		$(EXTRA_TARGET_FLAGS)   \
+		TFLAGS="$(STAGEautofeedback_TFLAGS)" PERF_DATA=perf.data \
+		$(TARGET-stageautofeedback-target-zlib)
+
+maybe-clean-stageautofeedback-target-zlib: clean-stageautofeedback-target-zlib
+clean-stageautofeedback: clean-stageautofeedback-target-zlib
+clean-stageautofeedback-target-zlib:
+	@if [ $(current_stage) = stageautofeedback ]; then \
+	  [ -f $(TARGET_SUBDIR)/zlib/Makefile ] || exit 0; \
+	else \
+	  [ -f $(TARGET_SUBDIR)/stageautofeedback-zlib/Makefile ] || exit 0; \
+	  $(MAKE) stageautofeedback-start; \
+	fi; \
+	cd $(TARGET_SUBDIR)/zlib && \
+	$(MAKE) $(EXTRA_TARGET_FLAGS)   clean
+@endif target-zlib-bootstrap
+
 
 
 
@@ -60319,7 +61106,15 @@ configure-target-libtermcap: stage_last
 configure-target-winsup: stage_last
 configure-target-libgloss: stage_last
 configure-target-libffi: stage_last
-configure-target-zlib: stage_last
+configure-stage1-target-zlib: maybe-all-stage1-gcc
+configure-stage2-target-zlib: maybe-all-stage2-gcc
+configure-stage3-target-zlib: maybe-all-stage3-gcc
+configure-stage4-target-zlib: maybe-all-stage4-gcc
+configure-stageprofile-target-zlib: maybe-all-stageprofile-gcc
+configure-stagetrain-target-zlib: maybe-all-stagetrain-gcc
+configure-stagefeedback-target-zlib: maybe-all-stagefeedback-gcc
+configure-stageautoprofile-target-zlib: maybe-all-stageautoprofile-gcc
+configure-stageautofeedback-target-zlib: maybe-all-stageautofeedback-gcc
 configure-target-rda: stage_last
 configure-target-libada: stage_last
 configure-stage1-target-libgomp: maybe-all-stage1-gcc
@@ -61429,8 +62224,6 @@ all-flex: maybe-all-build-bison
 all-flex: maybe-all-m4
 all-flex: maybe-all-build-texinfo
 all-m4: maybe-all-build-texinfo
-configure-target-fastjar: maybe-configure-target-zlib
-all-target-fastjar: maybe-all-target-zlib
 configure-target-libgo: maybe-configure-target-libffi
 all-target-libgo: maybe-all-target-libffi
 configure-target-libphobos: maybe-configure-target-libbacktrace
@@ -61444,6 +62237,15 @@ configure-stagefeedback-target-libphobos: maybe-configure-stagefeedback-target-l
 configure-stageautoprofile-target-libphobos: maybe-configure-stageautoprofile-target-libbacktrace
 configure-stageautofeedback-target-libphobos: maybe-configure-stageautofeedback-target-libbacktrace
 configure-target-libphobos: maybe-configure-target-zlib
+configure-stage1-target-libphobos: maybe-configure-stage1-target-zlib
+configure-stage2-target-libphobos: maybe-configure-stage2-target-zlib
+configure-stage3-target-libphobos: maybe-configure-stage3-target-zlib
+configure-stage4-target-libphobos: maybe-configure-stage4-target-zlib
+configure-stageprofile-target-libphobos: maybe-configure-stageprofile-target-zlib
+configure-stagetrain-target-libphobos: maybe-configure-stagetrain-target-zlib
+configure-stagefeedback-target-libphobos: maybe-configure-stagefeedback-target-zlib
+configure-stageautoprofile-target-libphobos: maybe-configure-stageautoprofile-target-zlib
+configure-stageautofeedback-target-libphobos: maybe-configure-stageautofeedback-target-zlib
 all-target-libphobos: maybe-all-target-libbacktrace
 all-stage1-target-libphobos: maybe-all-stage1-target-libbacktrace
 all-stage2-target-libphobos: maybe-all-stage2-target-libbacktrace
@@ -61455,6 +62257,15 @@ all-stagefeedback-target-libphobos: maybe-all-stagefeedback-target-libbacktrace
 all-stageautoprofile-target-libphobos: maybe-all-stageautoprofile-target-libbacktrace
 all-stageautofeedback-target-libphobos: maybe-all-stageautofeedback-target-libbacktrace
 all-target-libphobos: maybe-all-target-zlib
+all-stage1-target-libphobos: maybe-all-stage1-target-zlib
+all-stage2-target-libphobos: maybe-all-stage2-target-zlib
+all-stage3-target-libphobos: maybe-all-stage3-target-zlib
+all-stage4-target-libphobos: maybe-all-stage4-target-zlib
+all-stageprofile-target-libphobos: maybe-all-stageprofile-target-zlib
+all-stagetrain-target-libphobos: maybe-all-stagetrain-target-zlib
+all-stagefeedback-target-libphobos: maybe-all-stagefeedback-target-zlib
+all-stageautoprofile-target-libphobos: maybe-all-stageautoprofile-target-zlib
+all-stageautofeedback-target-libphobos: maybe-all-stageautofeedback-target-zlib
 all-target-libphobos: maybe-all-target-libatomic
 all-stage1-target-libphobos: maybe-all-stage1-target-libatomic
 all-stage2-target-libphobos: maybe-all-stage2-target-libatomic
@@ -61568,6 +62379,8 @@ all-fastjar: maybe-all-libiberty
 all-bison: maybe-all-intl
 all-flex: maybe-all-intl
 all-m4: maybe-all-intl
+configure-target-fastjar: maybe-configure-target-zlib
+all-target-fastjar: maybe-all-target-zlib
 configure-target-libgo: maybe-all-target-libstdc++-v3
 all-target-libgo: maybe-all-target-libbacktrace
 all-target-libgo: maybe-all-target-libatomic
@@ -61629,6 +62442,15 @@ configure-stagetrain-target-libphobos: maybe-all-stagetrain-target-libgcc
 configure-stagefeedback-target-libphobos: maybe-all-stagefeedback-target-libgcc
 configure-stageautoprofile-target-libphobos: maybe-all-stageautoprofile-target-libgcc
 configure-stageautofeedback-target-libphobos: maybe-all-stageautofeedback-target-libgcc
+configure-stage1-target-zlib: maybe-all-stage1-target-libgcc
+configure-stage2-target-zlib: maybe-all-stage2-target-libgcc
+configure-stage3-target-zlib: maybe-all-stage3-target-libgcc
+configure-stage4-target-zlib: maybe-all-stage4-target-libgcc
+configure-stageprofile-target-zlib: maybe-all-stageprofile-target-libgcc
+configure-stagetrain-target-zlib: maybe-all-stagetrain-target-libgcc
+configure-stagefeedback-target-zlib: maybe-all-stagefeedback-target-libgcc
+configure-stageautoprofile-target-zlib: maybe-all-stageautoprofile-target-libgcc
+configure-stageautofeedback-target-zlib: maybe-all-stageautofeedback-target-libgcc
 configure-stage1-target-libgomp: maybe-all-stage1-target-libgcc
 configure-stage2-target-libgomp: maybe-all-stage2-target-libgcc
 configure-stage3-target-libgomp: maybe-all-stage3-target-libgcc

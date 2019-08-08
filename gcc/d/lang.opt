@@ -341,13 +341,13 @@ fpreview=dip25
 D RejectNegative
 Implement DIP25: Sealed references.
 
+fpreview=dtorfields
+D RejectNegative
+Destruct fields of partially constructed objects.
+
 fpreview=fieldwise
 D RejectNegative
 Use field-wise comparisons for struct equality.
-
-fpreview=markdown
-D RejectNegative
-Enable Markdown replacements in Ddoc.
 
 fpreview=fixaliasthis
 D RejectNegative
@@ -357,9 +357,13 @@ fpreview=intpromote
 D RejectNegative
 Use C-style integral promotion for unary '+', '-' and '~'.
 
-fpreview=dtorfields
+fpreview=markdown
 D RejectNegative
-Destruct fields of partially constructed objects.
+Enable Markdown replacements in Ddoc.
+
+fpreview=nosharedaccess
+D RejectNegative
+Disable access to shared memory objects.
 
 fpreview=rvaluerefparam
 D RejectNegative

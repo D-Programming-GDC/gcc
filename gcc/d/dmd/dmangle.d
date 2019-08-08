@@ -103,6 +103,7 @@ private immutable char[TMAX] mangleChar =
     Treturn      : '@',
     Tvector      : '@',
     Ttraits      : '@',
+    Tmixin       : '@',
 ];
 
 unittest
@@ -1023,7 +1024,7 @@ public:
         buf.print(dim);
         foreach (i; 0 .. dim)
         {
-            e.getElement(i).accept(this);
+            e[i].accept(this);
         }
     }
 

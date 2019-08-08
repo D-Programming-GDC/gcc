@@ -60,6 +60,7 @@ enum SCOPE
     free          = 0x8000,   /// is on free list
 
     fullinst      = 0x10000,  /// fully instantiate templates
+    alias_        = 0x20000,  /// inside alias declaration.
 }
 
 // Flags that are carried along with a scope push()
@@ -376,7 +377,7 @@ struct Scope
             if (!ad || !ad.aliasthis)
                 return null;
 
-            Declaration decl = ad.aliasthis.isDeclaration();
+            Declaration decl = ad.aliasthis.sym.isDeclaration();
             if (!decl)
                 return null;
 

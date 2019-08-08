@@ -3116,12 +3116,8 @@ struct dylib_reference
     }
 
     @property void isym()(uint v) @safe pure nothrow @nogc
-    in
-    {
-        assert(v >= 0U, "Value is smaller than the minimum value of bitfield 'isym'");
-        assert(v <= 16777215U, "Value is greater than the maximum value of bitfield 'isym'");
-    }
-    body
+    in(v >= 0U, "Value is smaller than the minimum value of bitfield 'isym'")
+    in(v <= 16777215U, "Value is greater than the maximum value of bitfield 'isym'")
     {
         storage = cast(uint) ((storage & (-1 - cast(uint) 16777215U)) |
             ((cast(uint) v << 0U) & 16777215U));
@@ -3133,12 +3129,8 @@ struct dylib_reference
     }
 
     @property void flags()(uint v) pure nothrow @nogc @safe
-    in
-    {
-        assert(v >= 0U, "Value is smaller than the minimum value of bitfield 'flags'");
-        assert(v <= 255U, "Value is greater than the maximum value of bitfield 'flags'");
-    }
-    body
+    in(v >= 0U, "Value is smaller than the minimum value of bitfield 'flags'")
+    in(v <= 255U, "Value is greater than the maximum value of bitfield 'flags'")
     {
         storage = cast(uint) ((storage & (-1 - cast(uint) 4278190080U)) |
             ((cast(uint) v << 24U) & 4278190080U));
@@ -3163,12 +3155,8 @@ struct twolevel_hint
     }
 
     @property void isub_image()(uint v) pure nothrow @nogc @safe
-    in
-    {
-        assert(v >= 0U, "Value is smaller than the minimum value of bitfield 'isub_image'");
-        assert(v <= 255U, "Value is greater than the maximum value of bitfield 'isub_image'");
-    }
-    body
+    in(v >= 0U, "Value is smaller than the minimum value of bitfield 'isub_image'")
+    in(v <= 255U, "Value is greater than the maximum value of bitfield 'isub_image'")
     {
         storage = cast(uint) ((storage & (-1-cast(uint)255U)) |
             ((cast(uint) v << 0U) & 255U));
@@ -3180,12 +3168,8 @@ struct twolevel_hint
     }
 
     @property void itoc()(uint v) pure nothrow @nogc @safe
-    in
-    {
-        assert(v >= 0U, "Value is smaller than the minimum value of bitfield 'itoc'");
-        assert(v <= 16777215U, "Value is greater than the maximum value of bitfield 'itoc'");
-    }
-    body
+    in(v >= 0U, "Value is smaller than the minimum value of bitfield 'itoc'")
+    in(v <= 16777215U, "Value is greater than the maximum value of bitfield 'itoc'")
     {
         storage = cast(uint) ((storage & (-1-cast(uint)4294967040U)) |
             ((cast(uint) v << 8U) & 4294967040U));

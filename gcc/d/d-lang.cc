@@ -539,6 +539,7 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       global.params.fixAliasThis = value;
       global.params.fix16997 = value;
       global.params.markdown = value;
+      global.params.noSharedAccess = value;
       global.params.rvalueRefParam = value;
       break;
 
@@ -574,6 +575,10 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       global.params.markdown = value;
       break;
 
+    case OPT_fpreview_nosharedaccess:
+      global.params.noSharedAccess = value;
+      break;
+
     case OPT_fpreview_rvaluerefparam:
       global.params.rvalueRefParam = value;
       break;
@@ -607,8 +612,8 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       global.params.vcomplex = value;
       global.params.vfield = value;
       global.params.vgc = value;
-      global.params.vtls = value;
       global.params.vmarkdown= value;
+      global.params.vtls = value;
       break;
 
     case OPT_ftransition_complex:
@@ -623,12 +628,12 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       global.params.vgc = value;
       break;
 
-    case OPT_ftransition_tls:
-      global.params.vtls = value;
-      break;
-
     case OPT_ftransition_vmarkdown:
       global.params.vmarkdown = value;
+      break;
+
+    case OPT_ftransition_tls:
+      global.params.vtls = value;
       break;
 
     case OPT_funittest:
