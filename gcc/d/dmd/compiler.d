@@ -18,33 +18,31 @@
 
 module dmd.compiler;
 
+import dmd.arraytypes;
 import dmd.dmodule;
 import dmd.dscope;
 import dmd.expression;
 import dmd.mtype;
+import dmd.root.array;
+
+extern (C++) __gshared
+{
+    /// Module in which the D main is
+    Module rootHasMain = null;
+
+    bool includeImports = false;
+    // array of module patterns used to include/exclude imported modules
+    Array!(const(char)*) includeModulePatterns;
+    Modules compiledImports;
+}
+
 
 /**
  * A data structure that describes a back-end compiler and implements
  * compiler-specific actions.
  */
-struct Compiler
+extern (C++) struct Compiler
 {
-    /**
-     * Generate C main() in response to seeing D main().
-     *
-     * This function will generate a module called `__entrypoint`,
-     * and set the globals `entrypoint` and `rootHasMain`.
-     *
-     * This used to be in druntime, but contained a reference to _Dmain
-     * which didn't work when druntime was made into a dll and was linked
-     * to a program, such as a C++ program, that didn't have a _Dmain.
-     *
-     * Params:
-     *   sc = Scope which triggered the generation of the C main,
-     *        used to get the module where the D main is.
-     */
-    extern (C++) static void genCmain(Scope* sc);
-
     /******************************
      * Encode the given expression, which is assumed to be an rvalue literal
      * as another type for use in CTFE.

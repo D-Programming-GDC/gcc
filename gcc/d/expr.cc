@@ -1650,7 +1650,7 @@ public:
       {
 	StructDeclaration *sd = ((TypeStruct *) tnext)->sym;
 
-	for (size_t i = 0; i < sd->fields.dim; i++)
+	for (size_t i = 0; i < sd->fields.length; i++)
 	  {
 	    VarDeclaration *field = sd->fields[i];
 
@@ -1909,7 +1909,7 @@ public:
     tree fndecl;
     tree object;
 
-    if (e->func->isNested ())
+    if (e->func->isNested () && !e->func->isThis())
       {
 	if (e->e1->op == TOKnull)
 	  object = build_expr (e->e1);
@@ -2373,7 +2373,7 @@ public:
 	    if (e->thisexp)
 	      {
 		ClassDeclaration *tcd = e->thisexp->type->isClassHandle ();
-		Dsymbol *outer = cd->toParent2 ();
+		Dsymbol *outer = cd->toParentLocal ();
 		int offset = 0;
 
 		value = build_expr (e->thisexp);
@@ -2465,7 +2465,7 @@ public:
 	  {
 	    /* If we have a user supplied initializer, then set-up with a
 	       struct literal.  */
-	    if (e->arguments != NULL && sd->fields.dim != 0)
+	    if (e->arguments != NULL && sd->fields.length != 0)
 	      {
 		StructLiteralExp *se = StructLiteralExp::create (e->loc, sd,
 								 e->arguments,
@@ -2489,9 +2489,9 @@ public:
 	TypeDArray *tarray = tb->isTypeDArray ();
 
 	gcc_assert (!e->allocator);
-	gcc_assert (e->arguments && e->arguments->dim >= 1);
+	gcc_assert (e->arguments && e->arguments->length >= 1);
 
-	if (e->arguments->dim == 1)
+	if (e->arguments->length == 1)
 	  {
 	    /* Single dimension array allocations.  */
 	    Expression *arg = (*e->arguments)[0];
@@ -2515,11 +2515,11 @@ public:
 	    /* Multidimensional array allocations.  */
 	    vec<constructor_elt, va_gc> *elms = NULL;
 	    Type *telem = e->newtype->toBasetype ();
-	    tree tarray = make_array_type (Type::tsize_t, e->arguments->dim);
+	    tree tarray = make_array_type (Type::tsize_t, e->arguments->length);
 	    tree var = create_temporary_var (tarray);
 	    tree init = build_constructor (TREE_TYPE (var), NULL);
 
-	    for (size_t i = 0; i < e->arguments->dim; i++)
+	    for (size_t i = 0; i < e->arguments->length; i++)
 	      {
 		Expression *arg = (*e->arguments)[i];
 		CONSTRUCTOR_APPEND_ELT (elms, size_int (i), build_expr (arg));
@@ -2539,7 +2539,7 @@ public:
 
 	    tree tinfo = build_typeinfo (e->loc, e->type);
 	    tree dims = d_array_value (build_ctype (Type::tsize_t->arrayOf ()),
-				       size_int (e->arguments->dim),
+				       size_int (e->arguments->length),
 				       build_address (var));
 
 	    result = build_libcall (libcall, tb, 2, tinfo, dims);
@@ -2568,7 +2568,7 @@ public:
 	tree arg = build_typeinfo (e->loc, e->newtype);
 	result = build_libcall (libcall, tb, 1, arg);
 
-	if (e->arguments && e->arguments->dim == 1)
+	if (e->arguments && e->arguments->length == 1)
 	  {
 	    result = d_save_expr (result);
 	    tree init = modify_expr (build_deref (result),
@@ -2685,7 +2685,7 @@ public:
     if (e->e0)
       result = build_expr (e->e0);
 
-    for (size_t i = 0; i < e->exps->dim; ++i)
+    for (size_t i = 0; i < e->exps->length; ++i)
       {
 	Expression *exp = (*e->exps)[i];
 	result = compound_expr (result, build_expr (exp));
@@ -2712,7 +2712,7 @@ public:
     gcc_assert (tb->ty == Tarray || tb->ty == Tsarray || tb->ty == Tpointer);
 
     /* Handle empty array literals.  */
-    if (e->elements->dim == 0)
+    if (e->elements->length == 0)
       {
 	if (tb->ty == Tarray)
 	  this->result_ = d_array_value (build_ctype (e->type),
@@ -2727,14 +2727,14 @@ public:
     /* Build an expression that assigns the expressions in ELEMENTS to
        a constructor.  */
     vec<constructor_elt, va_gc> *elms = NULL;
-    vec_safe_reserve (elms, e->elements->dim);
+    vec_safe_reserve (elms, e->elements->length);
     bool constant_p = true;
     tree saved_elems = NULL_TREE;
 
     Type *etype = tb->nextOf ();
-    tree satype = make_array_type (etype, e->elements->dim);
+    tree satype = make_array_type (etype, e->elements->length);
 
-    for (size_t i = 0; i < e->elements->dim; i++)
+    for (size_t i = 0; i < e->elements->length; i++)
       {
 	Expression *expr = e->getElement (i);
 	tree value = build_expr (expr, this->constp_);
@@ -2773,7 +2773,7 @@ public:
 	    tree decl = build_artificial_decl (TREE_TYPE (ctor), ctor, "A");
 	    ctor = build_address (decl);
 	    if (tb->ty == Tarray)
-	      ctor = d_array_value (type, size_int (e->elements->dim), ctor);
+	      ctor = d_array_value (type, size_int (e->elements->length), ctor);
 
 	    d_pushdecl (decl);
 	    rest_of_decl_compilation (decl, 1, 0);
@@ -2793,12 +2793,12 @@ public:
 	tree mem = build_libcall (LIBCALL_ARRAYLITERALTX,
 				  etype->pointerTo (), 2,
 				  build_typeinfo (e->loc, etype->arrayOf ()),
-				  size_int (e->elements->dim));
+				  size_int (e->elements->length));
 	mem = d_save_expr (mem);
 
 	/* Now copy the constructor into memory.  */
 	tree tmemcpy = builtin_decl_explicit (BUILT_IN_MEMCPY);
-	tree size = size_mult_expr (size_int (e->elements->dim),
+	tree size = size_mult_expr (size_int (e->elements->length),
 				    size_int (tb->nextOf ()->size ()));
 
 	tree result = build_call_expr (tmemcpy, 3, mem,
@@ -2808,7 +2808,7 @@ public:
 	result = compound_expr (result, mem);
 
 	if (tb->ty == Tarray)
-	  result = d_array_value (type, size_int (e->elements->dim), result);
+	  result = d_array_value (type, size_int (e->elements->length), result);
 
 	this->result_ = compound_expr (saved_elems, result);
       }
@@ -2825,7 +2825,7 @@ public:
 
     /* Handle empty assoc array literals.  */
     TypeAArray *ta = tb->isTypeAArray ();
-    if (e->keys->dim == 0)
+    if (e->keys->length == 0)
       {
 	this->result_ = build_constructor (build_ctype (ta), NULL);
 	return;
@@ -2834,35 +2834,36 @@ public:
     /* Build an expression that assigns all expressions in KEYS
        to a constructor.  */
     vec<constructor_elt, va_gc> *kelts = NULL;
-    vec_safe_reserve (kelts, e->keys->dim);
-    for (size_t i = 0; i < e->keys->dim; i++)
+    vec_safe_reserve (kelts, e->keys->length);
+    for (size_t i = 0; i < e->keys->length; i++)
       {
 	Expression *key = (*e->keys)[i];
 	tree t = build_expr (key);
 	CONSTRUCTOR_APPEND_ELT (kelts, size_int (i),
 				convert_expr (t, key->type, ta->index));
       }
-    tree tkeys = make_array_type (ta->index, e->keys->dim);
+    tree tkeys = make_array_type (ta->index, e->keys->length);
     tree akeys = build_constructor (tkeys, kelts);
 
     /* Do the same with all expressions in VALUES.  */
     vec<constructor_elt, va_gc> *velts = NULL;
-    vec_safe_reserve (velts, e->values->dim);
-    for (size_t i = 0; i < e->values->dim; i++)
+    vec_safe_reserve (velts, e->values->length);
+    for (size_t i = 0; i < e->values->length; i++)
       {
 	Expression *value = (*e->values)[i];
 	tree t = build_expr (value);
 	CONSTRUCTOR_APPEND_ELT (velts, size_int (i),
 				convert_expr (t, value->type, ta->next));
       }
-    tree tvals = make_array_type (ta->next, e->values->dim);
+    tree tvals = make_array_type (ta->next, e->values->length);
     tree avals = build_constructor (tvals, velts);
 
     /* Generate: _d_assocarrayliteralTX (ti, keys, vals);  */
     tree keys = d_array_value (build_ctype (ta->index->arrayOf ()),
-			       size_int (e->keys->dim), build_address (akeys));
+			       size_int (e->keys->length),
+			       build_address (akeys));
     tree vals = d_array_value (build_ctype (ta->next->arrayOf ()),
-			       size_int (e->values->dim),
+			       size_int (e->values->length),
 			       build_address (avals));
 
     tree mem = build_libcall (LIBCALL_ASSOCARRAYLITERALTX, Type::tvoidptr, 3,
@@ -2882,7 +2883,7 @@ public:
   void visit (StructLiteralExp *e)
   {
     /* Handle empty struct literals.  */
-    if (e->elements == NULL || e->sd->fields.dim == 0)
+    if (e->elements == NULL || e->sd->fields.length == 0)
       {
 	this->result_ = build_constructor (build_ctype (e->type), NULL);
 	return;
@@ -2902,12 +2903,12 @@ public:
     tree saved_elems = NULL_TREE;
 
     /* CTFE may fill the hidden pointer by NullExp.  */
-    gcc_assert (e->elements->dim <= e->sd->fields.dim);
+    gcc_assert (e->elements->length <= e->sd->fields.length);
 
     Type *tb = e->type->toBasetype ();
     gcc_assert (tb->ty == Tstruct);
 
-    for (size_t i = 0; i < e->elements->dim; i++)
+    for (size_t i = 0; i < e->elements->length; i++)
       {
 	Expression *exp = (*e->elements)[i];
 	if (!exp)
@@ -2944,7 +2945,7 @@ public:
       }
 
     /* Maybe setup hidden pointer to outer scope context.  */
-    if (e->sd->isNested () && e->elements->dim != e->sd->fields.dim
+    if (e->sd->isNested () && e->elements->length != e->sd->fields.length
 	&& this->constp_ == false)
       {
 	tree field = get_symbol_decl (e->sd->vthis);
@@ -3012,8 +3013,8 @@ public:
 	vec<constructor_elt, va_gc> *elms = NULL;
 	bool constant_p = true;
 
-	vec_safe_reserve (elms, ale->elements->dim);
-	for (size_t i = 0; i < ale->elements->dim; i++)
+	vec_safe_reserve (elms, ale->elements->length);
+	for (size_t i = 0; i < ale->elements->length; i++)
 	  {
 	    Expression *expr = ale->getElement (i);
 	    tree value = d_convert (etype, build_expr (expr, this->constp_));

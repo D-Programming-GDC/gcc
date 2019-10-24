@@ -166,12 +166,13 @@ extern (C++) abstract class Statement : ASTNode
         return b;
     }
 
-    override final const(char)* toChars()
+    override final const(char)* toChars() const
     {
         HdrGenState hgs;
         OutBuffer buf;
         .toCBuffer(this, &buf, &hgs);
-        return buf.extractChars();
+        buf.writeByte(0);
+        return buf.extractSlice().ptr;
     }
 
     final void error(const(char)* format, ...)
@@ -431,6 +432,20 @@ extern (C++) abstract class Statement : ASTNode
     inout(BreakStatement)       isBreakStatement()       { return stmt == STMT.Break       ? cast(typeof(return))this : null; }
     inout(DtorExpStatement)     isDtorExpStatement()     { return stmt == STMT.DtorExp     ? cast(typeof(return))this : null; }
     inout(ForwardingStatement)  isForwardingStatement()  { return stmt == STMT.Forwarding  ? cast(typeof(return))this : null; }
+    inout(DoStatement)          isDoStatement()          { return stmt == STMT.Do          ? cast(typeof(return))this : null; }
+    inout(WhileStatement)       isWhileStatement()       { return stmt == STMT.While       ? cast(typeof(return))this : null; }
+    inout(ForStatement)         isForStatement()         { return stmt == STMT.For         ? cast(typeof(return))this : null; }
+    inout(ForeachStatement)     isForeachStatement()     { return stmt == STMT.Foreach     ? cast(typeof(return))this : null; }
+    inout(SwitchStatement)      isSwitchStatement()      { return stmt == STMT.Switch      ? cast(typeof(return))this : null; }
+    inout(ContinueStatement)    isContinueStatement()    { return stmt == STMT.Continue    ? cast(typeof(return))this : null; }
+    inout(WithStatement)        isWithStatement()        { return stmt == STMT.With        ? cast(typeof(return))this : null; }
+    inout(TryCatchStatement)    isTryCatchStatement()    { return stmt == STMT.TryCatch    ? cast(typeof(return))this : null; }
+    inout(ThrowStatement)       isThrowStatement()       { return stmt == STMT.Throw       ? cast(typeof(return))this : null; }
+    inout(TryFinallyStatement)  isTryFinallyStatement()  { return stmt == STMT.TryFinally  ? cast(typeof(return))this : null; }
+    inout(SwitchErrorStatement)  isSwitchErrorStatement()  { return stmt == STMT.SwitchError  ? cast(typeof(return))this : null; }
+    inout(UnrolledLoopStatement) isUnrolledLoopStatement() { return stmt == STMT.UnrolledLoop ? cast(typeof(return))this : null; }
+    inout(ForeachRangeStatement) isForeachRangeStatement() { return stmt == STMT.ForeachRange ? cast(typeof(return))this : null; }
+    inout(CompoundDeclarationStatement) isCompoundDeclarationStatement() { return stmt == STMT.CompoundDeclaration ? cast(typeof(return))this : null; }
 }
 
 /***********************************************************
@@ -797,8 +812,9 @@ extern (C++) final class CompileStatement : Statement
             return errorStatements();
 
         const errors = global.errors;
-        const len = buf.offset;
-        const str = buf.extractChars()[0 .. len];
+        const len = buf.length;
+        buf.writeByte(0);
+        const str = buf.extractSlice()[0 .. len];
         scope diagnosticReporter = new StderrDiagnosticReporter(global.params.useDeprecated);
         scope p = new Parser!ASTCodegen(loc, sc._module, str, false, diagnosticReporter);
         p.nextToken();
@@ -1555,7 +1571,8 @@ extern (C++) final class SwitchStatement : Statement
     bool isFinal;                   /// https://dlang.org/spec/statement.html#final-switch-statement
 
     DefaultStatement sdefault;      /// default:
-    TryFinallyStatement tf;         ///
+    Statement tryBody;              /// set to TryCatchStatement or TryFinallyStatement if in _body portion
+    TryFinallyStatement tf;         /// set if in the 'finally' block of a TryFinallyStatement
     GotoCaseStatements gotoCases;   /// array of unresolved GotoCaseStatement's
     CaseStatements* cases;          /// array of CaseStatement's
     int hasNoDefault;               /// !=0 if no default statement
@@ -1932,6 +1949,8 @@ extern (C++) final class TryCatchStatement : Statement
     Statement _body;
     Catches* catches;
 
+    Statement tryBody;   /// set to enclosing TryCatchStatement or TryFinallyStatement if in _body portion
+
     extern (D) this(const ref Loc loc, Statement _body, Catches* catches)
     {
         super(loc, STMT.TryCatch);
@@ -2001,7 +2020,8 @@ extern (C++) final class TryFinallyStatement : Statement
     Statement _body;
     Statement finalbody;
 
-    bool bodyFallsThru;         // true if _body falls through to finally
+    Statement tryBody;   /// set to enclosing TryCatchStatement or TryFinallyStatement if in _body portion
+    bool bodyFallsThru;  /// true if _body falls through to finally
 
     extern (D) this(const ref Loc loc, Statement _body, Statement finalbody)
     {
@@ -2083,11 +2103,11 @@ extern (C++) final class ScopeGuardStatement : Statement
                  *  sexception:    x = true;
                  *  sfinally: if (!x) statement;
                  */
-                auto v = copyToTemp(0, "__os", new IntegerExp(Loc.initial, 0, Type.tbool));
+                auto v = copyToTemp(0, "__os", IntegerExp.createBool(false));
                 v.dsymbolSemantic(sc);
                 *sentry = new ExpStatement(loc, v);
 
-                Expression e = new IntegerExp(Loc.initial, 1, Type.tbool);
+                Expression e = IntegerExp.createBool(true);
                 e = new AssignExp(Loc.initial, new VarExp(Loc.initial, v), e);
                 *sexception = new ExpStatement(Loc.initial, e);
 
@@ -2181,6 +2201,7 @@ extern (C++) final class GotoStatement : Statement
 {
     Identifier ident;
     LabelDsymbol label;
+    Statement tryBody;              /// set to TryCatchStatement or TryFinallyStatement if in _body portion
     TryFinallyStatement tf;
     ScopeGuardStatement os;
     VarDeclaration lastVar;
@@ -2199,10 +2220,7 @@ extern (C++) final class GotoStatement : Statement
     extern (D) bool checkLabel()
     {
         if (!label.statement)
-        {
-            error("label `%s` is undefined", label.toChars());
-            return true;
-        }
+            return true;        // error should have been issued for this already
 
         if (label.statement.os != os)
         {
@@ -2224,6 +2242,22 @@ extern (C++) final class GotoStatement : Statement
         {
             error("cannot `goto` in or out of `finally` block");
             return true;
+        }
+
+        Statement stbnext;
+        for (auto stb = tryBody; stb != label.statement.tryBody; stb = stbnext)
+        {
+            if (!stb)
+            {
+                error("cannot `goto` into `try` block");
+                return true;
+            }
+            if (auto stf = stb.isTryFinallyStatement())
+                stbnext = stf.tryBody;
+            else if (auto stc = stb.isTryCatchStatement())
+                stbnext = stc.tryBody;
+            else
+                assert(0);
         }
 
         VarDeclaration vd = label.statement.lastVar;
@@ -2269,10 +2303,12 @@ extern (C++) final class LabelStatement : Statement
     Identifier ident;
     Statement statement;
 
+    Statement tryBody;              /// set to TryCatchStatement or TryFinallyStatement if in _body portion
     TryFinallyStatement tf;
     ScopeGuardStatement os;
     VarDeclaration lastVar;
     Statement gotoTarget;       // interpret
+    void* extra;                // used by Statement_toIR()
     bool breaks;                // someone did a 'break ident'
 
     extern (D) this(const ref Loc loc, Identifier ident, Statement statement)
@@ -2333,6 +2369,9 @@ extern (C++) final class LabelStatement : Statement
 extern (C++) final class LabelDsymbol : Dsymbol
 {
     LabelStatement statement;
+
+    bool deleted;           // set if rewritten to return in foreach delegate
+    bool iasm;              // set if used by inline assembler
 
     extern (D) this(Identifier ident)
     {

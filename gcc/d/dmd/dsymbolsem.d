@@ -788,7 +788,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             dsym.error("extern symbols cannot have initializers");
 
         dsym.userAttribDecl = sc.userAttribDecl;
-        dsym.namespace = sc.namespace;
+        dsym.cppnamespace = sc.namespace;
 
         AggregateDeclaration ad = dsym.isThis();
         if (ad)
@@ -1015,7 +1015,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
 
                 OutBuffer buf;
                 buf.printf("__%s_field_%llu", dsym.ident.toChars(), cast(ulong)i);
-                auto id = Identifier.idPool(buf.peekSlice());
+                auto id = Identifier.idPool(buf[]);
 
                 Initializer ti;
                 if (ie)
@@ -1574,7 +1574,10 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         {
             loadErrored = imp.load(sc);
             if (imp.mod)
+            {
                 imp.mod.importAll(null);
+                imp.mod.checkImportDeprecation(imp.loc, sc);
+            }
         }
         if (imp.mod)
         {
@@ -1685,7 +1688,6 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         // https://issues.dlang.org/show_bug.cgi?id=11117
         // https://issues.dlang.org/show_bug.cgi?id=11164
         if (global.params.moduleDeps !is null && !(imp.id == Id.object && sc._module.ident == Id.object) &&
-            sc._module.ident != Id.entrypoint &&
             strcmp(sc._module.ident.toChars(), "__main") != 0)
         {
             /* The grammar of the file is:
@@ -1829,7 +1831,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                         goto Lnodecl;
                     (*pd.args)[0] = se;
                     if (global.params.verbose)
-                        message("linkopt   %.*s", cast(int)se.len, se.string);
+                        message("linkopt   %.*s", cast(int)se.len, se.peekString().ptr);
                 }
                 goto Lnodecl;
             }
@@ -1861,7 +1863,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                     if (se)
                     {
                         se = se.toUTF8(sc);
-                        fprintf(stderr, "%.*s", cast(int)se.len, se.string);
+                        fprintf(stderr, "%.*s", cast(int)se.len, se.peekString().ptr);
                     }
                     else
                         fprintf(stderr, "%s", e.toChars());
@@ -1881,7 +1883,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                     goto Lnodecl;
                 (*pd.args)[0] = se;
 
-                auto name = se.string[0 .. se.len].xarraydup;
+                auto name = se.peekString().xarraydup;
                 if (global.params.verbose)
                     message("library   %s", name.ptr);
                 if (global.params.moduleDeps && !global.params.moduleDepsFile)
@@ -1958,9 +1960,10 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                  *
                  * Therefore, this validation is compiler implementation specific.
                  */
+                auto slice = se.peekString();
                 for (size_t i = 0; i < se.len;)
                 {
-                    char* p = se.string;
+                    auto p = slice.ptr;
                     dchar c = p[i];
                     if (c < 0x80)
                     {
@@ -1975,7 +1978,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                             break;
                         }
                     }
-                    if (const msg = utf_decodeChar(se.string, se.len, i, c))
+                    if (const msg = utf_decodeChar(slice.ptr, se.len, i, c))
                     {
                         pd.error("%s", msg);
                         break;
@@ -2004,6 +2007,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                 buf.writestring(pd.ident.toString());
                 if (pd.args)
                 {
+                    const errors_save = global.startGagging();
                     for (size_t i = 0; i < pd.args.dim; i++)
                     {
                         Expression e = (*pd.args)[i];
@@ -2020,10 +2024,10 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                     }
                     if (pd.args.dim)
                         buf.writeByte(')');
+                    global.endGagging(errors_save);
                 }
                 message("pragma    %s", buf.peekChars());
             }
-            goto Lnodecl;
         }
         else
             error(pd.loc, "unrecognized `pragma(%s)`", pd.ident.toChars());
@@ -2040,7 +2044,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                     assert(pd.args && pd.args.dim == 1);
                     if (auto se = (*pd.args)[0].toStringExp())
                     {
-                        const name = se.string[0 .. se.len].xarraydup;
+                        const name = (cast(const(char)[])se.peekData()).xarraydup;
                         uint cnt = setMangleOverride(s, name);
                         if (cnt > 1)
                             pd.error("can only apply to a single declaration");
@@ -2078,8 +2082,9 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             return null;
 
         const errors = global.errors;
-        const len = buf.offset;
-        const str = buf.extractChars()[0 .. len];
+        const len = buf.length;
+        buf.writeByte(0);
+        const str = buf.extractSlice()[0 .. len];
         scope diagnosticReporter = new StderrDiagnosticReporter(global.params.useDeprecated);
         scope p = new Parser!ASTCodegen(cd.loc, sc._module, str, false, diagnosticReporter);
         p.nextToken();
@@ -2139,7 +2144,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
 
         if (ns.ident is null)
         {
-            ns.namespace = sc.namespace;
+            ns.cppnamespace = sc.namespace;
             sc = sc.startCTFE();
             ns.exp = ns.exp.expressionSemantic(sc);
             ns.exp = resolveProperties(sc, ns.exp);
@@ -2149,16 +2154,16 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             if (auto te = ns.exp.isTupleExp())
             {
                 expandTuples(te.exps);
-                CPPNamespaceDeclaration current = ns.namespace;
+                CPPNamespaceDeclaration current = ns.cppnamespace;
                 for (size_t d = 0; d < te.exps.dim; ++d)
                 {
                     auto exp = (*te.exps)[d];
-                    auto prev = d ? current : ns.namespace;
+                    auto prev = d ? current : ns.cppnamespace;
                     current = (d + 1) != te.exps.dim
                         ? new CPPNamespaceDeclaration(exp, null)
                         : ns;
                     current.exp = exp;
-                    current.namespace = prev;
+                    current.cppnamespace = prev;
                     if (auto se = exp.toStringExp())
                     {
                         current.ident = identFromSE(se);
@@ -2284,7 +2289,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         if (sc.stc & STC.deprecated_)
             ed.isdeprecated = true;
         ed.userAttribDecl = sc.userAttribDecl;
-        ed.namespace = sc.namespace;
+        ed.cppnamespace = sc.namespace;
 
         ed.semanticRun = PASS.semantic;
 
@@ -2703,7 +2708,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
 
         tempdecl.parent = sc.parent;
         tempdecl.protection = sc.protection;
-        tempdecl.namespace = sc.namespace;
+        tempdecl.cppnamespace = sc.namespace;
         tempdecl.isstatic = tempdecl.toParent().isModule() || (tempdecl._scope.stc & STC.static_);
 
         if (!tempdecl.isstatic)
@@ -2792,7 +2797,10 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         }
 
         /* BUG: should check:
-         *  o no virtual functions or non-static data members of classes
+         *  1. template functions must not introduce virtual functions, as they
+         *     cannot be accomodated in the vtbl[]
+         *  2. templates cannot introduce non-static data members (i.e. fields)
+         *     as they would change the instance size of the aggregate.
          */
 
         tempdecl.semanticRun = PASS.semanticdone;
@@ -3187,7 +3195,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         if (!sc || funcdecl.errors)
             return;
 
-        funcdecl.namespace = sc.namespace;
+        funcdecl.cppnamespace = sc.namespace;
         funcdecl.parent = sc.parent;
         Dsymbol parent = funcdecl.toParent();
 
@@ -3304,7 +3312,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             if (tf.purity == PURE.fwdref)
                 sc.stc |= STC.pure_;
             if (tf.trust != TRUST.default_)
-                sc.stc &= ~(STC.safe | STC.system | STC.trusted);
+                sc.stc &= ~STC.safeGroup;
             if (tf.trust == TRUST.safe)
                 sc.stc |= STC.safe;
             if (tf.trust == TRUST.system)
@@ -3616,7 +3624,9 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                             // a C++ dtor gets its vtblIndex later (and might even be added twice to the vtbl),
                             // e.g. when compiling druntime with a debug compiler, namely with core.stdcpp.exception.
                             if (auto fd = s.isFuncDeclaration())
-                                assert(fd.vtblIndex == i || (cd.classKind == ClassKind.cpp && fd.isDtorDeclaration));
+                                assert(fd.vtblIndex == i ||
+                                       (cd.classKind == ClassKind.cpp && fd.isDtorDeclaration) ||
+                                       funcdecl.parent.isInterfaceDeclaration); // interface functions can be in multiple vtbls
                         }
                     }
                     else
@@ -3990,7 +4000,29 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         }
 
         if (funcdecl.fbody && funcdecl.isMain() && sc._module.isRoot())
-            Compiler.genCmain(sc);
+        {
+            // check if `_d_cmain` is defined
+            bool cmainTemplateExists()
+            {
+                auto rootSymbol = sc.search(funcdecl.loc, Id.empty, null);
+                if (auto moduleSymbol = rootSymbol.search(funcdecl.loc, Id.object))
+                    if (moduleSymbol.search(funcdecl.loc, Id.CMain))
+                        return true;
+
+                return false;
+            }
+
+            // Only mixin `_d_cmain` if it is defined
+            if (cmainTemplateExists())
+            {
+                // add `mixin _d_cmain!();` to the declaring module
+                auto tqual = new TypeIdentifier(funcdecl.loc, Id.CMain);
+                auto tm = new TemplateMixin(funcdecl.loc, null, tqual, null);
+                sc._module.members.push(tm);
+            }
+
+            rootHasMain = sc._module;
+        }
 
         assert(funcdecl.type.ty != Terror || funcdecl.errors);
 
@@ -4625,7 +4657,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
 
             if (sc.linkage == LINK.cpp)
                 sd.classKind = ClassKind.cpp;
-            sd.namespace = sc.namespace;
+            sd.cppnamespace = sc.namespace;
         }
         else if (sd.symtab && !scx)
             return;
@@ -4845,7 +4877,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
 
             if (sc.linkage == LINK.cpp)
                 cldec.classKind = ClassKind.cpp;
-            cldec.namespace = sc.namespace;
+            cldec.cppnamespace = sc.namespace;
             if (sc.linkage == LINK.objc)
                 objc.setObjc(cldec);
         }
@@ -5564,7 +5596,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
 
             if (!idec.baseclasses.dim && sc.linkage == LINK.cpp)
                 idec.classKind = ClassKind.cpp;
-            idec.namespace = sc.namespace;
+            idec.cppnamespace = sc.namespace;
 
             if (sc.linkage == LINK.objc)
             {
@@ -5857,7 +5889,7 @@ void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions*
         goto Lerror;
 
     // Copy the tempdecl namespace (not the scope one)
-    tempinst.namespace = tempdecl.namespace;
+    tempinst.cppnamespace = tempdecl.cppnamespace;
 
     /* See if there is an existing TemplateInstantiation that already
      * implements the typeargs. If so, just refer to that one instead.

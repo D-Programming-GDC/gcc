@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "stor-layout.h"
 
 #include "d-tree.h"
+#include "d-frontend.h"
 #include "d-target.h"
 
 
@@ -238,16 +239,13 @@ build_frontend_type (tree type)
       sdecl->type->ctype = type;
       sdecl->type->merge2 ();
 
-      sdecl->members = new Dsymbols;
+      sdecl->members = d_gc_malloc<Dsymbols> ();
 
       for (tree field = TYPE_FIELDS (type); field; field = DECL_CHAIN (field))
 	{
 	  Type *ftype = build_frontend_type (TREE_TYPE (field));
 	  if (!ftype)
-	    {
-	      delete sdecl->members;
-	      return NULL;
-	    }
+	    return NULL;
 
 	  Identifier *fident
 	    = Identifier::idPool (IDENTIFIER_POINTER (DECL_NAME (field)));
@@ -272,7 +270,7 @@ build_frontend_type (tree type)
 	  tree parms = TYPE_ARG_TYPES (type);
 	  VarArg varargs_p = VARARGvariadic;
 
-	  Parameters *args = new Parameters;
+	  Parameters *args = d_gc_malloc<Parameters> ();
 	  args->reserve (list_length (parms));
 
 	  /* Attempt to convert all parameter types.  */
@@ -294,17 +292,14 @@ build_frontend_type (tree type)
 
 	      Type *targ = build_frontend_type (argtype);
 	      if (!targ)
-		{
-		  delete args;
-		  return NULL;
-		}
+		return NULL;
 
 	      args->push (Parameter::create (sc, targ, NULL, NULL, NULL));
 	    }
 
 	  /* GCC generic and placeholder built-ins are marked as variadic, yet
 	     have no named parameters, and so can't be represented in D.  */
-	  if (args->dim != 0 || varargs_p == VARARGnone)
+	  if (args->length != 0 || varargs_p == VARARGnone)
 	    {
 	      dtype = TypeFunction::create (args, dtype, varargs_p, LINKc);
 	      return dtype->addMod (mod);
@@ -362,7 +357,7 @@ d_eval_constant_expression (tree cst)
       else if (code == VECTOR_CST)
 	{
 	  dinteger_t nunits = VECTOR_CST_NELTS (cst).to_constant ();
-	  Expressions *elements = new Expressions;
+	  Expressions *elements = d_gc_malloc<Expressions> ();
 	  elements->setDim (nunits);
 
 	  for (size_t i = 0; i < nunits; i++)
@@ -499,7 +494,7 @@ build_alias_declaration (const char *alias, Type *type)
 void
 d_build_builtins_module (Module *m)
 {
-  Dsymbols *members = new Dsymbols;
+  Dsymbols *members = d_gc_malloc<Dsymbols> ();
   tree decl;
 
   for (size_t i = 0; vec_safe_iterate (gcc_builtins_functions, i, &decl); ++i)
@@ -658,9 +653,9 @@ maybe_set_builtin_1 (Dsymbol *d)
     {
       /* Recursively search through attribute decls.  */
       Dsymbols *decls = ad->include (NULL);
-      if (decls && decls->dim)
+      if (decls && decls->length)
 	{
-	  for (size_t i = 0; i < decls->dim; i++)
+	  for (size_t i = 0; i < decls->length; i++)
 	    {
 	      Dsymbol *sym = (*decls)[i];
 	      maybe_set_builtin_1 (sym);
@@ -697,7 +692,7 @@ d_maybe_set_builtin (Module *m)
   if (!m || !m->members)
     return;
 
-  for (size_t i = 0; i < m->members->dim; i++)
+  for (size_t i = 0; i < m->members->length; i++)
     {
       Dsymbol *sym = (*m->members)[i];
       maybe_set_builtin_1 (sym);

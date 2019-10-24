@@ -176,7 +176,7 @@ bool modifyFieldVar(Loc loc, Scope* sc, VarDeclaration var, Expression e1)
         {
             if (s)
             {
-                s = toParentP(s, var.toParent2());
+                s = s.toParentP(var.toParent2());
                 continue;
             }
         }
@@ -250,15 +250,19 @@ enum STC : long
     local               = (1L << 51),   // do not forward (see dmd.dsymbol.ForwardingScopeDsymbol).
     returninferred      = (1L << 52),   // 'return' has been inferred and should not be part of mangling
 
+    // Group members are mutually exclusive (there can be only one)
+    safeGroup = STC.safe | STC.trusted | STC.system,
+
     TYPECTOR = (STC.const_ | STC.immutable_ | STC.shared_ | STC.wild),
-    FUNCATTR = (STC.ref_ | STC.nothrow_ | STC.nogc | STC.pure_ | STC.property | STC.safe | STC.trusted | STC.system),
+    FUNCATTR = (STC.ref_ | STC.nothrow_ | STC.nogc | STC.pure_ | STC.property |
+                STC.safeGroup),
 }
 
 enum STCStorageClass =
     (STC.auto_ | STC.scope_ | STC.static_ | STC.extern_ | STC.const_ | STC.final_ | STC.abstract_ | STC.synchronized_ |
      STC.deprecated_ | STC.future | STC.override_ | STC.lazy_ | STC.alias_ | STC.out_ | STC.in_ | STC.manifest |
      STC.immutable_ | STC.shared_ | STC.wild | STC.nothrow_ | STC.nogc | STC.pure_ | STC.ref_ | STC.return_ | STC.tls | STC.gshared |
-     STC.property | STC.safe | STC.trusted | STC.system | STC.disable | STC.local);
+     STC.property | STC.safeGroup | STC.disable | STC.local);
 
 /* Accumulator for successive matches.
  */
@@ -617,7 +621,7 @@ extern (C++) final class TupleDeclaration : Declaration
                 {
                     buf.printf("_%s_%d", ident.toChars(), i);
                     const len = buf.offset;
-                    const name = cast(const(char)*)buf.extractData();
+                    const name = buf.extractSlice().ptr;
                     auto id = Identifier.idPool(name, len);
                     auto arg = new Parameter(STC.in_, t, id, null);
                 }
@@ -722,6 +726,7 @@ extern (C++) final class AliasDeclaration : Declaration
         //printf("AliasDeclaration::syntaxCopy()\n");
         assert(!s);
         AliasDeclaration sa = type ? new AliasDeclaration(loc, ident, type.syntaxCopy()) : new AliasDeclaration(loc, ident, aliassym.syntaxCopy(null));
+        sa.comment = comment;
         sa.storage_class = storage_class;
         return sa;
     }
@@ -976,7 +981,7 @@ extern (C++) final class OverDeclaration : Declaration
         return "overload alias"; // todo
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (this == o)
             return true;
@@ -1084,14 +1089,16 @@ extern (C++) class VarDeclaration : Declaration
     bool overlapped;                // if it is a field and has overlapping
     bool overlapUnsafe;             // if it is an overlapping field and the overlaps are unsafe
     bool doNotInferScope;           // do not infer 'scope' for this variable
+    bool doNotInferReturn;          // do not infer 'return' for this variable
     ubyte isdataseg;                // private data for isDataseg 0 unset, 1 true, 2 false
     Dsymbol aliassym;               // if redone as alias to another symbol
     VarDeclaration lastVar;         // Linked list of variables for goto-skips-init detection
     uint endlinnum;                 // line number of end of scope that this var lives in
 
     // When interpreting, these point to the value (NULL if value not determinable)
-    // The index of this variable on the CTFE stack, -1 if not allocated
-    int ctfeAdrOnStack;
+    // The index of this variable on the CTFE stack, AdrOnStackNone if not allocated
+    enum AdrOnStackNone = ~0u;
+    uint ctfeAdrOnStack;
 
     Expression edtor;               // if !=null, does the destruction of the variable
     IntRange* range;                // if !=null, the variable is known to be within the range
@@ -1122,7 +1129,7 @@ extern (C++) class VarDeclaration : Declaration
         assert(type || _init);
         this.type = type;
         this._init = _init;
-        ctfeAdrOnStack = -1;
+        ctfeAdrOnStack = AdrOnStackNone;
         this.storage_class = storage_class;
         sequenceNumber = ++nextSequenceNumber;
     }
@@ -1137,6 +1144,7 @@ extern (C++) class VarDeclaration : Declaration
         //printf("VarDeclaration::syntaxCopy(%s)\n", toChars());
         assert(!s);
         auto v = new VarDeclaration(loc, type ? type.syntaxCopy() : null, ident, _init ? _init.syntaxCopy() : null, storage_class);
+        v.comment = comment;
         return v;
     }
 
@@ -1531,7 +1539,8 @@ extern (C++) class VarDeclaration : Declaration
     /************************************
      * Check to see if this variable is actually in an enclosing function
      * rather than the current one.
-     * Returns true if error occurs.
+     * Update nestedrefs[], closureVars[] and outerVars[].
+     * Returns: true if error occurs.
      */
     extern (D) final bool checkNestedReference(Scope* sc, Loc loc)
     {
@@ -1576,7 +1585,7 @@ extern (C++) class VarDeclaration : Declaration
                 return true;
         }
 
-        // Add this to fdv.closureVars[] if not already there
+        // Add this VarDeclaration to fdv.closureVars[] if not already there
         if (!sc.intypeof && !(sc.flags & SCOPE.compile) &&
             // https://issues.dlang.org/show_bug.cgi?id=17605
             (fdv.flags & FUNCFLAG.compileTimeOnly || !(fdthis.flags & FUNCFLAG.compileTimeOnly))
@@ -1585,6 +1594,9 @@ extern (C++) class VarDeclaration : Declaration
             if (!fdv.closureVars.contains(this))
                 fdv.closureVars.push(this);
         }
+
+        if (!fdthis.outerVars.contains(this))
+            fdthis.outerVars.push(this);
 
         //printf("fdthis is %s\n", fdthis.toChars());
         //printf("var %s in function %s is nested ref\n", toChars(), fdv.toChars());
@@ -1713,7 +1725,7 @@ extern (C++) class TypeInfoDeclaration : VarDeclaration
         assert(0); // should never be produced by syntax
     }
 
-    override final const(char)* toChars()
+    override final const(char)* toChars() const
     {
         //printf("TypeInfoDeclaration::toChars() tinfo = %s\n", tinfo.toChars());
         OutBuffer buf;

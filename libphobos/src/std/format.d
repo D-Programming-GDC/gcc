@@ -2571,9 +2571,25 @@ if (is(FloatingPointTypeOf!T) && !is(T == enum) && !hasToString!(T, Char))
     import std.algorithm.comparison : min;
     import std.algorithm.searching : find;
     import std.string : indexOf, indexOfAny, indexOfNeither;
+    import std.math : isInfinity, isNaN, signbit;
+    import std.ascii : isUpper;
+
+    string nanInfStr(scope const ref FormatSpec!Char f, const bool nan,
+            const bool inf, const int sb, const bool up) @safe pure nothrow
+    {
+        return nan
+            ? up
+                ? sb ? "-NAN" : f.flPlus ? "+NAN" : "NAN"
+                : sb ? "-nan" : f.flPlus ? "+nan" : "nan"
+            : inf
+                ? up
+                    ? sb ? "-INF" : f.flPlus ? "+INF" : "INF"
+                    : sb ? "-inf" : f.flPlus ? "+inf" : "inf"
+                : "";
+    }
 
     FloatingPointTypeOf!T val = obj;
-    const spec = f.spec;
+    const char spec = f.spec;
 
     if (spec == 'r')
     {
@@ -2599,43 +2615,32 @@ if (is(FloatingPointTypeOf!T) && !is(T == enum) && !hasToString!(T, Char))
 
     version (CRuntime_Microsoft)
     {
-        import std.math : isNaN, isInfinity;
-        immutable double tval = val; // convert early to get "inf" in case of overflow
-        string s;
-        if (isNaN(tval))
-            s = "nan"; // snprintf writes 1.#QNAN
-        else if (isInfinity(tval))
-            s = val >= 0 ? "inf" : "-inf"; // snprintf writes 1.#INF
-
-        if (s.length > 0)
-        {
-          version (none)
-          {
-            return formatValueImpl(w, s, f);
-          }
-          else  // FIXME:workaround
-          {
-            s = s[0 .. f.precision < $ ? f.precision : $];
-            if (!f.flDash)
-            {
-                // right align
-                if (f.width > s.length)
-                    foreach (j ; 0 .. f.width - s.length) put(w, ' ');
-                put(w, s);
-            }
-            else
-            {
-                // left align
-                put(w, s);
-                if (f.width > s.length)
-                    foreach (j ; 0 .. f.width - s.length) put(w, ' ');
-            }
-            return;
-          }
-        }
+        // convert early to get "inf" in case of overflow
+        // windows handels inf and nan strange
+        // https://devblogs.microsoft.com/oldnewthing/20130228-01/?p=5103
+        immutable double tval = val;
     }
     else
+    {
         alias tval = val;
+    }
+
+    const nan = isNaN(tval);
+    const inf = isInfinity(tval);
+
+    if (nan || inf)
+    {
+        const sb = signbit(tval);
+        const up = isUpper(spec);
+        string ns = nanInfStr(f, nan, inf, sb, up);
+        FormatSpec!Char co;
+        co.spec = 's';
+        co.width = f.width;
+        co.flDash = f.flDash;
+        formatValue(w, ns, co);
+        return;
+    }
+
     FormatSpec!Char fs = f; // fs is copy for change its values.
     const spec2 = spec == 's' ? 'g' : spec;
     char[1 /*%*/ + 5 /*flags*/ + 3 /*width.prec*/ + 2 /*format*/
@@ -2654,6 +2659,8 @@ if (is(FloatingPointTypeOf!T) && !is(T == enum) && !hasToString!(T, Char))
     sprintfSpec[i] = 0;
     //printf("format: '%s'; geeba: %g\n", sprintfSpec.ptr, val);
     char[512] buf = void;
+
+    //writefln("'%s'", sprintfSpec[0 .. i]);
 
     immutable n = ()@trusted{
         import core.stdc.stdio : snprintf;
@@ -3288,6 +3295,9 @@ if (is(DynamicArrayTypeOf!T) && !is(StringTypeOf!T) && !is(T == enum) && !hasToS
 private void formatRange(Writer, T, Char)(ref Writer w, ref T val, scope const ref FormatSpec!Char f)
 if (isInputRange!T)
 {
+    // in this mode, we just want to do a representative print to discover if the format spec is valid
+    enum formatTestMode = is(Writer == NoOpSink);
+
     import std.conv : text;
 
     // Formatting character ranges like string
@@ -3390,7 +3400,10 @@ if (isInputRange!T)
                         {
                             printed = 0;
                             for (; !val.empty; val.popFront(), ++printed)
+                            {
                                 put(w, val.front);
+                                static if (formatTestMode) break; // one is enough to test
+                            }
                         }
                     }
                     else
@@ -3417,6 +3430,7 @@ if (isInputRange!T)
                 {
                     put(w, f.seqSeparator);
                     formatElement(w, val.front, f);
+                    static if (formatTestMode) break; // one is enough to test
                 }
             }
             static if (!isInfinite!T) put(w, f.seqAfter);
@@ -3431,6 +3445,7 @@ if (isInputRange!T)
             foreach (e ; a)
             {
                 formatValue(w, e, f);
+                static if (formatTestMode) break; // one is enough to test
             }
         }
         else
@@ -3438,6 +3453,7 @@ if (isInputRange!T)
             for (size_t i; !val.empty; val.popFront(), ++i)
             {
                 formatValue(w, val.front, f);
+                static if (formatTestMode) break; // one is enough to test
             }
         }
     }
@@ -3467,20 +3483,27 @@ if (isInputRange!T)
                         continue w;
                 break w;
             }
-            if (f.sep !is null)
+            static if (formatTestMode)
             {
-                put(w, fmt.trailing);
-                val.popFront();
-                if (val.empty)
-                    break;
-                put(w, f.sep);
+                break; // one is enough to test
             }
             else
             {
-                val.popFront();
-                if (val.empty)
-                    break;
-                put(w, fmt.trailing);
+                if (f.sep !is null)
+                {
+                    put(w, fmt.trailing);
+                    val.popFront();
+                    if (val.empty)
+                        break;
+                    put(w, f.sep);
+                }
+                else
+                {
+                    val.popFront();
+                    if (val.empty)
+                        break;
+                    put(w, fmt.trailing);
+                }
             }
         }
     }
@@ -3541,7 +3564,7 @@ void formatElement(Writer, T, Char)(auto ref Writer w, T val, scope const ref Fo
 if (is(StringTypeOf!T) && !is(T == enum))
 {
     import std.array : appender;
-    import std.utf : UTFException;
+    import std.utf : decode, UTFException;
 
     StringTypeOf!T str = val;   // bug 8015
 
@@ -3550,21 +3573,21 @@ if (is(StringTypeOf!T) && !is(T == enum))
         try
         {
             // ignore other specifications and quote
-            auto app = appender!(typeof(val[0])[])();
-            put(app, '\"');
             for (size_t i = 0; i < str.length; )
             {
-                import std.utf : decode;
-
                 auto c = decode(str, i);
                 // \uFFFE and \uFFFF are considered valid by isValidDchar,
                 // so need checking for interchange.
                 if (c == 0xFFFE || c == 0xFFFF)
                     goto LinvalidSeq;
-                formatChar(app, c, '"');
             }
-            put(app, '\"');
-            put(w, app.data);
+            put(w, '\"');
+            for (size_t i = 0; i < str.length; )
+            {
+                auto c = decode(str, i);
+                formatChar(w, c, '"');
+            }
+            put(w, '\"');
             return;
         }
         catch (UTFException)
@@ -4190,6 +4213,20 @@ version (unittest)
     S s = S(1);
 
     format!"%s"(s);
+}
+
+// https://issues.dlang.org/show_bug.cgi?id=20218
+@safe pure unittest
+{
+    void notCalled()
+    {
+        import std.range : repeat;
+
+        auto value = 1.repeat;
+
+        // test that range is not evaluated to completion at compiletime
+        format!"%s"(value);
+    }
 }
 
 // https://issues.dlang.org/show_bug.cgi?id=7879
@@ -5878,7 +5915,8 @@ do
             }
             else static if (isDynamicArray!T)
             {
-                result ~= unformatElement!(ElementType!T)(input, fmt);
+                import std.conv : WideElementType;
+                result ~= unformatElement!(WideElementType!T)(input, fmt);
             }
             else static if (isAssociativeArray!T)
             {
@@ -6587,10 +6625,10 @@ char[] sformat(Char, Args...)(return scope char[] buf, scope const(Char)[] fmt, 
     import core.exception : RangeError;
     import std.utf : encode;
 
-    size_t i;
-
-    struct Sink
+    static struct Sink
     {
+        char[] buf;
+        size_t i;
         void put(dchar c)
         {
             char[4] enc;
@@ -6621,7 +6659,8 @@ char[] sformat(Char, Args...)(return scope char[] buf, scope const(Char)[] fmt, 
                 put(s.front);
         }
     }
-    auto n = formattedWrite(Sink(), fmt, args);
+    auto sink = Sink(buf);
+    auto n = formattedWrite(sink, fmt, args);
     version (all)
     {
         // In the future, this check will be removed to increase consistency
@@ -6632,7 +6671,7 @@ char[] sformat(Char, Args...)(return scope char[] buf, scope const(Char)[] fmt, 
             text("Orphan format arguments: args[", n, " .. ", args.length, "]")
         );
     }
-    return buf[0 .. i];
+    return buf[0 .. sink.i];
 }
 
 /// The format string can be checked at compile-time (see $(LREF format) for details):
@@ -6668,6 +6707,17 @@ char[] sformat(Char, Args...)(return scope char[] buf, scope const(Char)[] fmt, 
 
     assert(sformat(buf[], "%s %s %s", "c"c, "w"w, "d"d) == "c w d");
     });
+}
+
+@system unittest // ensure that sformat avoids the GC
+{
+    import core.memory : GC;
+    const a = ["foo", "bar"];
+    const u = GC.stats().usedSize;
+    char[20] buf;
+    sformat(buf, "%d", 123);
+    sformat(buf, "%s", a);
+    assert(u == GC.stats().usedSize);
 }
 
 /*****************************
@@ -6828,4 +6878,59 @@ char[] sformat(Char, Args...)(return scope char[] buf, scope const(Char)[] fmt, 
     cmp = "0,100,000";
     tmp  = format("%08,d", 100_000);
     assert(tmp == cmp, tmp);
+}
+
+// Issue 20288
+@safe unittest
+{
+    string s = format("%,.2f", double.nan);
+    assert(s == "nan", s);
+
+    s = format("%,.2F", double.nan);
+    assert(s == "NAN", s);
+
+    s = format("%,.2f", -double.nan);
+    assert(s == "-nan", s);
+
+    s = format("%,.2F", -double.nan);
+    assert(s == "-NAN", s);
+
+    string g = format("^%13s$", "nan");
+    string h = "^          nan$";
+    assert(g == h, "\ngot:" ~ g ~ "\nexp:" ~ h);
+    string a = format("^%13,3.2f$", double.nan);
+    string b = format("^%13,3.2F$", double.nan);
+    string c = format("^%13,3.2f$", -double.nan);
+    string d = format("^%13,3.2F$", -double.nan);
+    assert(a == "^          nan$", "\ngot:'"~ a ~ "'\nexp:'^          nan$'");
+    assert(b == "^          NAN$", "\ngot:'"~ b ~ "'\nexp:'^          NAN$'");
+    assert(c == "^         -nan$", "\ngot:'"~ c ~ "'\nexp:'^         -nan$'");
+    assert(d == "^         -NAN$", "\ngot:'"~ d ~ "'\nexp:'^         -NAN$'");
+
+    a = format("^%-13,3.2f$", double.nan);
+    b = format("^%-13,3.2F$", double.nan);
+    c = format("^%-13,3.2f$", -double.nan);
+    d = format("^%-13,3.2F$", -double.nan);
+    assert(a == "^nan          $", "\ngot:'"~ a ~ "'\nexp:'^nan          $'");
+    assert(b == "^NAN          $", "\ngot:'"~ b ~ "'\nexp:'^NAN          $'");
+    assert(c == "^-nan         $", "\ngot:'"~ c ~ "'\nexp:'^-nan         $'");
+    assert(d == "^-NAN         $", "\ngot:'"~ d ~ "'\nexp:'^-NAN         $'");
+
+    a = format("^%+13,3.2f$", double.nan);
+    b = format("^%+13,3.2F$", double.nan);
+    c = format("^%+13,3.2f$", -double.nan);
+    d = format("^%+13,3.2F$", -double.nan);
+    assert(a == "^         +nan$", "\ngot:'"~ a ~ "'\nexp:'^         +nan$'");
+    assert(b == "^         +NAN$", "\ngot:'"~ b ~ "'\nexp:'^         +NAN$'");
+    assert(c == "^         -nan$", "\ngot:'"~ c ~ "'\nexp:'^         -nan$'");
+    assert(d == "^         -NAN$", "\ngot:'"~ d ~ "'\nexp:'^         -NAN$'");
+
+    a = format("^%-+13,3.2f$", double.nan);
+    b = format("^%-+13,3.2F$", double.nan);
+    c = format("^%-+13,3.2f$", -double.nan);
+    d = format("^%-+13,3.2F$", -double.nan);
+    assert(a == "^+nan         $", "\ngot:'"~ a ~ "'\nexp:'^+nan         $'");
+    assert(b == "^+NAN         $", "\ngot:'"~ b ~ "'\nexp:'^+NAN         $'");
+    assert(c == "^-nan         $", "\ngot:'"~ c ~ "'\nexp:'^-nan         $'");
+    assert(d == "^-NAN         $", "\ngot:'"~ d ~ "'\nexp:'^-NAN         $'");
 }

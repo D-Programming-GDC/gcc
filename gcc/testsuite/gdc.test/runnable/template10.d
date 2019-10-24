@@ -1,5 +1,8 @@
 // PERMUTE_ARGS: -inline
 
+void main() {}  // XBUG: dual-context not supported
+__EOF__
+
 /********************************************/
 
 void test1a()

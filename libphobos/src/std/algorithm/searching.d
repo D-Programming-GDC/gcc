@@ -375,7 +375,7 @@ public:
                 if (npos == 0) return haystack[hpos .. $];
                 --npos;
             }
-            hpos += max(skip[npos], cast(sizediff_t) npos - occurrence(haystack[npos+hpos]));
+            hpos += max(skip[npos], cast(ptrdiff_t) npos - occurrence(haystack[npos+hpos]));
         }
         return haystack[$ .. $];
     }
@@ -3319,7 +3319,7 @@ These functions may be used for computing arbitrary extrema by choosing `pred`
 appropriately. For corrrect functioning, `pred` must be a strict partial order,
 i.e. transitive (if `pred(a, b) && pred(b, c)` then `pred(a, c)`) and
 irreflexive (`pred(a, a)` is `false`). The $(LUCKY trichotomy property of
-inequality) is not required: these algoritms consider elements `a` and `b` equal
+inequality) is not required: these algorithms consider elements `a` and `b` equal
 (for the purpose of counting) if `pred` puts them in the same equivalence class,
 i.e. `!pred(a, b) && !pred(b, a)`.
 
@@ -3330,6 +3330,10 @@ Params:
 
 Returns: The minimum, respectively maximum element of a range together with the
 number it occurs in the range.
+
+Limitations: If at least one of the arguments is NaN, the result is
+an unspecified value. See $(REF maxElement, std,algorithm,searching)
+for examples on how to cope with NaNs.
 
 Throws: `Exception` if `range.empty`.
 
@@ -3539,6 +3543,24 @@ Params:
 
 Returns: The minimal element of the passed-in range.
 
+Note:
+    If at least one of the arguments is NaN, the result is an unspecified value.
+
+    If you want to ignore NaNs, you can use $(REF filter, std,algorithm,iteration)
+    and $(REF isNaN, std,math) to remove them, before applying minElement.
+    Add a suitable seed, to avoid error messages if all elements are NaNs:
+
+    ---
+    <range>.filter!(a=>!a.isNaN).minElement(<seed>);
+    ---
+
+    If you want to get NaN as a result if a NaN is present in the range,
+    you can use $(REF fold, std.algorithm,iteration) and $(REF isNaN, std,math):
+
+    ---
+    <range>.fold!((a,b)=>a.isNaN || b.isNaN ? real.nan : a < b ? a : b);
+    ---
+
 See_Also:
 
     $(LREF maxElement), $(REF min, std,algorithm,comparison), $(LREF minCount),
@@ -3662,16 +3684,20 @@ Iterates the passed range and returns the maximal element.
 A custom mapping function can be passed to `map`.
 In other languages this is sometimes called `argmax`.
 
-Complexity:
+Complexity: O(n)
     Exactly `n - 1` comparisons are needed.
 
 Params:
     map = custom accessor for the comparison key
-    r = range from which the maximum will be selected
+    r = range from which the maximum element will be selected
     seed = custom seed to use as initial element
 
 Returns: The maximal element of the passed-in range.
 
+Note:
+    If at least one of the arguments is NaN, the result is an unspecified value.
+    See $(REF minElement, std,algorithm,searching) for examples on how to cope
+    with NaNs.
 
 See_Also:
 
@@ -3806,6 +3832,10 @@ Returns: The position of the minimum (respectively maximum) element of forward
 range `range`, i.e. a subrange of `range` starting at the position of  its
 smallest (respectively largest) element and with the same ending as `range`.
 
+Limitations: If at least one of the arguments is NaN, the result is
+an unspecified value. See $(REF maxElement, std,algorithm,searching)
+for examples on how to cope with NaNs.
+
 See_Also:
     $(REF max, std,algorithm,comparison), $(LREF minCount), $(LREF minIndex), $(LREF minElement)
 */
@@ -3916,16 +3946,21 @@ Returns:
     The index of the first encounter of the minimum element in `range`. If the
     `range` is empty, -1 is returned.
 
+Limitations:
+    If at least one of the arguments is NaN, the result is
+    an unspecified value. See $(REF maxElement, std,algorithm,searching)
+    for examples on how to cope with NaNs.
+
 See_Also:
     $(LREF maxIndex), $(REF min, std,algorithm,comparison), $(LREF minCount), $(LREF minElement), $(LREF minPos)
  */
-sizediff_t minIndex(alias pred = "a < b", Range)(Range range)
+ptrdiff_t minIndex(alias pred = "a < b", Range)(Range range)
 if (isInputRange!Range && !isInfinite!Range &&
     is(typeof(binaryFun!pred(range.front, range.front))))
 {
     if (range.empty) return -1;
 
-    sizediff_t minPos = 0;
+    ptrdiff_t minPos = 0;
 
     static if (isRandomAccessRange!Range && hasLength!Range)
     {
@@ -3939,7 +3974,7 @@ if (isInputRange!Range && !isInfinite!Range &&
     }
     else
     {
-        sizediff_t curPos = 0;
+        ptrdiff_t curPos = 0;
         Unqual!(typeof(range.front)) min = range.front;
         for (range.popFront(); !range.empty; range.popFront())
         {
@@ -4068,10 +4103,15 @@ Returns:
     The index of the first encounter of the maximum in `range`. If the
     `range` is empty, -1 is returned.
 
+Limitations:
+    If at least one of the arguments is NaN, the result is
+    an unspecified value. See $(REF maxElement, std,algorithm,searching)
+    for examples on how to cope with NaNs.
+
 See_Also:
     $(LREF minIndex), $(REF max, std,algorithm,comparison), $(LREF maxCount), $(LREF maxElement), $(LREF maxPos)
  */
-sizediff_t maxIndex(alias pred = "a < b", Range)(Range range)
+ptrdiff_t maxIndex(alias pred = "a < b", Range)(Range range)
 if (isInputRange!Range && !isInfinite!Range &&
     is(typeof(binaryFun!pred(range.front, range.front))))
 {
@@ -5099,12 +5139,14 @@ pure @safe unittest // issue 18657
     import std.algorithm.comparison : equal;
     import std.range : refRange;
     {
-        auto r = refRange(&["foobar"][0]).until("bar");
+        string s = "foobar";
+        auto r = refRange(&s).until("bar");
         assert(equal(r.save, "foo"));
         assert(equal(r.save, "foo"));
     }
     {
-        auto r = refRange(&["foobar"][0]).until!(e => e == 'b');
+        string s = "foobar";
+        auto r = refRange(&s).until!(e => e == 'b');
         assert(equal(r.save, "foo"));
         assert(equal(r.save, "foo"));
     }

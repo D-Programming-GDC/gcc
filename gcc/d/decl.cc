@@ -60,7 +60,7 @@ along with GCC; see the file COPYING3.  If not see
 /* Return identifier for the external mangled name of DECL.  */
 
 const char *
-mangle_decl (Dsymbol *decl)
+d_mangle_decl (Dsymbol *decl)
 {
   if (decl->isFuncDeclaration ())
     return mangleExact ((FuncDeclaration *)decl);
@@ -78,7 +78,7 @@ mangle_decl (Dsymbol *decl)
 tree
 mangle_internal_decl (Dsymbol *decl, const char *name, const char *suffix)
 {
-  const char *prefix = mangle_decl (decl);
+  const char *prefix = d_mangle_decl (decl);
   unsigned namelen = strlen (name);
   unsigned buflen = (2 + strlen (prefix) + namelen + strlen (suffix)) * 2;
   char *buf = (char *) alloca (buflen);
@@ -101,7 +101,7 @@ gcc_attribute_p (Dsymbol *decl)
 {
   ModuleDeclaration *md = decl->getModule ()->md;
 
-  if (md && md->packages && md->packages->dim == 1)
+  if (md && md->packages && md->packages->length == 1)
     {
       if (!strcmp ((*md->packages)[0]->toChars (), "gcc")
 	  && !strcmp (md->id->toChars (), "attribute"))
@@ -127,7 +127,7 @@ apply_pragma_crt (Dsymbol *sym, bool isctor)
       Dsymbols *ds = ad->include (NULL);
       if (ds)
 	{
-	  for (size_t i = 0; i < ds->dim; i++)
+	  for (size_t i = 0; i < ds->length; i++)
 	    nested += apply_pragma_crt ((*ds)[i], isctor);
 	}
 
@@ -221,7 +221,7 @@ public:
     if (d->ident == NULL)
       {
 	/* Importing declaration list.  */
-	for (size_t i = 0; i < d->names.dim; i++)
+	for (size_t i = 0; i < d->names.length; i++)
 	  {
 	    AliasDeclaration *aliasdecl = d->aliasdecls[i];
 	    tree decl = build_import_decl (aliasdecl);
@@ -257,7 +257,7 @@ public:
 
   void visit (TupleDeclaration *d)
   {
-    for (size_t i = 0; i < d->objects->dim; i++)
+    for (size_t i = 0; i < d->objects->length; i++)
       {
 	RootObject *o = (*d->objects)[i];
 	if ((o->dyncast () == DYNCAST_EXPRESSION)
@@ -279,7 +279,7 @@ public:
     if (!ds)
       return;
 
-    for (size_t i = 0; i < ds->dim; i++)
+    for (size_t i = 0; i < ds->length; i++)
       {
 	Dsymbol *s = (*ds)[i];
 	s->accept (this);
@@ -342,7 +342,7 @@ public:
     if (isError (d) || !d->members)
       return;
 
-    for (size_t i = 0; i < d->members->dim; i++)
+    for (size_t i = 0; i < d->members->length; i++)
       {
 	Dsymbol *s = (*d->members)[i];
 	s->accept (this);
@@ -393,7 +393,7 @@ public:
     if (!d->needsCodegen ())
       return;
 
-    for (size_t i = 0; i < d->members->dim; i++)
+    for (size_t i = 0; i < d->members->length; i++)
       {
 	Dsymbol *s = (*d->members)[i];
 	s->accept (this);
@@ -407,7 +407,7 @@ public:
     if (isError (d)|| !d->members)
       return;
 
-    for (size_t i = 0; i < d->members->dim; i++)
+    for (size_t i = 0; i < d->members->length; i++)
       {
 	Dsymbol *s = (*d->members)[i];
 	s->accept (this);
@@ -457,7 +457,7 @@ public:
     d_finish_decl (d->sinit);
 
     /* Put out the members.  */
-    for (size_t i = 0; i < d->members->dim; i++)
+    for (size_t i = 0; i < d->members->length; i++)
       {
 	Dsymbol *member = (*d->members)[i];
 	/* There might be static ctors in the members, and they cannot
@@ -485,7 +485,7 @@ public:
     bool has_errors = false;
 
     /* Finish semantic analysis of functions in vtbl[].  */
-    for (size_t i = d->vtblOffset (); i < d->vtbl.dim; i++)
+    for (size_t i = d->vtblOffset (); i < d->vtbl.length; i++)
       {
 	FuncDeclaration *fd = d->vtbl[i]->isFuncDeclaration ();
 
@@ -503,7 +503,7 @@ public:
 	/* The function fd is hidden from the view of the class.
 	   If it overlaps with any function in the vtbl[], then
 	   issue an error.  */
-	for (size_t j = 1; j < d->vtbl.dim; j++)
+	for (size_t j = 1; j < d->vtbl.length; j++)
 	  {
 	    if (j == i)
 	      continue;
@@ -567,7 +567,7 @@ public:
       return;
 
     /* Put out the members.  */
-    for (size_t i = 0; i < d->members->dim; i++)
+    for (size_t i = 0; i < d->members->length; i++)
       {
 	Dsymbol *member = (*d->members)[i];
 	member->accept (this);
@@ -604,7 +604,7 @@ public:
     if (d->vtblOffset ())
       CONSTRUCTOR_APPEND_ELT (elms, size_zero_node, build_address (d->csym));
 
-    for (size_t i = d->vtblOffset (); i < d->vtbl.dim; i++)
+    for (size_t i = d->vtblOffset (); i < d->vtbl.length; i++)
       {
 	FuncDeclaration *fd = d->vtbl[i]->isFuncDeclaration ();
 
@@ -647,7 +647,7 @@ public:
       return;
 
     /* Put out the members.  */
-    for (size_t i = 0; i < d->members->dim; i++)
+    for (size_t i = 0; i < d->members->length; i++)
       {
 	Dsymbol *member = (*d->members)[i];
 	member->accept (this);
@@ -983,7 +983,7 @@ public:
       }
 
     /* formal function parameters.  */
-    size_t n_parameters = d->parameters ? d->parameters->dim : 0;
+    size_t n_parameters = d->parameters ? d->parameters->length : 0;
 
     for (size_t i = 0; i < n_parameters; i++)
       {
@@ -1215,7 +1215,7 @@ get_symbol_decl (Declaration *decl)
 					  decl->mangleOverride.length);
 	}
       else
-	mangled_name = get_identifier (mangle_decl (decl));
+	mangled_name = get_identifier (d_mangle_decl (decl));
 
       mangled_name = targetm.mangle_decl_assembler_name (decl->csym,
 							 mangled_name);
@@ -1272,6 +1272,17 @@ get_symbol_decl (Declaration *decl)
     }
   else if (TREE_CODE (decl->csym) == FUNCTION_DECL)
     {
+      /* Dual-context functions require the code generation to build an array
+	 for the context pointer of the function, making the delicate task of
+	 tracking which context to follow when encountering a non-local symbol,
+	 and so are a not planned to be supported.  */
+      if (fd->needThis () && !fd->isMember2 ())
+	{
+	  fatal_error (make_location_t (fd->loc),
+		       "function requires a dual-context, which is not yet "
+		       "supported by GDC");
+	}
+
       /* The real function type may differ from its declaration.  */
       tree fntype = TREE_TYPE (decl->csym);
       tree newfntype = NULL_TREE;
@@ -2075,27 +2086,27 @@ base_vtable_offset (ClassDeclaration *cd, BaseClass *bc)
 {
   unsigned csymoffset = target.classinfosize;
   unsigned interfacesize = int_size_in_bytes (vtbl_interface_type_node);
-  csymoffset += cd->vtblInterfaces->dim * interfacesize;
+  csymoffset += cd->vtblInterfaces->length * interfacesize;
 
-  for (size_t i = 0; i < cd->vtblInterfaces->dim; i++)
+  for (size_t i = 0; i < cd->vtblInterfaces->length; i++)
     {
       BaseClass *b = (*cd->vtblInterfaces)[i];
       if (b == bc)
 	return csymoffset;
-      csymoffset += b->sym->vtbl.dim * target.ptrsize;
+      csymoffset += b->sym->vtbl.length * target.ptrsize;
     }
 
   /* Check all overriding interface vtbl[]s.  */
   for (ClassDeclaration *cd2 = cd->baseClass; cd2; cd2 = cd2->baseClass)
     {
-      for (size_t k = 0; k < cd2->vtblInterfaces->dim; k++)
+      for (size_t k = 0; k < cd2->vtblInterfaces->length; k++)
 	{
 	  BaseClass *bs = (*cd2->vtblInterfaces)[k];
 	  if (bs->fillVtbl (cd, NULL, 0))
 	    {
 	      if (bc == bs)
 		return csymoffset;
-	      csymoffset += bs->sym->vtbl.dim * target.ptrsize;
+	      csymoffset += bs->sym->vtbl.length * target.ptrsize;
 	    }
 	}
     }
@@ -2116,7 +2127,7 @@ get_vtable_decl (ClassDeclaration *decl)
   tree ident = mangle_internal_decl (decl, "__vtbl", "Z");
   /* Note: Using a static array type for the VAR_DECL, the DECL_INITIAL value
      will have a different type.  However the back-end seems to accept this.  */
-  tree type = build_ctype (Type::tvoidptr->sarrayOf (decl->vtbl.dim));
+  tree type = build_ctype (Type::tvoidptr->sarrayOf (decl->vtbl.length));
 
   Dsymbol *vtblsym = decl->vtblSymbol ();
   vtblsym->csym = declare_extern_var (ident, type);
@@ -2187,7 +2198,7 @@ build_class_instance (ClassReferenceExp *exp)
       /* Anonymous vtable interface fields are laid out before the fields of
 	 each class.  The interface offset is used to determine where to put
 	 the classinfo offset reference.  */
-      for (size_t i = 0; i < bcd->vtblInterfaces->dim; i++)
+      for (size_t i = 0; i < bcd->vtblInterfaces->length; i++)
 	{
 	  BaseClass *bc = (*bcd->vtblInterfaces)[i];
 
@@ -2214,7 +2225,7 @@ build_class_instance (ClassReferenceExp *exp)
 
       /* Generate initial values of all fields owned by current class.
 	 Use both the name and offset to find the right field.  */
-      for (size_t i = 0; i < bcd->fields.dim; i++)
+      for (size_t i = 0; i < bcd->fields.length; i++)
 	{
 	  VarDeclaration *vfield = bcd->fields[i];
 	  int index = exp->findFieldIndexByName (vfield);
@@ -2401,7 +2412,7 @@ build_type_decl (tree type, Dsymbol *dsym)
 
   tree decl = build_decl (make_location_t (dsym->loc), TYPE_DECL,
 			  get_identifier (name), type);
-  SET_DECL_ASSEMBLER_NAME (decl, get_identifier (mangle_decl (dsym)));
+  SET_DECL_ASSEMBLER_NAME (decl, get_identifier (d_mangle_decl (dsym)));
   TREE_PUBLIC (decl) = 1;
   DECL_ARTIFICIAL (decl) = 1;
   DECL_CONTEXT (decl) = d_decl_context (dsym);

@@ -303,40 +303,6 @@ CTFloat::hash (real_t r)
 
 /* Implements the Compiler interface used by the frontend.  */
 
-/* Generate C main() in response to seeing D main().  This used to be in
-   libdruntime, but contained a reference to _Dmain which didn't work when
-   druntime was made into a shared library and was linked to a program, such
-   as a C++ program, that didn't have a _Dmain.  */
-
-void
-Compiler::genCmain (Scope *sc)
-{
-  static bool initialized = false;
-
-  if (initialized)
-    return;
-
-  /* The D code to be generated is provided by __entrypoint.di, try to load it,
-     but don't fail if unfound.  */
-  unsigned errors = global.startGagging ();
-  Module *m = Module::load (Loc (), NULL, Identifier::idPool ("__entrypoint"));
-
-  if (global.endGagging (errors))
-    m = NULL;
-
-  if (m != NULL)
-    {
-      m->importedFrom = m;
-      m->importAll (NULL);
-      dsymbolSemantic (m, NULL);
-      semantic2 (m, NULL);
-      semantic3 (m, NULL);
-      d_add_entrypoint_module (m, sc->_module);
-    }
-
-  initialized = true;
-}
-
 /* Perform a reinterpret cast of EXPR to type TYPE for use in CTFE.
    The front end should have already ensured that EXPR is a constant,
    so we just lower the value to GCC and return the converted CST.  */
@@ -360,8 +326,8 @@ Compiler::paintAsType (UnionExp *, Expression *expr, Type *type)
       Expressions *elements = ((ArrayLiteralExp *) expr)->elements;
       vec<constructor_elt, va_gc> *elms = NULL;
 
-      vec_safe_reserve (elms, elements->dim);
-      for (size_t i = 0; i < elements->dim; i++)
+      vec_safe_reserve (elms, elements->length);
+      for (size_t i = 0; i < elements->length; i++)
 	{
 	  Expression *e = (*elements)[i];
 	  if (e->type->isintegral ())
@@ -436,13 +402,13 @@ Compiler::loadModule (Module *m)
       if (!strcmp (id->toChars (), "object"))
 	create_tinfo_types (m);
     }
-  else if (md->packages->dim == 1)
+  else if (md->packages->length == 1)
     {
       if (!strcmp ((*md->packages)[0]->toChars (), "gcc")
 	  && !strcmp (md->id->toChars (), "builtins"))
 	d_build_builtins_module (m);
     }
-  else if (md->packages->dim == 2)
+  else if (md->packages->length == 2)
     {
       if (!strcmp ((*md->packages)[0]->toChars (), "core")
 	  && !strcmp ((*md->packages)[1]->toChars (), "stdc"))

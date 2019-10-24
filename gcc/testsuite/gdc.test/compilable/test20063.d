@@ -1,3 +1,4 @@
+__EOF__ // XBUG: dual-context not supported
 
 struct S
 {

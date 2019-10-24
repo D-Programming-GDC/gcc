@@ -857,10 +857,10 @@ else version (CRuntime_Musl)
     enum PTHREAD_BARRIER_SERIAL_THREAD = -1;
 
     int pthread_barrier_destroy(pthread_barrier_t*);
-    int pthread_barrier_init(pthread_barrier_t*, in pthread_barrierattr_t*, uint);
+    int pthread_barrier_init(pthread_barrier_t*, const scope pthread_barrierattr_t*, uint);
     int pthread_barrier_wait(pthread_barrier_t*);
     int pthread_barrierattr_destroy(pthread_barrierattr_t*);
-    int pthread_barrierattr_getpshared(in pthread_barrierattr_t*, int*);
+    int pthread_barrierattr_getpshared(const scope pthread_barrierattr_t*, int*);
     int pthread_barrierattr_init(pthread_barrierattr_t*);
     int pthread_barrierattr_setpshared(pthread_barrierattr_t*, int);
 }
@@ -925,7 +925,7 @@ else version (CRuntime_Bionic)
 }
 else version (CRuntime_Musl)
 {
-    int pthread_condattr_getclock(in pthread_condattr_t*, clockid_t*);
+    int pthread_condattr_getclock(const scope pthread_condattr_t*, clockid_t*);
     int pthread_condattr_setclock(pthread_condattr_t*, clockid_t);
 }
 else version (CRuntime_UClibc)
@@ -1317,9 +1317,9 @@ else version (CRuntime_Bionic)
 }
 else version (CRuntime_Musl)
 {
-    int pthread_mutex_timedlock(pthread_mutex_t*, in timespec*);
-    int pthread_rwlock_timedrdlock(pthread_rwlock_t*, in timespec*);
-    int pthread_rwlock_timedwrlock(pthread_rwlock_t*, in timespec*);
+    int pthread_mutex_timedlock(pthread_mutex_t*, const scope timespec*);
+    int pthread_rwlock_timedrdlock(pthread_rwlock_t*, const scope timespec*);
+    int pthread_rwlock_timedwrlock(pthread_rwlock_t*, const scope timespec*);
 }
 else version (CRuntime_UClibc)
 {

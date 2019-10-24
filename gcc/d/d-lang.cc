@@ -53,6 +53,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "debug.h"
 
 #include "d-tree.h"
+#include "d-frontend.h"
 
 
 /* Array of D frontend type/decl nodes.  */
@@ -85,10 +86,6 @@ d_option;
 /* List of modules being compiled.  */
 static Modules builtin_modules;
 
-/* Module where `C main' is defined, compiled in if needed.  */
-static Module *entrypoint_module = NULL;
-static Module *entrypoint_root_module = NULL;
-
 /* The current and global binding level in effect.  */
 struct binding_level *current_binding_level;
 struct binding_level *global_binding_level;
@@ -107,7 +104,7 @@ static void
 deps_add_target (const char *target, bool quoted)
 {
   if (!d_option.deps_target)
-    d_option.deps_target = new OutBuffer ();
+    d_option.deps_target = d_gc_malloc<OutBuffer> ();
   else
     d_option.deps_target->writeByte (' ');
 
@@ -167,7 +164,7 @@ deps_write (Module *module, OutBuffer *buffer, unsigned colmax = 72)
   /* Write out make target module name.  */
   if (d_option.deps_target)
     {
-      size = d_option.deps_target->offset;
+      size = d_option.deps_target->length ();
       str = d_option.deps_target->extractChars ();
     }
   else
@@ -182,7 +179,7 @@ deps_write (Module *module, OutBuffer *buffer, unsigned colmax = 72)
   column++;
 
   /* Write out all make dependencies.  */
-  while (modlist.dim > 0)
+  while (modlist.length > 0)
     {
       Module *depmod = modlist.pop ();
 
@@ -213,14 +210,12 @@ deps_write (Module *module, OutBuffer *buffer, unsigned colmax = 72)
 	phonylist.push (depmod);
 
       /* Search all imports of the written dependency.  */
-      for (size_t i = 0; i < depmod->aimports.dim; i++)
+      for (size_t i = 0; i < depmod->aimports.length; i++)
 	{
 	  Module *m = depmod->aimports[i];
 
 	  /* Ignore compiler-generated modules.  */
-	  if ((m->ident == Identifier::idPool ("__entrypoint")
-	       || m->ident == Identifier::idPool ("__main"))
-	      && m->parent == NULL)
+	  if (m->ident == Identifier::idPool ("__main") && m->parent == NULL)
 	    continue;
 
 	  /* Don't search system installed modules, this includes
@@ -249,7 +244,7 @@ deps_write (Module *module, OutBuffer *buffer, unsigned colmax = 72)
   buffer->writenl ();
 
   /* Write out all phony targets.  */
-  for (size_t i = 0; i < phonylist.dim; i++)
+  for (size_t i = 0; i < phonylist.length; i++)
     {
       Module *m = phonylist[i];
 
@@ -258,10 +253,6 @@ deps_write (Module *module, OutBuffer *buffer, unsigned colmax = 72)
       buffer->writestring (":\n");
     }
 }
-
-/* These functions are defined in D runtime.  */
-extern "C" int rt_init (void);
-extern "C" void gc_disable (void);
 
 /* Implements the lang_hooks.init_options routine for language D.
    This initializes the global state for the D frontend before calling
@@ -272,7 +263,7 @@ d_init_options (unsigned int, cl_decoded_option *decoded_options)
 {
   /* Initialize the D runtime.  */
   rt_init ();
-  gc_disable ();
+//  gc_disable ();
 
   /* Set default values.  */
   global._init ();
@@ -288,8 +279,8 @@ d_init_options (unsigned int, cl_decoded_option *decoded_options)
   global.params.useDeprecated = DIAGNOSTICoff;
   global.params.warnings = DIAGNOSTICoff;
 
-  global.params.imppath = new Strings ();
-  global.params.fileImppath = new Strings ();
+  global.params.imppath = d_gc_malloc<Strings> ();
+  global.params.fileImppath = d_gc_malloc<Strings> ();
 
   /* Extra GDC-specific options.  */
   d_option.fonly = NULL;
@@ -443,7 +434,7 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       if (Identifier::isValidIdentifier (CONST_CAST (char *, arg)))
 	{
 	  if (!global.params.debugids)
-	    global.params.debugids = new Strings ();
+	    global.params.debugids = d_gc_malloc<Strings> ();
 	  global.params.debugids->push (arg);
 	  break;
 	}
@@ -601,7 +592,7 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 
     case OPT_fsave_mixins_:
       global.params.mixinFile = arg;
-      global.params.mixinOut = new OutBuffer ();
+      global.params.mixinOut = d_gc_malloc<OutBuffer> ();
       break;
 
     case OPT_fswitch_errors:
@@ -654,7 +645,7 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       if (Identifier::isValidIdentifier (CONST_CAST (char *, arg)))
 	{
 	  if (!global.params.versionids)
-	    global.params.versionids = new Strings ();
+	    global.params.versionids = d_gc_malloc<Strings> ();
 	  global.params.versionids->push (arg);
 	  break;
 	}
@@ -880,7 +871,7 @@ d_post_options (const char ** fn)
   /* Add in versions given on the command line.  */
   if (global.params.versionids)
     {
-      for (size_t i = 0; i < global.params.versionids->dim; i++)
+      for (size_t i = 0; i < global.params.versionids->length; i++)
 	{
 	  const char *s = (*global.params.versionids)[i];
 	  VersionCondition::addGlobalIdent (s);
@@ -889,7 +880,7 @@ d_post_options (const char ** fn)
 
   if (global.params.debugids)
     {
-      for (size_t i = 0; i < global.params.debugids->dim; i++)
+      for (size_t i = 0; i < global.params.debugids->length; i++)
 	{
 	  const char *s = (*global.params.debugids)[i];
 	  DebugCondition::addGlobalIdent (s);
@@ -1070,17 +1061,6 @@ d_add_builtin_module (Module *m)
   builtin_modules.push (m);
 }
 
-/* Record the entrypoint module ENTRY which will be compiled in the current
-   compilation.  ROOT is the module scope where this was requested from.  */
-
-void
-d_add_entrypoint_module (Module *entry, Module *root)
-{
-  /* We are emitting this straight to object file.  */
-  entrypoint_module = entry;
-  entrypoint_root_module = root;
-}
-
 /* Implements the lang_hooks.parse_file routine for language D.  */
 
 void
@@ -1095,14 +1075,14 @@ d_parse_file (void)
 	{
 	  OutBuffer buf;
 	  buf.writestring ("predefs  ");
-	  for (size_t i = 0; i < global.versionids->dim; i++)
+	  for (size_t i = 0; i < global.versionids->length; i++)
 	    {
 	      Identifier *id = (*global.versionids)[i];
 	      buf.writestring (" ");
 	      buf.writestring (id->toChars ());
 	    }
 
-	  message ("%.*s", (int) buf.offset, (char *) buf.data);
+	  message ("%s", buf.peekChars ());
 	}
     }
 
@@ -1162,14 +1142,14 @@ d_parse_file (void)
     }
 
   /* Read all D source files.  */
-  for (size_t i = 0; i < modules.dim; i++)
+  for (size_t i = 0; i < modules.length; i++)
     {
       Module *m = modules[i];
       m->read (Loc ());
     }
 
   /* Parse all D source files.  */
-  for (size_t i = 0; i < modules.dim; i++)
+  for (size_t i = 0; i < modules.length; i++)
     {
       Module *m = modules[i];
 
@@ -1214,7 +1194,7 @@ d_parse_file (void)
       /* Generate 'header' import files.  Since 'header' import files must be
 	 independent of command line switches and what else is imported, they
 	 are generated before any semantic analysis.  */
-      for (size_t i = 0; i < modules.dim; i++)
+      for (size_t i = 0; i < modules.length; i++)
 	{
 	  Module *m = modules[i];
 	  if (m->isHdrFile || (d_option.fonly && m != Module::rootModule))
@@ -1231,7 +1211,7 @@ d_parse_file (void)
     goto had_errors;
 
   /* Load all unconditional imports for better symbol resolving.  */
-  for (size_t i = 0; i < modules.dim; i++)
+  for (size_t i = 0; i < modules.length; i++)
     {
       Module *m = modules[i];
 
@@ -1247,7 +1227,7 @@ d_parse_file (void)
   /* Do semantic analysis.  */
   doing_semantic_analysis_p = true;
 
-  for (size_t i = 0; i < modules.dim; i++)
+  for (size_t i = 0; i < modules.length; i++)
     {
       Module *m = modules[i];
 
@@ -1261,9 +1241,9 @@ d_parse_file (void)
   Module::dprogress = 1;
   Module::runDeferredSemantic ();
 
-  if (Module::deferred.dim)
+  if (Module::deferred.length)
     {
-      for (size_t i = 0; i < Module::deferred.dim; i++)
+      for (size_t i = 0; i < Module::deferred.length; i++)
 	{
 	  Dsymbol *sd = Module::deferred[i];
 	  error_at (make_location_t (sd->loc),
@@ -1272,14 +1252,14 @@ d_parse_file (void)
     }
 
   /* Process all built-in modules or functions now for CTFE.  */
-  while (builtin_modules.dim != 0)
+  while (builtin_modules.length != 0)
     {
       Module *m = builtin_modules.pop ();
       d_maybe_set_builtin (m);
     }
 
   /* Do pass 2 semantic analysis.  */
-  for (size_t i = 0; i < modules.dim; i++)
+  for (size_t i = 0; i < modules.length; i++)
     {
       Module *m = modules[i];
 
@@ -1295,7 +1275,7 @@ d_parse_file (void)
     goto had_errors;
 
   /* Do pass 3 semantic analysis.  */
-  for (size_t i = 0; i < modules.dim; i++)
+  for (size_t i = 0; i < modules.length; i++)
     {
       Module *m = modules[i];
 
@@ -1308,7 +1288,7 @@ d_parse_file (void)
   Module::runDeferredSemantic3 ();
 
   /* Check again, incase semantic3 pass loaded any more modules.  */
-  while (builtin_modules.dim != 0)
+  while (builtin_modules.length != 0)
     {
       Module *m = builtin_modules.pop ();
       d_maybe_set_builtin (m);
@@ -1336,7 +1316,7 @@ d_parse_file (void)
       OutBuffer buf;
       FILE *deps_stream;
 
-      for (size_t i = 0; i < modules.dim; i++)
+      for (size_t i = 0; i < modules.length; i++)
 	deps_write (modules[i], &buf);
 
       /* -MF <arg> overrides -M[M]D.  */
@@ -1356,7 +1336,7 @@ d_parse_file (void)
       else
 	deps_stream = stdout;
 
-      fprintf (deps_stream, "%.*s", (int) buf.offset, (char *) buf.data);
+      fprintf (deps_stream, "%s", buf.peekChars ());
 
       if (deps_stream != stdout
 	  && (ferror (deps_stream) || fclose (deps_stream)))
@@ -1389,7 +1369,7 @@ d_parse_file (void)
       else
 	json_stream = stdout;
 
-      fprintf (json_stream, "%.*s", (int) buf.offset, (char *) buf.data);
+      fprintf (json_stream, "%s", buf.peekChars ());
 
       if (json_stream != stdout
 	  && (ferror (json_stream) || fclose (json_stream)))
@@ -1399,7 +1379,7 @@ d_parse_file (void)
   /* Generate Ddoc files.  */
   if (global.params.doDocComments && !global.errors && !errorcount)
     {
-      for (size_t i = 0; i < modules.dim; i++)
+      for (size_t i = 0; i < modules.length; i++)
 	{
 	  Module *m = modules[i];
 	  gendocfile (m);
@@ -1409,18 +1389,18 @@ d_parse_file (void)
   /* Handle -fdump-d-original.  */
   if (global.params.vcg_ast)
     {
-      for (size_t i = 0; i < modules.dim; i++)
+      for (size_t i = 0; i < modules.length; i++)
 	{
 	  Module *m = modules[i];
 	  OutBuffer buf;
 	  buf.doindent = 1;
 
 	  moduleToBuffer (&buf, m);
-	  message ("%.*s", (int) buf.offset, (char *) buf.data);
+	  message ("%s", buf.peekChars ());
 	}
     }
 
-  for (size_t i = 0; i < modules.dim; i++)
+  for (size_t i = 0; i < modules.length; i++)
     {
       Module *m = modules[i];
       if ((m->isHdrFile && m != main_module)
@@ -1431,12 +1411,7 @@ d_parse_file (void)
 	message ("code      %s", m->toChars ());
 
       if (!flag_syntax_only)
-	{
-	  if ((entrypoint_module != NULL) && (m == entrypoint_root_module))
-	    build_decl_tree (entrypoint_module);
-
-	  build_decl_tree (m);
-	}
+	build_decl_tree (m);
     }
 
   /* And end the main input file, if the debug writer wants it.  */
@@ -1456,7 +1431,7 @@ d_parse_file (void)
       if (mixin_stream)
 	{
 	  OutBuffer *buf = global.params.mixinOut;
-	  fprintf (mixin_stream, "%.*s", (int) buf->offset, (char *) buf->data);
+	  fprintf (mixin_stream, "%s", buf->peekChars ());
 
 	  if (ferror (mixin_stream) || fclose (mixin_stream))
 	    fatal_error (input_location, "closing mixin file %s: %m",

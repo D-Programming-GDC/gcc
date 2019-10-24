@@ -13,6 +13,7 @@
 module dmd.statementsem;
 
 import core.stdc.stdio;
+import core.stdc.string;
 
 import dmd.aggregate;
 import dmd.aliasthis;
@@ -77,7 +78,7 @@ private Identifier fixupLabelName(Scope* sc, Identifier ident)
         buf.writestring(flags == SCOPE.require ? "__in_" : "__out_");
         buf.writestring(ident.toString());
 
-        ident = Identifier.idPool(buf.peekSlice());
+        ident = Identifier.idPool(buf[]);
     }
     return ident;
 }
@@ -2338,11 +2339,10 @@ else
                         errorSupplemental(ps.loc, "while evaluating `pragma(msg, %s)`", arg.toChars());
                         return setError();
                     }
-                    StringExp se = e.toStringExp();
-                    if (se)
+                    if (auto se = e.toStringExp())
                     {
-                        se = se.toUTF8(sc);
-                        fprintf(stderr, "%.*s", cast(int)se.len, se.string);
+                        const slice = se.toUTF8(sc).peekString();
+                        fprintf(stderr, "%.*s", cast(int)slice.length, slice.ptr);
                     }
                     else
                         fprintf(stderr, "%s", e.toChars());
@@ -2481,6 +2481,7 @@ else
          */
 
         //printf("SwitchStatement::semantic(%p)\n", ss);
+        ss.tryBody = sc.tryBody;
         ss.tf = sc.tf;
         if (ss.cases)
         {
@@ -2653,7 +2654,7 @@ else
                     sl = new DotIdExp(ss.loc, sl, Id.__switch_error);
 
                     Expressions* args = new Expressions(2);
-                    (*args)[0] = new StringExp(ss.loc, cast(char*) ss.loc.filename);
+                    (*args)[0] = new StringExp(ss.loc, ss.loc.filename[0 .. strlen(ss.loc.filename)]);
                     (*args)[1] = new IntegerExp(ss.loc.linnum);
 
                     sl = new CallExp(ss.loc, sl, args);
@@ -2726,7 +2727,7 @@ else
 
                 // Sort cases for efficient lookup
                 import core.stdc.stdlib : qsort, _compare_fp_t;
-                qsort(csCopy.data, numcases, CaseStatement.sizeof, cast(_compare_fp_t)&sort_compare);
+                qsort((*csCopy)[].ptr, numcases, CaseStatement.sizeof, cast(_compare_fp_t)&sort_compare);
             }
 
             // The actual lowering
@@ -2878,6 +2879,11 @@ else
                 cs.error("`switch` and `case` are in different `finally` blocks");
                 errors = true;
             }
+            if (sc.sw.tryBody != sc.tryBody)
+            {
+                cs.error("case cannot be in different `try` block level from `switch`");
+                errors = true;
+            }
         }
         else
         {
@@ -2998,6 +3004,11 @@ else
             if (sc.sw.tf != sc.tf)
             {
                 ds.error("`switch` and `default` are in different `finally` blocks");
+                errors = true;
+            }
+            if (sc.sw.tryBody != sc.tryBody)
+            {
+                ds.error("default cannot be in different `try` block level from `switch`");
                 errors = true;
             }
             if (sc.sw.isFinal)
@@ -3851,8 +3862,13 @@ else
         enum FLAGcpp = 1;
         enum FLAGd = 2;
 
+        tcs.tryBody = sc.tryBody;
+
+        scope sc2 = sc.push();
+        sc2.tryBody = tcs;
         tcs._body = tcs._body.semanticScope(sc, null, null);
         assert(tcs._body);
+        sc2.pop();
 
         /* Even if body is empty, still do semantic analysis on catches
          */
@@ -3933,7 +3949,12 @@ else
     override void visit(TryFinallyStatement tfs)
     {
         //printf("TryFinallyStatement::semantic()\n");
+        tfs.tryBody = sc.tryBody;
+
+        auto sc2 = sc.push();
+        sc.tryBody = tfs;
         tfs._body = tfs._body.statementSemantic(sc);
+        sc2.pop();
 
         sc = sc.push();
         sc.tf = tfs;
@@ -4080,6 +4101,7 @@ else
 
         gs.ident = fixupLabelName(sc, gs.ident);
         gs.label = fd.searchLabel(gs.ident);
+        gs.tryBody = sc.tryBody;
         gs.tf = sc.tf;
         gs.os = sc.os;
         gs.lastVar = sc.lastVar;
@@ -4092,6 +4114,7 @@ else
              * so we can patch it later, and add it to a 'look at this later'
              * list.
              */
+            gs.label.deleted = true;
             auto ss = new ScopeStatement(gs.loc, gs, gs.loc);
             sc.fes.gotos.push(ss); // 'look at this later' list
             result = ss;
@@ -4117,6 +4140,7 @@ else
         FuncDeclaration fd = sc.parent.isFuncDeclaration();
 
         ls.ident = fixupLabelName(sc, ls.ident);
+        ls.tryBody = sc.tryBody;
         ls.tf = sc.tf;
         ls.os = sc.os;
         ls.lastVar = sc.lastVar;
@@ -4293,9 +4317,14 @@ void catchSemantic(Catch c, Scope* sc)
             stc |= STC.scope_;
         }
 
-        if (c.ident)
+        // DIP1008 requires destruction of the Throwable, even if the user didn't specify an identifier
+        auto ident = c.ident;
+        if (!ident && global.params.ehnogc)
+            ident = Identifier.anonymous();
+
+        if (ident)
         {
-            c.var = new VarDeclaration(c.loc, c.type, c.ident, null, stc);
+            c.var = new VarDeclaration(c.loc, c.type, ident, null, stc);
             c.var.iscatchvar = true;
             c.var.dsymbolSemantic(sc);
             sc.insert(c.var);

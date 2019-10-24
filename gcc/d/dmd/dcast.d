@@ -1863,9 +1863,10 @@ Expression castTo(Expression e, Scope* sc, Type t)
                 {
                     void* s = mem.xmalloc(fullSize);
                     const srcSize = e.len * e.sz;
-                    memcpy(s, se.string, srcSize);
+                    const data = se.peekData();
+                    memcpy(s, data.ptr, srcSize);
                     memset(s + srcSize, 0, fullSize - srcSize);
-                    se.string = cast(char*)s;
+                    se.setData(s, se.len, se.sz);
                 }
                 result = se;
                 return;
@@ -1928,13 +1929,13 @@ Expression castTo(Expression e, Scope* sc, Type t)
                     for (size_t u = 0; u < e.len;)
                     {
                         dchar c;
-                        const p = utf_decodeChar(se.string, e.len, u, c);
+                        const p = utf_decodeChar(se.peekString().ptr, e.len, u, c);
                         if (p)
                             e.error("%s", p);
                         else
                             buffer.writeUTF16(c);
                     }
-                    newlen = buffer.offset / 2;
+                    newlen = buffer.length / 2;
                     buffer.writeUTF16(0);
                     goto L1;
 
@@ -1942,7 +1943,7 @@ Expression castTo(Expression e, Scope* sc, Type t)
                     for (size_t u = 0; u < e.len;)
                     {
                         dchar c;
-                        const p = utf_decodeChar(se.string, e.len, u, c);
+                        const p = utf_decodeChar(se.peekString().ptr, e.len, u, c);
                         if (p)
                             e.error("%s", p);
                         buffer.write4(c);
@@ -1955,13 +1956,13 @@ Expression castTo(Expression e, Scope* sc, Type t)
                     for (size_t u = 0; u < e.len;)
                     {
                         dchar c;
-                        const p = utf_decodeWchar(se.wstring, e.len, u, c);
+                        const p = utf_decodeWchar(se.peekWstring().ptr, e.len, u, c);
                         if (p)
                             e.error("%s", p);
                         else
                             buffer.writeUTF8(c);
                     }
-                    newlen = buffer.offset;
+                    newlen = buffer.length;
                     buffer.writeUTF8(0);
                     goto L1;
 
@@ -1969,7 +1970,7 @@ Expression castTo(Expression e, Scope* sc, Type t)
                     for (size_t u = 0; u < e.len;)
                     {
                         dchar c;
-                        const p = utf_decodeWchar(se.wstring, e.len, u, c);
+                        const p = utf_decodeWchar(se.peekWstring().ptr, e.len, u, c);
                         if (p)
                             e.error("%s", p);
                         buffer.write4(c);
@@ -1981,28 +1982,28 @@ Expression castTo(Expression e, Scope* sc, Type t)
                 case X(Tdchar, Tchar):
                     for (size_t u = 0; u < e.len; u++)
                     {
-                        uint c = se.dstring[u];
+                        uint c = se.peekDstring()[u];
                         if (!utf_isValidDchar(c))
                             e.error("invalid UCS-32 char \\U%08x", c);
                         else
                             buffer.writeUTF8(c);
                         newlen++;
                     }
-                    newlen = buffer.offset;
+                    newlen = buffer.length;
                     buffer.writeUTF8(0);
                     goto L1;
 
                 case X(Tdchar, Twchar):
                     for (size_t u = 0; u < e.len; u++)
                     {
-                        uint c = se.dstring[u];
+                        uint c = se.peekDstring()[u];
                         if (!utf_isValidDchar(c))
                             e.error("invalid UCS-32 char \\U%08x", c);
                         else
                             buffer.writeUTF16(c);
                         newlen++;
                     }
-                    newlen = buffer.offset / 2;
+                    newlen = buffer.length / 2;
                     buffer.writeUTF16(0);
                     goto L1;
 
@@ -2012,13 +2013,11 @@ Expression castTo(Expression e, Scope* sc, Type t)
                         se = cast(StringExp)e.copy();
                         copied = 1;
                     }
-                    se.string = buffer.extractData();
-                    se.len = newlen;
 
                     {
                         d_uns64 szx = tb.nextOf().size();
                         assert(szx <= 255);
-                        se.sz = cast(ubyte)szx;
+                        se.setData(buffer.extractSlice().ptr, newlen, cast(ubyte)szx);
                     }
                     break;
 
@@ -2040,14 +2039,13 @@ Expression castTo(Expression e, Scope* sc, Type t)
                 if (dim2 != se.len)
                 {
                     // Copy when changing the string literal
-                    size_t newsz = se.sz;
-                    size_t d = (dim2 < se.len) ? dim2 : se.len;
+                    const newsz = se.sz;
+                    const d = (dim2 < se.len) ? dim2 : se.len;
                     void* s = mem.xmalloc((dim2 + 1) * newsz);
-                    memcpy(s, se.string, d * newsz);
+                    memcpy(s, se.peekData().ptr, d * newsz);
                     // Extend with 0, add terminating 0
                     memset(s + d * newsz, 0, (dim2 + 1 - d) * newsz);
-                    se.string = cast(char*)s;
-                    se.len = dim2;
+                    se.setData(s, dim2, newsz);
                 }
             }
             se.type = t;

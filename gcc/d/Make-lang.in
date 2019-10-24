@@ -81,6 +81,7 @@ D_FRONTEND_OBJS = \
 	d/attrib.o \
 	d/ast_node.o \
 	d/astcodegen.o \
+	d/bitarray.o \
 	d/blockexit.o \
 	d/builtin.o \
 	d/canthrow.o \
@@ -148,6 +149,7 @@ D_FRONTEND_OBJS = \
 	d/permissivevisitor.o \
 	d/port.o \
 	d/printast.o \
+	d/region.o \
 	d/rmem.o \
 	d/rootobject.o \
 	d/safe.o \

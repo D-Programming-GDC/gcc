@@ -170,7 +170,7 @@ private const(char)[] getFilename(Identifiers* packages, Identifier ident)
         {
             const q = strchr(m, '=');
             assert(q);
-            if (dotmods.offset == q - m && memcmp(dotmods.peekChars(), m, q - m) == 0)
+            if (dotmods.length == q - m && memcmp(dotmods.peekChars(), m, q - m) == 0)
             {
                 buf.reset();
                 auto rhs = q[1 .. strlen(q)];
@@ -487,7 +487,7 @@ extern (C++) final class Module : Package
     Identifiers* versionids;    // version identifiers
     Identifiers* versionidsNot; // forward referenced version identifiers
 
-    Macro* macrotable;          // document comment macros
+    MacroTable macrotable;      // document comment macros
     Escape* escapetable;        // document comment escapes
 
     size_t nameoffset;          // offset of module name from start of ModuleInfo
@@ -622,7 +622,7 @@ extern (C++) final class Module : Package
                 else version (Windows)
                     import core.sys.windows.winbase : getpid = GetCurrentProcessId;
                 buf.printf("__stdin_%d.d", getpid());
-                arg = buf.peekSlice();
+                arg = buf[];
             }
             if (global.params.preservePaths)
                 argdoc = arg;
@@ -664,7 +664,7 @@ extern (C++) final class Module : Package
     {
         //printf("Module::loadSourceBuffer('%s') file '%s'\n", toChars(), srcfile.toChars());
         // take ownership of buffer
-        srcBuffer = new FileBuffer(readResult.extractData());
+        srcBuffer = new FileBuffer(readResult.extractSlice());
         if (readResult.success)
             return true;
 
@@ -1176,6 +1176,29 @@ extern (C++) final class Module : Package
         return needmoduleinfo || global.params.cov;
     }
 
+    /*******************************************
+     * Print deprecation warning if we're deprecated, when
+     * this module is imported from scope sc.
+     *
+     * Params:
+     *  sc = the scope into which we are imported
+     *  loc = the location of the import statement
+     */
+    void checkImportDeprecation(const ref Loc loc, Scope* sc)
+    {
+        if (md && md.isdeprecated && !sc.isDeprecated)
+        {
+            Expression msg = md.msg;
+            if (StringExp se = msg ? msg.toStringExp() : null)
+            {
+                const slice = se.peekString();
+                deprecation(loc, "is deprecated - %.*s", cast(int)slice.length, slice.ptr);
+            }
+            else
+                deprecation(loc, "is deprecated");
+        }
+    }
+
     override Dsymbol search(const ref Loc loc, Identifier ident, int flags = SearchLocalsOnly)
     {
         /* Since modules can be circularly referenced,
@@ -1295,9 +1318,7 @@ extern (C++) final class Module : Package
             }
             else
             {
-                todo = cast(Dsymbol*)malloc(len * Dsymbol.sizeof);
-                if (!todo)
-                    Mem.error();
+                todo = cast(Dsymbol*)Mem.check(malloc(len * Dsymbol.sizeof));
                 todoalloc = todo;
             }
             memcpy(todo, deferred.tdata(), len * Dsymbol.sizeof);
@@ -1446,7 +1467,7 @@ extern (C++) final class Module : Package
 
 /***********************************************************
  */
-struct ModuleDeclaration
+extern (C++) struct ModuleDeclaration
 {
     Loc loc;
     Identifier id;

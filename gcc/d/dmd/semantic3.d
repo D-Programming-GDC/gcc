@@ -547,7 +547,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
 
                 if ((needEnsure && global.params.useOut == CHECKENABLE.on) || fpostinv)
                 {
-                    funcdecl.returnLabel = new LabelDsymbol(Id.returnLabel);
+                    funcdecl.returnLabel = funcdecl.searchLabel(Id.returnLabel);
                 }
 
                 // scope of out contract (need for vresult.semantic)
@@ -795,7 +795,7 @@ private extern(C++) final class Semantic3Visitor : Visitor
                             /* Add an assert(0, msg); where the missing return
                              * should be.
                              */
-                            e = new AssertExp(funcdecl.endloc, IntegerExp.literal!0, new StringExp(funcdecl.loc, cast(char*)"missing return expression"));
+                            e = new AssertExp(funcdecl.endloc, IntegerExp.literal!0, new StringExp(funcdecl.loc, "missing return expression"));
                         }
                         else
                             e = new HaltExp(funcdecl.endloc);
@@ -1183,6 +1183,18 @@ private extern(C++) final class Semantic3Visitor : Visitor
                 if (funcdecl.fbody || funcdecl.allowsContractWithoutBody())
                     funcdecl.fbody = sbody;
             }
+
+            // Check for undefined labels
+            if (funcdecl.labtab)
+                foreach (keyValue; funcdecl.labtab.tab.asRange)
+                {
+                    //printf("  KV: %s = %s\n", keyValue.key.toChars(), keyValue.value.toChars());
+                    LabelDsymbol label = cast(LabelDsymbol)keyValue.value;
+                    if (!label.statement && (!label.deleted || label.iasm))
+                    {
+                        funcdecl.error("label `%s` is undefined", label.toChars());
+                    }
+                }
 
             // Fix up forward-referenced gotos
             if (funcdecl.gotos)

@@ -412,18 +412,6 @@ public:
 		else
 		  error_at (location, "cannot %<goto%> into %<catch%> block");
 	      }
-	    else if (s->isCaseStatement ())
-	      {
-		location = make_location_t (s->loc);
-		error_at (location, "case cannot be in different "
-			  "%<try%> block level from %<switch%>");
-	      }
-	    else if (s->isDefaultStatement ())
-	      {
-		location = make_location_t (s->loc);
-		error_at (location, "default cannot be in different "
-			  "%<try%> block level from %<switch%>");
-	      }
 	    else
 	      gcc_unreachable ();
 	  }
@@ -798,7 +786,7 @@ public:
        Also checking the jump from the switch to the label is allowed.  */
     if (s->cases)
       {
-	for (size_t i = 0; i < s->cases->dim; i++)
+	for (size_t i = 0; i < s->cases->length; i++)
 	  {
 	    CaseStatement *cs = (*s->cases)[i];
 	    tree caselabel = this->lookup_label (cs);
@@ -992,7 +980,7 @@ public:
     if (s->statements == NULL)
       return;
 
-    for (size_t i = 0; i < s->statements->dim; i++)
+    for (size_t i = 0; i < s->statements->length; i++)
       {
 	Statement *statement = (*s->statements)[i];
 
@@ -1013,7 +1001,7 @@ public:
     tree lbreak = this->push_break_label (s);
     this->start_scope (level_loop);
 
-    for (size_t i = 0; i < s->statements->dim; i++)
+    for (size_t i = 0; i < s->statements->length; i++)
       {
 	Statement *statement = (*s->statements)[i];
 
@@ -1118,7 +1106,7 @@ public:
 
     if (s->catches)
       {
-	for (size_t i = 0; i < s->catches->dim; i++)
+	for (size_t i = 0; i < s->catches->length; i++)
 	  {
 	    Catch *vcatch = (*s->catches)[i];
 
@@ -1244,7 +1232,7 @@ public:
     /* Collect all arguments, which may be input or output operands.  */
     if (s->args)
       {
-	for (size_t i = 0; i < s->args->dim; i++)
+	for (size_t i = 0; i < s->args->length; i++)
 	  {
 	    Identifier *name = (*s->names)[i];
 	    const char *sname = name ? name->toChars () : NULL;
@@ -1274,7 +1262,7 @@ public:
     /* Collect all clobber arguments.  */
     if (s->clobbers)
       {
-	for (size_t i = 0; i < s->clobbers->dim; i++)
+	for (size_t i = 0; i < s->clobbers->length; i++)
 	  {
 	    StringExp *clobber = (*s->clobbers)[i]->isStringExp ();
 	    const char *cstring = (const char *)(clobber->len
@@ -1289,7 +1277,7 @@ public:
        by the front-end, so pass down the label symbol to the back-end.  */
     if (s->labels)
       {
-	for (size_t i = 0; i < s->labels->dim; i++)
+	for (size_t i = 0; i < s->labels->length; i++)
 	  {
 	    Identifier *ident = (*s->labels)[i];
 	    GotoStatement *gs = (*s->gotos)[i];
@@ -1315,7 +1303,7 @@ public:
     if (s->args)
       {
 	unsigned noutputs = s->outputargs;
-	unsigned ninputs = (s->args->dim - noutputs);
+	unsigned ninputs = (s->args->length - noutputs);
 	const char **oconstraints = XALLOCAVEC (const char *, noutputs);
 	bool allows_mem, allows_reg, is_inout;
 	size_t i;
@@ -1383,7 +1371,7 @@ public:
     if (s->imports == NULL)
       return;
 
-    for (size_t i = 0; i < s->imports->dim; i++)
+    for (size_t i = 0; i < s->imports->length; i++)
       {
 	Dsymbol *dsym = (*s->imports)[i];
 

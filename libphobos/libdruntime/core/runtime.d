@@ -727,7 +727,7 @@ extern (C) UnitTestResult runModuleUnitTests()
         results.summarize = !results.runMain;
         break;
     default:
-        throw new Error("Unknown --DRT-testmode option: " ~ rt_configOption("testmode", null, false));
+        assert(0, "Unknown --DRT-testmode option: " ~ rt_configOption("testmode", null, false));
     }
 
     return results;
@@ -820,12 +820,18 @@ version (GNU)
 {
     static if (!__traits(compiles, { import gcc.backtrace; new LibBacktrace(0); }) &&
                !__traits(compiles, { import gcc.backtrace; new UnwindBacktrace(0); }))
-        version = DEFAULT_TRACEINFO;
+        version = HasBacktrace;
 }
-else version (Posix)
-    version = DEFAULT_TRACEINFO;
+else version (CRuntime_Glibc)       version = HasBacktrace;
+else version (Darwin)          version = HasBacktrace;
+else version (FreeBSD)         version = HasBacktrace;
+else version (NetBSD)          version = HasBacktrace;
+else version (DragonFlyBSD)    version = HasBacktrace;
+else version (Solaris)         version = HasBacktrace;
+else version (CRuntime_UClibc) version = HasBacktrace;
 
-version (DEFAULT_TRACEINFO) private class DefaultTraceInfo : Throwable.TraceInfo
+/// Default implementation for most POSIX systems
+version (HasBacktrace) private class DefaultTraceInfo : Throwable.TraceInfo
 {
     // backtrace
     version (CRuntime_Glibc)

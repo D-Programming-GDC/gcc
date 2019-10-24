@@ -278,7 +278,7 @@ extern (C++) void expandTuples(Expressions* exps)
 /****************************************
  * Expand alias this tuples.
  */
-extern (C++) TupleDeclaration isAliasThisTuple(Expression e)
+TupleDeclaration isAliasThisTuple(Expression e)
 {
     if (!e.type)
         return null;
@@ -308,7 +308,7 @@ extern (C++) TupleDeclaration isAliasThisTuple(Expression e)
     }
 }
 
-extern (C++) int expandAliasThisTuples(Expressions* exps, size_t starti = 0)
+int expandAliasThisTuples(Expressions* exps, size_t starti = 0)
 {
     if (!exps || exps.dim == 0)
         return -1;
@@ -349,7 +349,7 @@ extern (C++) int expandAliasThisTuples(Expressions* exps, size_t starti = 0)
  * Returns:
  *      template for that function, otherwise null
  */
-extern (C++) TemplateDeclaration getFuncTemplateDecl(Dsymbol s)
+TemplateDeclaration getFuncTemplateDecl(Dsymbol s)
 {
     FuncDeclaration f = s.isFuncDeclaration();
     if (f && f.parent)
@@ -484,7 +484,7 @@ extern (D) Expression doCopyOrMove(Scope *sc, Expression e, Type t = null)
  * to serve essentially as a Variant that will sit on the stack
  * during CTFE to reduce memory consumption.
  */
-struct UnionExp
+extern (C++) struct UnionExp
 {
     // yes, default constructor does nothing
     extern (D) this(Expression e)
@@ -550,10 +550,10 @@ private:
  *      x1 = first operand
  *      x2 = second operand
  * Returns:
- *      1 if x1 is x2
- *      else 0
+ *      true if x1 is x2
+ *      else false
  */
-int RealIdentical(real_t x1, real_t x2)
+bool RealIdentical(real_t x1, real_t x2)
 {
     return (CTFloat.isNaN(x1) && CTFloat.isNaN(x2)) || CTFloat.isIdentical(x1, x2);
 }
@@ -710,7 +710,7 @@ extern (C++) abstract class Expression : ASTNode
         return DYNCAST.expression;
     }
 
-    override const(char)* toChars()
+    override const(char)* toChars() const
     {
         OutBuffer buf;
         HdrGenState hgs;
@@ -1165,7 +1165,7 @@ extern (C++) abstract class Expression : ASTNode
              */
 
             Dsymbol vparent = v.toParent2();
-            for (Dsymbol s = sc.func; !err && s; s = toParentP(s, vparent))
+            for (Dsymbol s = sc.func; !err && s; s = s.toParentP(vparent))
             {
                 if (s == vparent)
                     break;
@@ -1353,7 +1353,7 @@ extern (C++) abstract class Expression : ASTNode
     extern (D) final bool checkReadModifyWrite(TOK rmwOp, Expression ex = null)
     {
         //printf("Expression::checkReadModifyWrite() %s %s", toChars(), ex ? ex.toChars() : "");
-        if (!type || !type.isShared())
+        if (!type || !type.isShared() || type.isTypeStruct() || type.isTypeClass())
             return false;
 
         // atomicOp uses opAssign (+=/-=) rather than opOp (++/--) for the CT string literal.
@@ -1679,7 +1679,7 @@ extern (C++) final class IntegerExp : Expression
         emplaceExp!(IntegerExp)(pue, loc, value, type);
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (this == o)
             return true;
@@ -1833,6 +1833,25 @@ extern (C++) final class IntegerExp : Expression
             theConstant = new IntegerExp(v);
         return theConstant;
     }
+
+    /**
+     * Use this instead of creating new instances for commonly used bools.
+     *
+     * Parameters:
+     *      b = The value of the expression
+     * Returns:
+     *      A static instance of the expression, typed as `Type.tbool`.
+     */
+    static IntegerExp createBool(bool b)
+    {
+        __gshared IntegerExp trueExp, falseExp;
+        if (!trueExp)
+        {
+            trueExp = new IntegerExp(Loc.initial, 1, Type.tbool);
+            falseExp = new IntegerExp(Loc.initial, 0, Type.tbool);
+        }
+        return b ? trueExp : falseExp;
+    }
 }
 
 /***********************************************************
@@ -1923,7 +1942,7 @@ extern (C++) final class RealExp : Expression
         emplaceExp!(RealExp)(pue, loc, value, type);
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (this == o)
             return true;
@@ -1998,7 +2017,7 @@ extern (C++) final class ComplexExp : Expression
         emplaceExp!(ComplexExp)(pue, loc, value, type);
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (this == o)
             return true;
@@ -2214,7 +2233,7 @@ extern (C++) final class NullExp : Expression
         this.type = type;
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (auto e = o.isExpression())
         {
@@ -2235,7 +2254,7 @@ extern (C++) final class NullExp : Expression
     {
         if (implicitConvTo(Type.tstring))
         {
-            auto se = new StringExp(loc, cast(char*)mem.xcalloc(1, 1), 0);
+            auto se = new StringExp(loc, (cast(char*)mem.xcalloc(1, 1))[0 .. 0]);
             se.type = Type.tstring;
             return se;
         }
@@ -2253,7 +2272,7 @@ extern (C++) final class NullExp : Expression
  */
 extern (C++) final class StringExp : Expression
 {
-    union
+    private union
     {
         char* string;   // if sz == 1
         wchar* wstring; // if sz == 2
@@ -2262,56 +2281,54 @@ extern (C++) final class StringExp : Expression
     size_t len;         // number of code units
     ubyte sz = 1;       // 1: char, 2: wchar, 4: dchar
     ubyte committed;    // !=0 if type is committed
-    char postfix = 0;   // 'c', 'w', 'd'
+    enum char NoPostfix = 0;
+    char postfix = NoPostfix;   // 'c', 'w', 'd'
     OwnedBy ownedByCtfe = OwnedBy.code;
 
-    extern (D) this(const ref Loc loc, char* string)
+    extern (D) this(const ref Loc loc, const(void)[] string)
     {
         super(loc, TOK.string_, __traits(classInstanceSize, StringExp));
-        this.string = string;
-        this.len = strlen(string);
+        this.string = cast(char*)string.ptr; // note that this.string should be const
+        this.len = string.length;
         this.sz = 1;                    // work around LDC bug #1286
     }
 
-    extern (D) this(const ref Loc loc, void* string, size_t len)
+    extern (D) this(const ref Loc loc, const(void)[] string, size_t len, ubyte sz, char postfix = NoPostfix)
     {
         super(loc, TOK.string_, __traits(classInstanceSize, StringExp));
-        this.string = cast(char*)string;
+        this.string = cast(char*)string.ptr; // note that this.string should be const
         this.len = len;
-        this.sz = 1;                    // work around LDC bug #1286
-    }
-
-    extern (D) this(const ref Loc loc, void* string, size_t len, char postfix)
-    {
-        super(loc, TOK.string_, __traits(classInstanceSize, StringExp));
-        this.string = cast(char*)string;
-        this.len = len;
+        this.sz = sz;
         this.postfix = postfix;
-        this.sz = 1;                    // work around LDC bug #1286
     }
 
     static StringExp create(Loc loc, char* s)
     {
-        return new StringExp(loc, s);
+        return new StringExp(loc, s[0 .. strlen(s)]);
     }
 
     static StringExp create(Loc loc, void* string, size_t len)
     {
-        return new StringExp(loc, string, len);
+        return new StringExp(loc, string[0 .. len]);
     }
 
     // Same as create, but doesn't allocate memory.
     static void emplace(UnionExp* pue, Loc loc, char* s)
     {
-        emplaceExp!(StringExp)(pue, loc, s);
+        emplaceExp!(StringExp)(pue, loc, s[0 .. strlen(s)]);
     }
 
-    static void emplace(UnionExp* pue, Loc loc, void* string, size_t len)
+    extern (D) static void emplace(UnionExp* pue, Loc loc, const(void)[] string)
     {
-        emplaceExp!(StringExp)(pue, loc, string, len);
+        emplaceExp!(StringExp)(pue, loc, string);
     }
 
-    override bool equals(RootObject o)
+    extern (D) static void emplace(UnionExp* pue, Loc loc, const(void)[] string, size_t len, ubyte sz, char postfix)
+    {
+        emplaceExp!(StringExp)(pue, loc, string, len, sz, postfix);
+    }
+
+    override bool equals(const RootObject o) const
     {
         //printf("StringExp::equals('%s') %s\n", o.toChars(), toChars());
         if (auto e = o.isExpression())
@@ -2463,18 +2480,6 @@ extern (C++) final class StringExp : Expression
         }
     }
 
-    /**************************************************
-     * If the string data is UTF-8 and can be accessed directly,
-     * return a pointer to it.
-     * Do not assume a terminating 0.
-     * Returns:
-     *  pointer to string data if possible, null if not
-     */
-    char* toPtr()
-    {
-        return (sz == 1) ? string : null;
-    }
-
     override StringExp toStringExp()
     {
         return this;
@@ -2603,10 +2608,50 @@ extern (C++) final class StringExp : Expression
         return s[0 .. nbytes];
     }
 
-    extern (D) const(char)[] peekSlice() const
+    extern (D) const(char)[] peekString() const
     {
         assert(sz == 1);
         return this.string[0 .. len];
+    }
+
+    extern (D) const(wchar)[] peekWstring() const
+    {
+        assert(sz == 2);
+        return this.wstring[0 .. len];
+    }
+
+    extern (D) const(dchar)[] peekDstring() const
+    {
+        assert(sz == 4);
+        return this.dstring[0 .. len];
+    }
+
+    /*******************
+     * Get a slice of the data.
+     */
+    extern (D) const(ubyte)[] peekData() const
+    {
+        return cast(const(ubyte)[])this.string[0 .. len * sz];
+    }
+
+    /*******************
+     * Borrow a slice of the data, so the caller can modify
+     * it in-place (!)
+     */
+    extern (D) ubyte[] borrowData()
+    {
+        return cast(ubyte[])this.string[0 .. len * sz];
+    }
+
+    /***********************
+     * Set new string data.
+     * `this` becomes the new owner of the data.
+     */
+    extern (D) void setData(void* s, size_t len, ubyte sz)
+    {
+        this.string = cast(char*)s;
+        this.len = len;
+        this.sz = sz;
     }
 
     override void accept(Visitor v)
@@ -2694,7 +2739,7 @@ extern (C++) final class TupleExp : Expression
         return new TupleExp(loc, e0 ? e0.syntaxCopy() : null, arraySyntaxCopy(exps));
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (this == o)
             return true;
@@ -2707,7 +2752,7 @@ extern (C++) final class TupleExp : Expression
                     return false;
                 foreach (i, e1; *exps)
                 {
-                    Expression e2 = (*te.exps)[i];
+                    auto e2 = (*te.exps)[i];
                     if (!e1.equals(e2))
                         return false;
                 }
@@ -2781,11 +2826,11 @@ extern (C++) final class ArrayLiteralExp : Expression
             arraySyntaxCopy(elements));
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (this == o)
             return true;
-        Expression e = o.isExpression();
+        auto e = o.isExpression();
         if (!e)
             return false;
         if (auto ae = e.isArrayLiteralExp())
@@ -2796,14 +2841,14 @@ extern (C++) final class ArrayLiteralExp : Expression
             {
                 return false;
             }
+
             foreach (i, e1; *elements)
             {
-                Expression e2 = (*ae.elements)[i];
-                if (!e1)
-                    e1 = basis;
-                if (!e2)
-                    e2 = ae.basis;
-                if (e1 != e2 && (!e1 || !e2 || !e1.equals(e2)))
+                auto e2 = (*ae.elements)[i];
+                auto e1x = e1 ? e1 : basis;
+                auto e2x = e2 ? e2 : ae.basis;
+
+                if (e1x != e2x && (!e1x || !e2x || !e1x.equals(e2x)))
                     return false;
             }
             return true;
@@ -2873,8 +2918,8 @@ extern (C++) final class ArrayLiteralExp : Expression
                 buf.write4(0);
             }
 
-            const size_t len = buf.offset / sz - 1;
-            auto se = new StringExp(loc, buf.extractData(), len, prefix);
+            const size_t len = buf.length / sz - 1;
+            auto se = new StringExp(loc, buf.extractSlice()[0 .. len * sz], len, sz, prefix);
             se.sz = sz;
             se.type = type;
             return se;
@@ -2908,7 +2953,7 @@ extern (C++) final class AssocArrayLiteralExp : Expression
         this.values = values;
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (this == o)
             return true;
@@ -2990,6 +3035,7 @@ extern (C++) final class StructLiteralExp : Expression
     int stageflags;
 
     bool useStaticInit;     /// if this is true, use the StructDeclaration's init symbol
+    bool isOriginal = false; /// used when moving instances to indicate `this is this.origin`
     OwnedBy ownedByCtfe = OwnedBy.code;
 
     extern (D) this(const ref Loc loc, StructDeclaration sd, Expressions* elements, Type stype = null)
@@ -3009,11 +3055,11 @@ extern (C++) final class StructLiteralExp : Expression
         return new StructLiteralExp(loc, sd, cast(Expressions*)elements, stype);
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (this == o)
             return true;
-        Expression e = o.isExpression();
+        auto e = o.isExpression();
         if (!e)
             return false;
         if (auto se = e.isStructLiteralExp())
@@ -3024,7 +3070,7 @@ extern (C++) final class StructLiteralExp : Expression
                 return false;
             foreach (i, e1; *elements)
             {
-                Expression e2 = (*se.elements)[i];
+                auto e2 = (*se.elements)[i];
                 if (e1 != e2 && (!e1 || !e2 || !e1.equals(e2)))
                     return false;
             }
@@ -3427,6 +3473,7 @@ extern (C++) final class SymOffExp : SymbolExp
  */
 extern (C++) final class VarExp : SymbolExp
 {
+    bool delegateWasExtracted;
     extern (D) this(const ref Loc loc, Declaration var, bool hasOverloads = true)
     {
         if (var.isVarDeclaration())
@@ -3443,7 +3490,7 @@ extern (C++) final class VarExp : SymbolExp
         return new VarExp(loc, var, hasOverloads);
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (this == o)
             return true;
@@ -3478,7 +3525,7 @@ extern (C++) final class VarExp : SymbolExp
             error("manifest constant `%s` cannot be modified", var.toChars());
             return new ErrorExp();
         }
-        if (var.storage_class & STC.lazy_)
+        if (var.storage_class & STC.lazy_ && !delegateWasExtracted)
         {
             error("lazy variable `%s` cannot be modified", var.toChars());
             return new ErrorExp();
@@ -3576,7 +3623,7 @@ extern (C++) final class FuncExp : Expression
         assert(fd.fbody);
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (this == o)
             return true;
@@ -3816,7 +3863,7 @@ extern (C++) final class FuncExp : Expression
         return m;
     }
 
-    override const(char)* toChars()
+    override const(char)* toChars() const
     {
         return fd.toChars();
     }
@@ -4060,7 +4107,7 @@ extern (C++) abstract class UnaExp : Expression
 }
 
 alias fp_t = UnionExp function(const ref Loc loc, Type, Expression, Expression);
-alias fp2_t = int function(const ref Loc loc, TOK, Expression, Expression);
+alias fp2_t = bool function(const ref Loc loc, TOK, Expression, Expression);
 
 /***********************************************************
  */
@@ -4407,7 +4454,7 @@ extern (C++) final class CompileExp : Expression
         return new CompileExp(loc, arraySyntaxCopy(exps));
     }
 
-    override bool equals(RootObject o)
+    override bool equals(const RootObject o) const
     {
         if (this == o)
             return true;
@@ -4420,7 +4467,7 @@ extern (C++) final class CompileExp : Expression
                 return false;
             foreach (i, e1; *exps)
             {
-                Expression e2 = (*ce.exps)[i];
+                auto e2 = (*ce.exps)[i];
                 if (e1 != e2 && (!e1 || !e2 || !e1.equals(e2)))
                     return false;
             }
@@ -6526,7 +6573,7 @@ extern (C++) final class FileInitExp : DefaultInitExp
         else
             s = loc.isValid() ? loc.filename : sc._module.ident.toChars();
 
-        Expression e = new StringExp(loc, cast(char*)s);
+        Expression e = new StringExp(loc, s[0 .. strlen(s)]);
         e = e.expressionSemantic(sc);
         e = e.castTo(sc, type);
         return e;
@@ -6572,7 +6619,7 @@ extern (C++) final class ModuleInitExp : DefaultInitExp
     override Expression resolveLoc(const ref Loc loc, Scope* sc)
     {
         const char* s = (sc.callsc ? sc.callsc : sc)._module.toPrettyChars();
-        Expression e = new StringExp(loc, cast(char*)s);
+        Expression e = new StringExp(loc, s[0 .. strlen(s)]);
         e = e.expressionSemantic(sc);
         e = e.castTo(sc, type);
         return e;
@@ -6602,7 +6649,7 @@ extern (C++) final class FuncInitExp : DefaultInitExp
             s = sc.func.Dsymbol.toPrettyChars();
         else
             s = "";
-        Expression e = new StringExp(loc, cast(char*)s);
+        Expression e = new StringExp(loc, s[0 .. strlen(s)]);
         e = e.expressionSemantic(sc);
         e.type = Type.tstring;
         return e;
@@ -6642,7 +6689,7 @@ extern (C++) final class PrettyFuncInitExp : DefaultInitExp
             s = "";
         }
 
-        Expression e = new StringExp(loc, cast(char*)s);
+        Expression e = new StringExp(loc, s[0 .. strlen(s)]);
         e = e.expressionSemantic(sc);
         e.type = Type.tstring;
         return e;

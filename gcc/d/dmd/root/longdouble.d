@@ -21,26 +21,27 @@ module dmd.root.longdouble;
 import core.stdc.config;
 import core.stdc.stdint;
 
+extern(C++):
 nothrow:
 @nogc:
 
 // Type used by the front-end for compile-time reals
 struct longdouble
 {
-    this(T)(T r)
+    extern (D) this(T)(T r)
     {
         this.set(r);
     }
 
     // No constructor to be able to use this class in a union.
-    longdouble opAssign(T)(T r)
+    extern (D) longdouble opAssign(T)(T r)
         if (is (T : longdouble))
     {
         this.realvalue = r.realvalue; 
         return this;
     }
 
-    longdouble opAssign(T)(T r)
+    extern (D) longdouble opAssign(T)(T r)
         if (!is (T : longdouble))
     {
         this.set(r);
@@ -48,7 +49,7 @@ struct longdouble
     }
 
     // Arithmetic operators.
-    longdouble opBinary(string op, T)(T r) const
+    extern (D) longdouble opBinary(string op, T)(T r) const
         if ((op == "+" || op == "-" || op == "*" || op == "/" || op == "%")
             && is (T : longdouble))
     {
@@ -64,36 +65,34 @@ struct longdouble
             return this.mod(r);
     }
 
-    longdouble opUnary(string op)() const
+    extern (D) longdouble opUnary(string op)() const
         if (op == "-")
     {
         return this.neg();
     }
 
-    int opCmp(longdouble r) const
+    extern (D) int opCmp(longdouble r) const
     {
         return this.cmp(r);
     }
 
-    int opEquals(longdouble r) const
+    extern (D) int opEquals(longdouble r) const
     {
         return this.equals(r);
     }
 
-    bool opCast(T : bool)() const
+    extern (D) bool opCast(T : bool)() const
     {
         return this.to_bool();
     }
 
-    T opCast(T)() const
+    extern (D) T opCast(T)() const
     {
         static if (__traits(isUnsigned, T))
             return cast (T) this.to_uint();
         else
             return cast(T) this.to_int();
     }
-
-    extern (C++):
 
     void set(int8_t d);
     void set(int16_t d);

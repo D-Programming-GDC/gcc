@@ -740,8 +740,8 @@ else version (CRuntime_Bionic)
 }
 else version (CRuntime_Musl)
 {
-    int mlock(in void*, size_t);
-    int munlock(in void*, size_t);
+    int mlock(const scope void*, size_t);
+    int munlock(const scope void*, size_t);
 }
 else version (CRuntime_UClibc)
 {
@@ -853,8 +853,8 @@ else version (CRuntime_Bionic)
 }
 else version (CRuntime_Musl)
 {
-    int shm_open(in char*, int, mode_t);
-    int shm_unlink(in char*);
+    int shm_open(const scope char*, int, mode_t);
+    int shm_unlink(const scope char*);
 }
 else version (CRuntime_UClibc)
 {

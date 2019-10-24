@@ -86,7 +86,7 @@ private Dsymbol getDsymbolWithoutExpCtx(RootObject oarg)
     return getDsymbol(oarg);
 }
 
-private __gshared StringTable traitsStringTable;
+private const StringTable traitsStringTable;
 
 shared static this()
 {
@@ -146,11 +146,12 @@ shared static this()
         "getLocation",
     ];
 
-    traitsStringTable._init(names.length);
+    StringTable* stringTable = cast(StringTable*) &traitsStringTable;
+    stringTable._init(names.length);
 
     foreach (s; names)
     {
-        auto sv = traitsStringTable.insert(s, cast(void*)s.ptr);
+        auto sv = stringTable.insert(s, cast(void*)s.ptr);
         assert(sv);
     }
 }
@@ -425,8 +426,17 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
         e.ident != Id.getProtection &&
         e.ident != Id.getAttributes)
     {
+        // Pretend we're in a deprecated scope so that deprecation messages
+        // aren't triggered when checking if a symbol is deprecated
+        const save = sc.stc;
+        if (e.ident == Id.isDeprecated)
+            sc.stc |= STC.deprecated_;
         if (!TemplateInstance.semanticTiargs(e.loc, sc, e.args, 1))
+        {
+            sc.stc = save;
             return new ErrorExp();
+        }
+        sc.stc = save;
     }
     size_t dim = e.args ? e.args.dim : 0;
 
@@ -438,12 +448,12 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
 
     IntegerExp True()
     {
-        return new IntegerExp(e.loc, true, Type.tbool);
+        return IntegerExp.createBool(true);
     }
 
     IntegerExp False()
     {
-        return new IntegerExp(e.loc, false, Type.tbool);
+        return IntegerExp.createBool(false);
     }
 
     /********
@@ -757,7 +767,7 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
             id = s.ident;
         }
 
-        auto se = new StringExp(e.loc, cast(char*)id.toChars());
+        auto se = new StringExp(e.loc, id.toString());
         return se.expressionSemantic(sc);
     }
     if (e.ident == Id.getProtection)
@@ -785,7 +795,7 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
 
         auto protName = protectionToChars(s.prot().kind); // TODO: How about package(names)
         assert(protName);
-        auto se = new StringExp(e.loc, cast(char*)protName);
+        auto se = new StringExp(e.loc, protName[0 .. strlen(protName)]);
         return se.expressionSemantic(sc);
     }
     if (e.ident == Id.parent)
@@ -895,7 +905,7 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
             e.error("string must be chars");
             return new ErrorExp();
         }
-        auto id = Identifier.idPool(se.peekSlice());
+        auto id = Identifier.idPool(se.peekString());
 
         /* Prefer dsymbol, because it might need some runtime contexts.
          */
@@ -1094,7 +1104,7 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
 
         auto exps = new Expressions();
         if (ad && ad.aliasthis)
-            exps.push(new StringExp(e.loc, cast(char*)ad.aliasthis.ident.toChars()));
+            exps.push(new StringExp(e.loc, ad.aliasthis.ident.toString()));
         Expression ex = new TupleExp(e.loc, exps);
         ex = ex.expressionSemantic(sc);
         return ex;
@@ -1168,7 +1178,7 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
 
         void addToMods(string str)
         {
-            mods.push(new StringExp(Loc.initial, cast(char*)str.ptr, str.length));
+            mods.push(new StringExp(Loc.initial, str));
         }
         tf.modifiersApply(&addToMods);
         tf.attributesApply(&addToMods, TRUSTformatSystem);
@@ -1195,7 +1205,7 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
         }
 
         bool value = target.isReturnOnStack(tf, fd && fd.needThis());
-        return new IntegerExp(e.loc, value, Type.tbool);
+        return IntegerExp.createBool(value);
     }
     if (e.ident == Id.getFunctionVariadicStyle)
     {
@@ -1240,7 +1250,7 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
                                              : "stdarg";    break;
             case VarArg.typesafe: style = "typesafe";       break;
         }
-        auto se = new StringExp(e.loc, cast(char*)style);
+        auto se = new StringExp(e.loc, style);
         return se.expressionSemantic(sc);
     }
     if (e.ident == Id.getParameterStorageClasses)
@@ -1300,7 +1310,7 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
 
         void push(string s)
         {
-            exps.push(new StringExp(e.loc, cast(char*)s.ptr, cast(uint)s.length));
+            exps.push(new StringExp(e.loc, s));
         }
 
         if (stc & STC.auto_)
@@ -1373,7 +1383,7 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
             }
         }
         auto linkage = linkageToChars(link);
-        auto se = new StringExp(e.loc, cast(char*)linkage);
+        auto se = new StringExp(e.loc, linkage[0 .. strlen(linkage)]);
         return se.expressionSemantic(sc);
     }
     if (e.ident == Id.allMembers ||
@@ -1490,7 +1500,7 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
         auto exps = cast(Expressions*)idents;
         foreach (i, id; *idents)
         {
-            auto se = new StringExp(e.loc, cast(char*)id.toChars());
+            auto se = new StringExp(e.loc, id.toString());
             (*exps)[i] = se;
         }
 
@@ -1534,8 +1544,9 @@ Expression semanticTraits(TraitsExp e, Scope* sc)
                         err = true;
                         break;
                     }
-                    const len = buf.offset;
-                    const str = buf.extractChars()[0 .. len];
+                    const len = buf.length;
+                    buf.writeByte(0);
+                    const str = buf.extractSlice()[0 .. len];
                     scope diagnosticReporter = new StderrDiagnosticReporter(global.params.useDeprecated);
                     scope p = new Parser!ASTCodegen(e.loc, sc._module, str, false, diagnosticReporter);
                     p.nextToken();
@@ -1842,10 +1853,12 @@ Lnext:
         }
         se = se.toUTF8(sc);
 
-        Expression r = target.getTargetInfo(se.toPtr(), e.loc);
+        const slice = se.peekString();
+        Expression r = target.getTargetInfo(slice.ptr, e.loc); // BUG: reliance on terminating 0
         if (!r)
         {
-            e.error("`getTargetInfo` key `\"%s\"` not supported by this implementation", se.toPtr());
+            e.error("`getTargetInfo` key `\"%.*s\"` not supported by this implementation",
+                cast(int)slice.length, slice.ptr);
             return new ErrorExp();
         }
         return r.expressionSemantic(sc);
@@ -1875,9 +1888,9 @@ Lnext:
         }
 
         auto exps = new Expressions(3);
-        exps.data[0] = new StringExp(e.loc, cast(void*)s.loc.filename, strlen(s.loc.filename));
-        exps.data[1] = new IntegerExp(e.loc, s.loc.linnum,Type.tint32);
-        exps.data[2] = new IntegerExp(e.loc, s.loc.charnum,Type.tint32);
+        (*exps)[0] = new StringExp(e.loc, s.loc.filename[0 .. strlen(s.loc.filename)]);
+        (*exps)[1] = new IntegerExp(e.loc, s.loc.linnum,Type.tint32);
+        (*exps)[2] = new IntegerExp(e.loc, s.loc.charnum,Type.tint32);
         auto tup = new TupleExp(e.loc, exps);
         return tup.expressionSemantic(sc);
     }
@@ -1888,7 +1901,7 @@ Lnext:
         if (!seed.length)
             return null;
         cost = 0;
-        StringValue* sv = traitsStringTable.lookup(seed);
+        const sv = traitsStringTable.lookup(seed);
         return sv ? cast(const(char)*)sv.ptrvalue : null;
     }
 

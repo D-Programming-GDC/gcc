@@ -43,9 +43,6 @@ class StaticForeach;
 // Back end
 struct code;
 
-bool inferAggregate(ForeachStatement *fes, Scope *sc, Dsymbol *&sapply);
-bool inferApplyArgTypes(ForeachStatement *fes, Scope *sc, Dsymbol *&sapply);
-
 /* How a statement exits; this is returned by blockExit()
  */
 enum BE
@@ -103,7 +100,7 @@ enum
     STMTgoto,
     STMTlabel,
     STMTasm, STMTinlineAsm, STMTgccAsm,
-    STMTimport,
+    STMTimport
 };
 
 class Statement : public ASTNode
@@ -114,7 +111,7 @@ public:
 
     virtual Statement *syntaxCopy();
 
-    const char *toChars();
+    const char *toChars() const;
 
     void error(const char *format, ...);
     void warning(const char *format, ...);
@@ -145,6 +142,19 @@ public:
     BreakStatement       *isBreakStatement()       { return stmt == STMTbreak       ? (BreakStatement*)this       : NULL; }
     DtorExpStatement     *isDtorExpStatement()     { return stmt == STMTdtorExp     ? (DtorExpStatement*)this     : NULL; }
     ForwardingStatement  *isForwardingStatement()  { return stmt == STMTforwarding  ? (ForwardingStatement*)this  : NULL; }
+    DoStatement          *isDoStatement()          { return stmt == STMTdo          ? (DoStatement*)this          : NULL; }
+    ForStatement         *isForStatement()         { return stmt == STMTfor         ? (ForStatement*)this         : NULL; }
+    ForeachStatement     *isForeachStatement()     { return stmt == STMTforeach     ? (ForeachStatement*)this     : NULL; }
+    SwitchStatement      *isSwitchStatement()      { return stmt == STMTswitch      ? (SwitchStatement*)this      : NULL; }
+    ContinueStatement    *isContinueStatement()    { return stmt == STMTcontinue    ? (ContinueStatement*)this    : NULL; }
+    WithStatement        *isWithStatement()        { return stmt == STMTwith        ? (WithStatement*)this        : NULL; }
+    TryCatchStatement    *isTryCatchStatement()    { return stmt == STMTtryCatch    ? (TryCatchStatement*)this    : NULL; }
+    ThrowStatement       *isThrowStatement()       { return stmt == STMTthrow       ? (ThrowStatement*)this       : NULL; }
+    TryFinallyStatement  *isTryFinallyStatement()  { return stmt == STMTtryFinally  ? (TryFinallyStatement*)this  : NULL; }
+    SwitchErrorStatement  *isSwitchErrorStatement()  { return stmt == STMTswitchError  ? (SwitchErrorStatement*)this  : NULL; }
+    UnrolledLoopStatement *isUnrolledLoopStatement() { return stmt == STMTunrolledLoop ? (UnrolledLoopStatement*)this : NULL; }
+    ForeachRangeStatement *isForeachRangeStatement() { return stmt == STMTforeachRange ? (ForeachRangeStatement*)this : NULL; }
+    CompoundDeclarationStatement *isCompoundDeclarationStatement() { return stmt == STMTcompoundDeclaration ? (CompoundDeclarationStatement*)this : NULL; }
 
     void accept(Visitor *v) { v->visit(this); }
 };
@@ -426,6 +436,7 @@ public:
     bool isFinal;
 
     DefaultStatement *sdefault;
+    Statement *tryBody;            // set to TryCatchStatement or TryFinallyStatement if in _body portion
     TryFinallyStatement *tf;
     GotoCaseStatements gotoCases;  // array of unresolved GotoCaseStatement's
     CaseStatements *cases;         // array of CaseStatement's
@@ -570,6 +581,8 @@ public:
     Statement *_body;
     Catches *catches;
 
+    Statement *tryBody;   /// set to enclosing TryCatchStatement or TryFinallyStatement if in _body portion
+
     Statement *syntaxCopy();
     bool hasBreak() const;
 
@@ -601,7 +614,8 @@ public:
     Statement *_body;
     Statement *finalbody;
 
-    bool bodyFallsThru;         // true if _body falls through to finally
+    Statement *tryBody;   // set to enclosing TryCatchStatement or TryFinallyStatement if in _body portion
+    bool bodyFallsThru;   // true if _body falls through to finally
 
     static TryFinallyStatement *create(Loc loc, Statement *body, Statement *finalbody);
     Statement *syntaxCopy();
@@ -651,6 +665,7 @@ class GotoStatement : public Statement
 public:
     Identifier *ident;
     LabelDsymbol *label;
+    Statement *tryBody;   /// set to enclosing TryCatchStatement or TryFinallyStatement if in _body portion
     TryFinallyStatement *tf;
     ScopeGuardStatement *os;
     VarDeclaration *lastVar;
@@ -665,11 +680,12 @@ class LabelStatement : public Statement
 public:
     Identifier *ident;
     Statement *statement;
+    Statement *tryBody;   /// set to enclosing TryCatchStatement or TryFinallyStatement if in _body portion
     TryFinallyStatement *tf;
     ScopeGuardStatement *os;
     VarDeclaration *lastVar;
     Statement *gotoTarget;      // interpret
-
+    void* extra;                // used by Statement_toIR()
     bool breaks;                // someone did a 'break ident'
 
     Statement *syntaxCopy();
@@ -683,6 +699,9 @@ class LabelDsymbol : public Dsymbol
 {
 public:
     LabelStatement *statement;
+
+    bool deleted;           // set if rewritten to return in foreach delegate
+    bool iasm;              // set if used by inline assembler
 
     static LabelDsymbol *create(Identifier *ident);
     LabelDsymbol *isLabel();

@@ -595,7 +595,6 @@ extern void add_import_paths (const char *, const char *, bool);
 
 /* In d-lang.cc.  */
 extern void d_add_builtin_module (Module *);
-extern void d_add_entrypoint_module (Module *, Module *);
 extern d_tree_node_structure_enum d_tree_node_structure (lang_tree_node *);
 extern struct lang_type *build_lang_type (Type *);
 extern struct lang_decl *build_lang_decl (Declaration *);
@@ -605,7 +604,7 @@ extern tree d_signed_type (tree);
 extern void d_keep (tree);
 
 /* In decl.cc.  */
-const char *mangle_decl (Dsymbol *);
+extern const char *d_mangle_decl (Dsymbol *);
 extern tree mangle_internal_decl (Dsymbol *, const char *, const char *);
 extern void build_decl_tree (Dsymbol *);
 extern tree get_symbol_decl (Declaration *);

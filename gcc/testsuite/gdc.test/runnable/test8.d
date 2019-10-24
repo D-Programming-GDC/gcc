@@ -752,7 +752,7 @@ int foo42(const(char) *x, ...)
     va_list ap;
 
     va_start!(typeof(x))(ap, x);
-    //printf("&x = %p, ap = %p\n", &x, ap);     // XBUG: static array va_lists (eg: x86_64) cannot be passed as vararg.
+    //printf("&x = %p, ap = %p\n", &x, ap);
 
     int i;
     i = va_arg!(typeof(i))(ap);
