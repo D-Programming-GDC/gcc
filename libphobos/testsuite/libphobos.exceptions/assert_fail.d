@@ -3,11 +3,16 @@ import core.stdc.stdio : fprintf, printf, stderr;
 
 void test(string comp = "==", A, B)(A a, B b, string msg, size_t line = __LINE__)
 {
+    test(assert(mixin("a " ~ comp ~ " b")), msg, line);
+}
+
+void test(T)(lazy T dg, string msg, size_t line = __LINE__)
+{
     int ret = () {
         import core.exception : AssertError;
         try
         {
-            assert(mixin("a " ~ comp ~ " b"));
+            dg();
         } catch(AssertError e)
         {
             // don't use assert here for better debugging
@@ -69,6 +74,10 @@ void testStrings()
     char[] dlang = "dlang".dup;
     const(char)[] rust = "rust";
     test(dlang, rust, `"dlang" != "rust"`);
+
+    // https://issues.dlang.org/show_bug.cgi?id=20322
+    test("left"w, "right"w, `"left" != "right"`);
+    test("left"d, "right"d, `"left" != "right"`);
 }
 
 void testToString()()
@@ -85,6 +94,22 @@ void testToString()()
         }
     }
     test(new Foo("a"), new Foo("b"), "Foo(a) != Foo(b)");
+
+    // Verifiy that the const toString is selected if present
+    static struct Overloaded
+    {
+        string toString()
+        {
+            return "Mutable";
+        }
+
+        string toString() const
+        {
+            return "Const";
+        }
+    }
+
+    test!"!="(Overloaded(), Overloaded(), "Const is Const");
 }
 
 
@@ -106,6 +131,15 @@ void testStruct()()
     struct T { T[] t; }
     test(S(0), S(1), "S(0) !is S(1)");
     test(T([T(null)]), T(null), "[T([])] != []");
+
+    // https://issues.dlang.org/show_bug.cgi?id=20323
+    static struct NoCopy
+    {
+        @disable this(this);
+    }
+
+    NoCopy n;
+    test(assert(n != n), "NoCopy() is NoCopy()");
 }
 
 void testAA()()
@@ -131,6 +165,9 @@ void testVoidArray()()
     test("s", null, `"s" != ""`);
     test(['c'], null, `"c" != ""`);
     test!"!="(null, null, "`null` == `null`");
+
+    const void[] chunk = [byte(1), byte(2), byte(3)];
+    test(chunk, null, "[1, 2, 3] != []");
 }
 
 void testTemporary()
@@ -140,7 +177,21 @@ void testTemporary()
         ~this() @system {}
     }
 
-    assert(Bad() == Bad());
+    test(assert(Bad() != Bad()), "Bad() is Bad()");
+}
+
+void testEnum()
+{
+    static struct UUID {
+        union
+        {
+            ubyte[] data = [1];
+        }
+    }
+
+    ubyte[] data;
+    enum ctfe = UUID();
+    test(assert(ctfe.data == data), "[1] != []");
 }
 
 void main()
@@ -156,5 +207,6 @@ void main()
     testAttributes();
     testVoidArray();
     testTemporary();
+    testEnum();
     fprintf(stderr, "success.\n");
 }

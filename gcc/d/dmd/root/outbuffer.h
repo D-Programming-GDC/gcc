@@ -45,7 +45,6 @@ public:
     void reserve(d_size_t nbytes);
     void setsize(d_size_t size);
     void reset();
-    //void write(const void *data, d_size_t nbytes);
     void writestring(const char *string);
     void prependstring(const char *string);
     void writenl();                     // write newline
