@@ -875,6 +875,7 @@ public:
     d_keep (t->ctype);
     IDENTIFIER_DAGGREGATE (deco) = t->sym;
     TYPE_LANG_SPECIFIC (t->ctype) = build_lang_type (t);
+    TYPE_CXX_ODR_P (t->ctype) = 1;
 
     if (t->sym->members)
       {
@@ -942,6 +943,7 @@ public:
     TYPE_LANG_SPECIFIC (t->ctype) = build_lang_type (t);
     TYPE_LANG_SPECIFIC (basetype) = TYPE_LANG_SPECIFIC (t->ctype);
     CLASS_TYPE_P (basetype) = 1;
+    TYPE_CXX_ODR_P (basetype) = 1;
 
     /* Put out all fields, including from each base class.  */
     layout_aggregate_type (t->sym, basetype, t->sym);
