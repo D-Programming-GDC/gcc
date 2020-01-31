@@ -30,15 +30,8 @@ void poorMansAssert(bool condition)
 {
     if (!condition)
     {
-        version (GNU)
-        {
-            import gcc.builtins;
-            __builtin_trap();
-        }
-        else
-        {
-            asm {hlt;}
-        }
+        static char* hlt;
+        *hlt = 0;
     }
 }
 

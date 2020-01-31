@@ -337,6 +337,10 @@ fpreview=dip1008
 D RejectNegative
 Implement DIP1008: Allow exceptions in @nogc code.
 
+fpreview=dip1021
+D RejectNegative
+Implement DIP1021: Mutable function arguments.
+
 fpreview=dip25
 D RejectNegative
 Implement DIP25: Sealed references.

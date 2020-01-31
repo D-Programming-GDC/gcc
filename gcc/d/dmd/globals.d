@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/globals.d, _globals.d)
@@ -178,6 +178,10 @@ extern (C++) struct Param
                             // https://issues.dlang.org/show_bug.cgi?id=14246
     bool fieldwise;         // do struct equality testing field-wise rather than by memcmp()
     bool rvalueRefParam;    // allow rvalues to be arguments to ref parameters
+                            // http://dconf.org/2019/talks/alexandrescu.html
+                            // https://gist.github.com/andralex/e5405a5d773f07f73196c05f8339435a
+                            // https://digitalmars.com/d/archives/digitalmars/D/Binding_rvalues_to_ref_parameters_redux_325087.html
+                            // Implementation: https://github.com/dlang/dmd/pull/9817
 
     CppStdRevision cplusplus = CppStdRevision.cpp98;    // version of C++ standard to support
 
@@ -293,7 +297,7 @@ extern (C++) struct Global
     string map_ext = "map";       // for .map files
     bool run_noext;                     // allow -run sources without extensions.
 
-    string copyright = "Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved";
+    string copyright = "Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved";
     string written = "written by Walter Bright";
 
     Array!(const(char)*)* path;         // Array of char*'s which form the import lookup path
@@ -313,6 +317,8 @@ extern (C++) struct Global
 
     Array!Identifier* versionids;    // command line versions and predefined versions
     Array!Identifier* debugids;      // command line debug versions and predefined versions
+
+    enum recursionLimit = 500; // number of recursive template expansions before abort
 
   nothrow:
 
@@ -578,7 +584,7 @@ nothrow:
 
     extern (D) size_t toHash() const @trusted pure nothrow
     {
-        import dmd.utils : toDString;
+        import dmd.root.string : toDString;
 
         auto hash = hashOf(linnum);
         hash = hashOf(charnum, hash);

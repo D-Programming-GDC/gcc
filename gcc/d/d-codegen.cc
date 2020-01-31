@@ -1992,8 +1992,7 @@ d_build_call (TypeFunction *tf, tree callable, tree object,
 
       size_t nparams = tf->parameterList.length ();
       /* if _arguments[] is the first argument.  */
-      size_t varargs = (tf->linkage == LINKd
-			&& tf->parameterList.varargs == VARARGvariadic);
+      size_t varargs = tf->isDstyleVariadic ();
 
       /* Assumes arguments->length <= formal_args->length if (!tf->varargs).  */
       for (size_t i = 0; i < arguments->length; ++i)

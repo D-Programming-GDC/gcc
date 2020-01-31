@@ -1,5 +1,5 @@
 /* target.d -- Target interface for the D front end.
- * Copyright (C) 2019 Free Software Foundation, Inc.
+ * Copyright (C) 2019-2020 Free Software Foundation, Inc.
  *
  * GCC is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -52,6 +52,9 @@ extern (C++) struct Target
 
     // C++ ABI
     TargetCPP cpp;
+
+    // Objective-C ABI
+    TargetObjC objc;
 
     /**
      * Values representing all properties for floating point types
@@ -270,6 +273,15 @@ struct TargetCPP
      *      true if isFundamental was set by function
      */
     extern (C++) bool fundamentalType(const Type t, ref bool isFundamental);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * Functions and variables specific to interface with extern(Objective-C) ABI.
+ */
+struct TargetObjC
+{
+    bool supported;     /// set if compiler can interface with Objective-C
 }
 
 ////////////////////////////////////////////////////////////////////////////////

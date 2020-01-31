@@ -1,6 +1,6 @@
 
 /* Compiler implementation of the D programming language
- * Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved
  * written by Walter Bright
  * http://www.digitalmars.com
  * Distributed under the Boost Software License, Version 1.0.
@@ -28,8 +28,6 @@ public:
     const char *toHChars2() const;
     DYNCAST dyncast() const;
 
-    static Identifier *generateId(const char *prefix);
-    static Identifier *generateId(const char *prefix, size_t i);
     static Identifier *idPool(const char *s, unsigned len);
 
     static inline Identifier *idPool(const char *s)

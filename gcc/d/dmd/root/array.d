@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/root/array.d, root/_array.d)
@@ -15,6 +15,12 @@ module dmd.root.array;
 import core.stdc.string;
 
 import dmd.root.rmem;
+import dmd.root.string;
+
+debug
+{
+    debug = stomp; // flush out dangling pointer problems by stomping on unused memory
+}
 
 extern (C++) struct Array(T)
 {
@@ -40,37 +46,57 @@ public:
 
     ~this() pure nothrow
     {
+        debug (stomp) memset(data.ptr, 0xFF, data.length);
         if (data.ptr != &smallarray[0])
             mem.xfree(data.ptr);
     }
     ///returns elements comma separated in []
     extern(D) const(char)[] toString() const
     {
-        static if (is(typeof(T.init.toString())))
+        static const(char)[] toStringImpl(alias toStringFunc, Array)(Array* a, bool quoted = false)
         {
-            const(char)[][] buf = (cast(const(char)[]*)mem.xcalloc((char[]).sizeof, length))[0 .. length];
+            const(char)[][] buf = (cast(const(char)[]*)mem.xcalloc((char[]).sizeof, a.length))[0 .. a.length];
             size_t len = 2; // [ and ]
-            foreach (u; 0 .. length)
+            const seplen = quoted ? 3 : 1; // ',' or null terminator and optionally '"'
+            if (a.length == 0)
+                len += 1; // null terminator
+            else
             {
-                buf[u] = data[u].toString();
-                len += buf[u].length + 1; //length + ',' or null terminator
+                foreach (u; 0 .. a.length)
+                {
+                    buf[u] = toStringFunc(a.data[u]);
+                    len += buf[u].length + seplen;
+                }
             }
             char[] str = (cast(char*)mem.xmalloc_noscan(len))[0..len];
 
             str[0] = '[';
             char* p = str.ptr + 1;
-            foreach (u; 0 .. length)
+            foreach (u; 0 .. a.length)
             {
                 if (u)
                     *p++ = ',';
+                if (quoted)
+                    *p++ = '"';
                 memcpy(p, buf[u].ptr, buf[u].length);
                 p += buf[u].length;
+                if (quoted)
+                    *p++ = '"';
             }
             *p++ = ']';
             *p = 0;
-            assert(p - str.ptr == str.length - 1); //null terminator
+            assert(p - str.ptr == str.length - 1); // null terminator
             mem.xfree(buf.ptr);
             return str[0 .. $-1];
+        }
+
+        static if (is(typeof(T.init.toString())))
+        {
+            return toStringImpl!(a => a.toString)(&this);
+        }
+        else static if (is(typeof(T.init.toDString())))
+        {
+            return toStringImpl!(a => a.toDString)(&this, true);
         }
         else
         {
@@ -137,12 +163,30 @@ public:
                 if (nentries > increment)       // if 1.5 is not enough
                     increment = nentries;
                 const allocdim = length + increment;
-                auto p = cast(T*)mem.xrealloc(data.ptr, allocdim * T.sizeof);
+                debug (stomp)
+                {
+                    // always move using allocate-copy-stomp-free
+                    auto p = cast(T*)mem.xmalloc(allocdim * T.sizeof);
+                    memcpy(p, data.ptr, length * T.sizeof);
+                    memset(data.ptr, 0xFF, data.length * T.sizeof);
+                    mem.xfree(data.ptr);
+                }
+                else
+                    auto p = cast(T*)mem.xrealloc(data.ptr, allocdim * T.sizeof);
                 data = p[0 .. allocdim];
             }
-            if (mem.isGCEnabled)
-                if (length + nentries < data.length)
-                    memset(data.ptr + length + nentries, 0, (data.length - length - nentries) * T.sizeof);
+
+            debug (stomp)
+            {
+                if (length < data.length)
+                    memset(data.ptr + length, 0xFF, (data.length - length) * T.sizeof);
+            }
+            else
+            {
+                if (mem.isGCEnabled)
+                    if (length < data.length)
+                        memset(data.ptr + length, 0xFF, (data.length - length) * T.sizeof);
+            }
         }
     }
 
@@ -151,6 +195,7 @@ public:
         if (length - i - 1)
             memmove(data.ptr + i, data.ptr + i + 1, (length - i - 1) * T.sizeof);
         length--;
+        debug (stomp) memset(data.ptr + length, 0xFF, T.sizeof);
     }
 
     void insert(size_t index, typeof(this)* a) pure nothrow
@@ -229,7 +274,15 @@ public:
 
     T pop() nothrow pure @nogc
     {
-        return data[--length];
+        debug (stomp)
+        {
+            assert(length);
+            auto result = data[length - 1];
+            remove(length - 1);
+            return result;
+        }
+        else
+            return data[--length];
     }
 
     extern (D) inout(T)[] opSlice() inout nothrow pure @nogc
@@ -249,6 +302,7 @@ public:
 
 unittest
 {
+    // Test for objects implementing toString()
     static struct S
     {
         int s = -1;
@@ -259,6 +313,17 @@ unittest
     }
     auto array = Array!S(4);
     assert(array.toString() == "[S,S,S,S]");
+    array.setDim(0);
+    assert(array.toString() == "[]");
+
+    // Test for toDString()
+    auto strarray = Array!(const(char)*)(2);
+    strarray[0] = "hello";
+    strarray[1] = "world";
+    auto str = strarray.toString();
+    assert(str == `["hello","world"]`);
+    // Test presence of null terminator.
+    assert(str.ptr[str.length] == '\0');
 }
 
 unittest

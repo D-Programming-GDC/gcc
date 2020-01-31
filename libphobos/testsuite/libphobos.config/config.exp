@@ -20,8 +20,9 @@ set dg-output-text [list]
 
 # Test, arguments to pass to the test program, and return code.
 set config_test_list [list \
-    { test19433 "--DRT-dont-eat-me" 0 } \
     { rt_trap_exceptions_drt "--DRT-trapExceptions=0" 1 } \
+    { test19433 "--DRT-dont-eat-me" 0 } \
+    { test20459 "--DRT-gcopts=profile:1" 0 } \
 ]
 
 # Initialize dg.

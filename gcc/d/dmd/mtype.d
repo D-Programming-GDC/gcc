@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/mtype.d, _mtype.d)
@@ -466,7 +466,7 @@ extern (C++) abstract class Type : ASTNode
 
     extern (C++) __gshared Type[TMAX] basic;
 
-    extern (D) __gshared StringTable stringtable;
+    extern (D) __gshared StringTable!Type stringtable;
     extern (D) private __gshared ubyte[TMAX] sizeTy = ()
         {
             ubyte[TMAX] sizeTy = __traits(classInstanceSize, TypeBasic);
@@ -960,10 +960,10 @@ extern (C++) abstract class Type : ASTNode
         if (!t.deco)
             return t.merge();
 
-        StringValue* sv = stringtable.lookup(t.deco, strlen(t.deco));
-        if (sv && sv.ptrvalue)
+        auto sv = stringtable.lookup(t.deco, strlen(t.deco));
+        if (sv && sv.value)
         {
-            t = cast(Type)sv.ptrvalue;
+            t = sv.value;
             assert(t.deco);
         }
         else
@@ -4156,6 +4156,7 @@ extern (C++) final class TypeFunction : TypeNext
     bool isscope;               // true: 'this' is scope
     bool isreturninferred;      // true: 'this' is return from inference
     bool isscopeinferred;       // true: 'this' is scope from inference
+    bool islive;                // is @live
     LINK linkage;               // calling convention
     TRUST trust;                // level of trust
     PURE purity = PURE.impure;
@@ -4181,6 +4182,8 @@ extern (C++) final class TypeFunction : TypeNext
             this.isnogc = true;
         if (stc & STC.property)
             this.isproperty = true;
+        if (stc & STC.live)
+            this.islive = true;
 
         if (stc & STC.ref_)
             this.isref = true;
@@ -4346,6 +4349,17 @@ extern (C++) final class TypeFunction : TypeNext
                 return true;
         }
         return false;
+    }
+
+    /*******************************
+     * Check for `extern (D) U func(T t, ...)` variadic function type,
+     * which has `_arguments[]` added as the first argument.
+     * Returns:
+     *  true if D-style variadic
+     */
+    bool isDstyleVariadic() const pure nothrow
+    {
+        return linkage == LINK.d && parameterList.varargs == VarArg.variadic;
     }
 
     /***************************
@@ -4739,6 +4753,7 @@ extern (C++) final class TypeFunction : TypeNext
                              * copytmp.__copyCtor(arg);
                              */
                             auto tmp = new VarDeclaration(arg.loc, tprm, Identifier.generateId("__copytmp"), null);
+                            tmp.storage_class = STC.rvalue | STC.temp | STC.ctfe;
                             tmp.dsymbolSemantic(sc);
                             Expression ve = new VarExp(arg.loc, tmp);
                             Expression e = new DotIdExp(arg.loc, ve, Id.ctor);
@@ -5157,11 +5172,13 @@ extern (C++) final class TypeTraits : Type
  */
 extern (C++) final class TypeMixin : Type
 {
+    Loc loc;
     Expressions* exps;
 
-    extern (D) this(Expressions* exps)
+    extern (D) this(const ref Loc loc, Expressions* exps)
     {
         super(Tmixin);
+        this.loc = loc;
         this.exps = exps;
     }
 
@@ -5172,7 +5189,7 @@ extern (C++) final class TypeMixin : Type
 
     override Type syntaxCopy()
     {
-        return new TypeMixin(Expression.arraySyntaxCopy(exps));
+        return new TypeMixin(loc, Expression.arraySyntaxCopy(exps));
     }
 
     override void accept(Visitor v)

@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/doc.d, _doc.d)
@@ -46,6 +46,7 @@ import dmd.root.filename;
 import dmd.root.outbuffer;
 import dmd.root.port;
 import dmd.root.rmem;
+import dmd.root.string;
 import dmd.tokens;
 import dmd.utf;
 import dmd.utils;
@@ -414,7 +415,7 @@ extern(C++) void gendocfile(Module m)
         time(&t);
         char* p = ctime(&t);
         p = mem.xstrdup(p);
-        m.macrotable.define("DATETIME", p[0 .. strlen(p)]);
+        m.macrotable.define("DATETIME", p.toDString());
         m.macrotable.define("YEAR", p[20 .. 20 + 4]);
     }
     const srcfilename = m.srcfile.toString();
@@ -2136,7 +2137,7 @@ size_t skiptoident(ref OutBuffer buf, size_t i)
     {
         dchar c;
         size_t oi = i;
-        if (utf_decodeChar(slice.ptr, slice.length, i, c))
+        if (utf_decodeChar(slice, i, c))
         {
             /* Ignore UTF errors, but still consume input
              */
@@ -2165,7 +2166,7 @@ private size_t skippastident(ref OutBuffer buf, size_t i)
     {
         dchar c;
         size_t oi = i;
-        if (utf_decodeChar(slice.ptr, slice.length, i, c))
+        if (utf_decodeChar(slice, i, c))
         {
             /* Ignore UTF errors, but still consume input
              */
@@ -2196,7 +2197,7 @@ private size_t skipPastIdentWithDots(ref OutBuffer buf, size_t i)
     {
         dchar c;
         size_t oi = i;
-        if (utf_decodeChar(slice.ptr, slice.length, i, c))
+        if (utf_decodeChar(slice, i, c))
         {
             /* Ignore UTF errors, but still consume input
              */
@@ -5339,7 +5340,7 @@ bool isIdStart(const(char)* p)
     if (c >= 0x80)
     {
         size_t i = 0;
-        if (utf_decodeChar(p, 4, i, c))
+        if (utf_decodeChar(p[0 .. 4], i, c))
             return false; // ignore errors
         if (isUniAlpha(c))
             return true;
@@ -5358,7 +5359,7 @@ bool isIdTail(const(char)* p)
     if (c >= 0x80)
     {
         size_t i = 0;
-        if (utf_decodeChar(p, 4, i, c))
+        if (utf_decodeChar(p[0 .. 4], i, c))
             return false; // ignore errors
         if (isUniAlpha(c))
             return true;
@@ -5383,7 +5384,7 @@ int utfStride(const(char)* p)
     if (c < 0x80)
         return 1;
     size_t i = 0;
-    utf_decodeChar(p, 4, i, c); // ignore errors, but still consume input
+    utf_decodeChar(p[0 .. 4], i, c); // ignore errors, but still consume input
     return cast(int)i;
 }
 

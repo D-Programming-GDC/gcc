@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/func.d, _func.d)
@@ -40,6 +40,7 @@ import dmd.mtype;
 import dmd.objc;
 import dmd.root.outbuffer;
 import dmd.root.rootobject;
+import dmd.root.string;
 import dmd.semantic2;
 import dmd.semantic3;
 import dmd.statement_rewrite_walker;
@@ -1906,6 +1907,12 @@ extern (C++) class FuncDeclaration : Declaration
                 FuncDeclaration f = v.nestedrefs[j];
                 assert(f != this);
 
+                /* __require and __ensure will always get called directly,
+                 * so they never make outer functions closure.
+                 */
+                if (f.ident == Id.require || f.ident == Id.ensure)
+                    continue;
+
                 //printf("\t\tf = %p, %s, isVirtual=%d, isThis=%p, tookAddressOf=%d\n", f, f.toChars(), f.isVirtual(), f.isThis(), f.tookAddressOf);
 
                 /* Look to see if f escapes. We consider all parents of f within
@@ -2724,17 +2731,17 @@ unittest
     assert(buf[] == "`shared` ");
     assert(!mismatches.isNotShared);
 
-    buf.reset;
+    buf.setsize(0);
     mismatches = MODMatchToBuffer(&buf, 0, MODFlags.shared_);
     assert(buf[] == "non-shared ");
     assert(mismatches.isNotShared);
 
-    buf.reset;
+    buf.setsize(0);
     mismatches = MODMatchToBuffer(&buf, MODFlags.const_, 0);
     assert(buf[] == "`const` ");
     assert(!mismatches.isMutable);
 
-    buf.reset;
+    buf.setsize(0);
     mismatches = MODMatchToBuffer(&buf, 0, MODFlags.const_);
     assert(buf[] == "mutable ");
     assert(mismatches.isMutable);
@@ -2744,7 +2751,7 @@ private const(char)* prependSpace(const(char)* str)
 {
     if (!str || !*str) return "";
 
-    return (" " ~ str[0 .. strlen(str)] ~ "\0").ptr;
+    return (" " ~ str.toDString() ~ "\0").ptr;
 }
 
 /// Flag used by $(LREF resolveFuncCall).
@@ -3891,61 +3898,6 @@ extern (C++) final class NewDeclaration : FuncDeclaration
     }
 
     override inout(NewDeclaration) isNewDeclaration() inout
-    {
-        return this;
-    }
-
-    override void accept(Visitor v)
-    {
-        v.visit(this);
-    }
-}
-
-/***********************************************************
- */
-extern (C++) final class DeleteDeclaration : FuncDeclaration
-{
-    Parameters* parameters;
-
-    extern (D) this(const ref Loc loc, const ref Loc endloc, StorageClass stc, Parameters* fparams)
-    {
-        super(loc, endloc, Id.classDelete, STC.static_ | stc, null);
-        this.parameters = fparams;
-    }
-
-    override Dsymbol syntaxCopy(Dsymbol s)
-    {
-        assert(!s);
-        auto f = new DeleteDeclaration(loc, endloc, storage_class, Parameter.arraySyntaxCopy(parameters));
-        return FuncDeclaration.syntaxCopy(f);
-    }
-
-    override const(char)* kind() const
-    {
-        return "deallocator";
-    }
-
-    override bool isDelete()
-    {
-        return true;
-    }
-
-    override bool isVirtual() const
-    {
-        return false;
-    }
-
-    override bool addPreInvariant()
-    {
-        return false;
-    }
-
-    override bool addPostInvariant()
-    {
-        return false;
-    }
-
-    override inout(DeleteDeclaration) isDeleteDeclaration() inout
     {
         return this;
     }

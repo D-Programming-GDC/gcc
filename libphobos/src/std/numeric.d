@@ -199,7 +199,12 @@ private:
     // Perform IEEE rounding with round to nearest detection
     void roundedShift(T,U)(ref T sig, U shift)
     {
-        if (sig << (T.sizeof*8 - shift) == cast(T) 1uL << (T.sizeof*8 - 1))
+        if (shift >= T.sizeof*8)
+        {
+            // avoid illegal shift
+            sig = 0;
+        }
+        else if (sig << (T.sizeof*8 - shift) == cast(T) 1uL << (T.sizeof*8 - 1))
         {
             // round to even
             sig >>= shift;
@@ -615,7 +620,7 @@ public:
         AliasSeq!(
             CustomFloat!(5, 10),
             CustomFloat!(5, 11, CustomFloatFlags.ieee ^ CustomFloatFlags.signed),
-            CustomFloat!(1, 15, CustomFloatFlags.ieee ^ CustomFloatFlags.signed),
+            CustomFloat!(1, 7, CustomFloatFlags.ieee ^ CustomFloatFlags.signed),
             CustomFloat!(4, 3, CustomFloatFlags.ieee | CustomFloatFlags.probability ^ CustomFloatFlags.signed)
         );
 
@@ -852,6 +857,61 @@ public:
     static assert(CustomFloat!(1,6).min_normal.significand == 0);
     static assert(CustomFloat!(3,5, CustomFloatFlags.none).min_normal.exponent == 0);
     static assert(CustomFloat!(3,5, CustomFloatFlags.none).min_normal.significand == 4);
+}
+
+@safe unittest
+{
+    import std.math : isNaN;
+
+    alias cf = CustomFloat!(5, 2);
+
+    auto f = cf.nan.get!float();
+    assert(isNaN(f));
+
+    cf a;
+    a = real.max;
+    assert(a == cf.infinity);
+
+    a = 0.015625;
+    assert(a.exponent == 0);
+    assert(a.significand == 0);
+
+    a = 0.984375;
+    assert(a.exponent == 1);
+    assert(a.significand == 0);
+}
+
+@system unittest
+{
+    import std.exception : assertThrown;
+    import core.exception : AssertError;
+
+    alias cf = CustomFloat!(3, 5, CustomFloatFlags.none);
+
+    cf a;
+    assertThrown!AssertError(a = real.max);
+}
+
+@system unittest
+{
+    import std.exception : assertThrown;
+    import core.exception : AssertError;
+
+    alias cf = CustomFloat!(3, 5, CustomFloatFlags.nan);
+
+    cf a;
+    assertThrown!AssertError(a = real.max);
+}
+
+@system unittest
+{
+    import std.exception : assertThrown;
+    import core.exception : AssertError;
+
+    alias cf = CustomFloat!(24, 8, CustomFloatFlags.none);
+
+    cf a;
+    assertThrown!AssertError(a = float.infinity);
 }
 
 private bool isCorrectCustomFloat(uint precision, uint exponentWidth, CustomFloatFlags flags) @safe pure nothrow @nogc
@@ -1420,7 +1480,7 @@ T findRoot(T, R)(scope R delegate(T) f, in T a, in T b,
         //numCalls=0;
         //++numProblems;
         assert(!x1.isNaN() && !x2.isNaN());
-        assert(signbit(x1) != signbit(x2));
+        assert(signbit(f(x1)) != signbit(f(x2)));
         auto result = findRoot(f, x1, x2, f(x1), f(x2),
           (real lo, real hi) { return false; });
 
@@ -1438,16 +1498,16 @@ T findRoot(T, R)(scope R delegate(T) f, in T a, in T b,
         //++numCalls;
         if (x>float.max)
             x = float.max;
-        if (x<-double.max)
-            x = -double.max;
+        if (x<-float.max)
+            x = -float.max;
         // This has a single real root at -59.286543284815
         return 0.386*x*x*x + 23*x*x + 15.7*x + 525.2;
     }
     // Test a function with more than one root.
     real multisine(real x) { ++numCalls; return sin(x); }
-    //testFindRoot( &multisine, 6, 90);
-    //testFindRoot(&cubicfn, -100, 100);
-    //testFindRoot( &cubicfn, -double.max, real.max);
+    testFindRoot( &multisine, 6, 90);
+    testFindRoot(&cubicfn, -100, 100);
+    testFindRoot( &cubicfn, -double.max, real.max);
 
 
 /* Tests from the paper:
@@ -1480,7 +1540,7 @@ T findRoot(T, R)(scope R delegate(T) f, in T a, in T b,
     foreach (k; power_nvals)
     {
         n = k;
-        //testFindRoot(&power, -1, 10);
+        testFindRoot(&power, -1, 10);
     }
 
     int powerProblems = numProblems;
@@ -1541,17 +1601,17 @@ T findRoot(T, R)(scope R delegate(T) f, in T a, in T b,
     }
 
     numProblems=0;
-    //testFindRoot(&alefeld0, PI_2, PI);
+    testFindRoot(&alefeld0, PI_2, PI);
     for (n=1; n <= 10; ++n)
     {
-        //testFindRoot(&alefeld0, n*n+1e-9L, (n+1)*(n+1)-1e-9L);
+        testFindRoot(&alefeld0, n*n+1e-9L, (n+1)*(n+1)-1e-9L);
     }
     ale_a = -40; ale_b = -1;
-    //testFindRoot(&alefeld1, -9, 31);
+    testFindRoot(&alefeld1, -9, 31);
     ale_a = -100; ale_b = -2;
-    //testFindRoot(&alefeld1, -9, 31);
+    testFindRoot(&alefeld1, -9, 31);
     ale_a = -200; ale_b = -3;
-    //testFindRoot(&alefeld1, -9, 31);
+    testFindRoot(&alefeld1, -9, 31);
     int [] nvals_3 = [1, 2, 5, 10, 15, 20];
     int [] nvals_5 = [1, 2, 4, 5, 8, 15, 20];
     int [] nvals_6 = [1, 5, 10, 15, 20];
@@ -1559,48 +1619,48 @@ T findRoot(T, R)(scope R delegate(T) f, in T a, in T b,
 
     for (int i=4; i<12; i+=2)
     {
-       n = i;
-       ale_a = 0.2;
-       //testFindRoot(&alefeld2, 0, 5);
-       ale_a=1;
-       //testFindRoot(&alefeld2, 0.95, 4.05);
-       //testFindRoot(&alefeld2, 0, 1.5);
+        n = i;
+        ale_a = 0.2;
+        testFindRoot(&alefeld2, 0, 5);
+        ale_a=1;
+        testFindRoot(&alefeld2, 0.95, 4.05);
+        testFindRoot(&alefeld2, 0, 1.5);
     }
     foreach (i; nvals_3)
     {
         n=i;
-        //testFindRoot(&alefeld3, 0, 1);
+        testFindRoot(&alefeld3, 0, 1);
     }
     foreach (i; nvals_3)
     {
         n=i;
-        //testFindRoot(&alefeld4, 0, 1);
+        testFindRoot(&alefeld4, 0, 1);
     }
     foreach (i; nvals_5)
     {
         n=i;
-        //testFindRoot(&alefeld5, 0, 1);
+        testFindRoot(&alefeld5, 0, 1);
     }
     foreach (i; nvals_6)
     {
         n=i;
-        //testFindRoot(&alefeld6, 0, 1);
+        testFindRoot(&alefeld6, 0, 1);
     }
     foreach (i; nvals_7)
     {
         n=i;
-        //testFindRoot(&alefeld7, 0.01L, 1);
+        testFindRoot(&alefeld7, 0.01L, 1);
     }
     real worstcase(real x)
     {
         ++numCalls;
         return x<0.3*real.max? -0.999e-3 : 1.0;
     }
-    //testFindRoot(&worstcase, -real.max, real.max);
+    testFindRoot(&worstcase, -real.max, real.max);
 
     // just check that the double + float cases compile
-    //findRoot((double x){ return 0.0; }, -double.max, double.max);
-    //findRoot((float x){ return 0.0f; }, -float.max, float.max);
+    findRoot((double x){ return 0.0; }, -double.max, double.max);
+    findRoot((float x){ return 0.0f; }, -float.max, float.max);
 
 /*
    int grandtotal=0;
@@ -2143,6 +2203,7 @@ if (isForwardRange!(R))
     a = [ 1.0, 3.0 ];
     assert(normalize(a));
     assert(a == [ 0.25, 0.75 ]);
+    assert(normalize!(typeof(a))(a, 50)); // a = [12.5, 37.5]
     a = [ 0.0, 0.0 ];
     assert(!normalize(a));
     assert(a == [ 0.5, 0.5 ]);

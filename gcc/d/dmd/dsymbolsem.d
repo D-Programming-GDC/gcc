@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/dsymbolsem.d, _dsymbolsem.d)
@@ -423,7 +423,7 @@ private bool buildCopyCtor(StructDeclaration sd, Scope* sc)
         return false;
 
     bool hasPostblit;
-    if (sd.postblit)
+    if (sd.postblit && !sd.postblit.isDisabled())
         hasPostblit = true;
 
     auto ctor = sd.search(sd.loc, Id.ctor);
@@ -1632,6 +1632,12 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                     foreach (id; (*imp.packages)[1 .. imp.packages.dim]) // [b, c]
                     {
                         p = cast(Package) p.symtab.lookup(id);
+                        // https://issues.dlang.org/show_bug.cgi?id=17991
+                        // An import of truly empty file/package can happen
+                        // https://issues.dlang.org/show_bug.cgi?id=20151
+                        // Package in the path conflicts with a module name
+                        if (p is null)
+                            break;
                         scopesym.addAccessiblePackage(p, imp.protection);
                     }
                 }
@@ -1963,8 +1969,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                 auto slice = se.peekString();
                 for (size_t i = 0; i < se.len;)
                 {
-                    auto p = slice.ptr;
-                    dchar c = p[i];
+                    dchar c = slice[i];
                     if (c < 0x80)
                     {
                         if (c.isValidMangling)
@@ -1978,9 +1983,9 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                             break;
                         }
                     }
-                    if (const msg = utf_decodeChar(slice.ptr, se.len, i, c))
+                    if (const msg = utf_decodeChar(slice, i, c))
                     {
-                        pd.error("%s", msg);
+                        pd.error("%.*s", cast(int)msg.length, msg.ptr);
                         break;
                     }
                     if (!isUniAlpha(c))
@@ -2869,7 +2874,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         {
             /* Assign scope local unique identifier, as same as lambdas.
              */
-            const(char)* s = "__mixin";
+            const(char)[] s = "__mixin";
 
             if (FuncDeclaration func = sc.parent.isFuncDeclaration())
             {
@@ -2999,7 +3004,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
 
         __gshared int nest;
         //printf("%d\n", nest);
-        if (++nest > 500)
+        if (++nest > global.recursionLimit)
         {
             global.gag = 0; // ensure error message gets printed
             tm.error("recursive expansion");
@@ -4517,53 +4522,6 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         funcDeclarationSemantic(nd);
     }
 
-    override void visit(DeleteDeclaration deld)
-    {
-        //printf("DeleteDeclaration::semantic()\n");
-
-        // @@@DEPRECATED_2.091@@@
-        // Made an error in 2.087.
-        // Should be removed in 2.091
-        error(deld.loc, "class deallocators are obsolete, consider moving the deallocation strategy outside of the class");
-
-        if (deld.semanticRun >= PASS.semanticdone)
-            return;
-        if (deld._scope)
-        {
-            sc = deld._scope;
-            deld._scope = null;
-        }
-
-        deld.parent = sc.parent;
-        Dsymbol p = deld.parent.pastMixin();
-        if (!p.isAggregateDeclaration())
-        {
-            error(deld.loc, "deallocator can only be a member of aggregate, not %s `%s`", p.kind(), p.toChars());
-            deld.type = Type.terror;
-            deld.errors = true;
-            return;
-        }
-        if (!deld.type)
-            deld.type = new TypeFunction(ParameterList(deld.parameters), Type.tvoid, LINK.d, deld.storage_class);
-
-        deld.type = deld.type.typeSemantic(deld.loc, sc);
-
-        // Check that there is only one argument of type void*
-        TypeFunction tf = deld.type.toTypeFunction();
-        if (tf.parameterList.length != 1)
-        {
-            deld.error("one argument of type `void*` expected");
-        }
-        else
-        {
-            Parameter fparam = tf.parameterList[0];
-            if (!fparam.type.equals(Type.tvoid.pointerTo()))
-                deld.error("one argument of type `void*` expected, not `%s`", fparam.type.toChars());
-        }
-
-        funcDeclarationSemantic(deld);
-    }
-
     /* https://issues.dlang.org/show_bug.cgi?id=19731
      *
      * Some aggregate member functions might have had
@@ -4727,7 +4685,6 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         /* Look for special member functions.
          */
         sd.aggNew = cast(NewDeclaration)sd.search(Loc.initial, Id.classNew);
-        sd.aggDelete = cast(DeleteDeclaration)sd.search(Loc.initial, Id.classDelete);
 
         // Look for the constructor
         sd.ctor = sd.searchCtor();
@@ -5324,7 +5281,6 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
          */
         // Can be in base class
         cldec.aggNew = cast(NewDeclaration)cldec.search(Loc.initial, Id.classNew);
-        cldec.aggDelete = cast(DeleteDeclaration)cldec.search(Loc.initial, Id.classDelete);
 
         // Look for the constructor
         cldec.ctor = cldec.searchCtor();
@@ -6256,7 +6212,7 @@ void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions*
         while (ti && !ti.deferred && ti.tinst)
         {
             ti = ti.tinst;
-            if (++nest > 500)
+            if (++nest > global.recursionLimit)
             {
                 global.gag = 0; // ensure error message gets printed
                 tempinst.error("recursive expansion");

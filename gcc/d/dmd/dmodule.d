@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/dmodule.d, _dmodule.d)
@@ -38,9 +38,9 @@ import dmd.root.filename;
 import dmd.root.outbuffer;
 import dmd.root.port;
 import dmd.root.rmem;
+import dmd.root.string;
 import dmd.semantic2;
 import dmd.semantic3;
-import dmd.utils;
 import dmd.visitor;
 
 version(Windows) {
@@ -172,7 +172,7 @@ private const(char)[] getFilename(Identifiers* packages, Identifier ident)
             assert(q);
             if (dotmods.length == q - m && memcmp(dotmods.peekChars(), m, q - m) == 0)
             {
-                buf.reset();
+                buf.setsize(0);
                 auto rhs = q[1 .. strlen(q)];
                 if (rhs.length > 0 && (rhs[$ - 1] == '/' || rhs[$ - 1] == '\\'))
                     rhs = rhs[0 .. $ - 1]; // remove trailing separator
@@ -695,7 +695,7 @@ extern (C++) final class Module : Package
             }
             else
                 fprintf(stderr, "Specify path to file '%s' with -I switch\n", srcfile.toChars());
-            fatal();
+            // fatal();
         }
         return false;
     }

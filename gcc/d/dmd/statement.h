@@ -1,6 +1,6 @@
 
 /* Compiler implementation of the D programming language
- * Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved
  * written by Walter Bright
  * http://www.digitalmars.com
  * Distributed under the Boost Software License, Version 1.0.
@@ -458,6 +458,7 @@ public:
 
     int index;          // which case it is (since we sort this)
     VarDeclaration *lastVar;
+    void* extra;            // for use by Statement_toIR()
 
     Statement *syntaxCopy();
 

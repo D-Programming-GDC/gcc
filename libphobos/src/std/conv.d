@@ -2045,10 +2045,17 @@ template roundTo(Target)
 {
     Target roundTo(Source)(Source value)
     {
-        import std.math : trunc;
+        import std.math : abs, log2, trunc;
 
         static assert(isFloatingPoint!Source);
         static assert(isIntegral!Target);
+
+        // If value >= 2 ^^ (real.mant_dig - 1), the number is an integer
+        // and adding 0.5 won't work, but we allready know, that we do
+        // not have to round anything.
+        if (log2(abs(value)) >= real.mant_dig - 1)
+            return to!Target(value);
+
         return to!Target(trunc(value + (value < 0 ? -0.5L : 0.5L)));
     }
 }
@@ -2086,6 +2093,27 @@ template roundTo(Target)
     assertThrown!ConvException(roundTo!int(float.init));
     auto ex = collectException(roundTo!int(float.init));
     assert(ex.msg == "Input was NaN");
+}
+
+// issue 5232
+@safe pure unittest
+{
+    real r1 = ulong.max;
+    assert(roundTo!ulong(r1) == ulong.max);
+
+    real r2 = ulong.max - 1;
+    assert(roundTo!ulong(r2) == ulong.max - 1);
+
+    real r3 = ulong.max / 2;
+    assert(roundTo!ulong(r3) == ulong.max / 2);
+
+    real r4 = ulong.max / 2 + 1;
+    assert(roundTo!ulong(r4) == ulong.max / 2 + 1);
+
+    // this is only an issue on computers where real == double
+    long l = -(2L ^^ double.mant_dig) + 1;
+    double r5 = l;
+    assert(roundTo!long(r5) == l);
 }
 
 /**
@@ -2574,6 +2602,13 @@ Lerr:
     assert(parse!int(input) == 777);
 }
 
+// issue 9621
+@safe pure unittest
+{
+    string s1 = "[ \"\\141\", \"\\0\", \"\\41\", \"\\418\" ]";
+    assert(parse!(string[])(s1) == ["a", "\0", "!", "!8"]);
+}
+
 /// ditto
 Target parse(Target, Source)(ref Source source, uint radix)
 if (isSomeChar!(ElementType!Source) &&
@@ -2605,6 +2640,7 @@ do
         alias s = source;
     }
 
+    auto found = false;
     do
     {
         uint c = s.front;
@@ -2631,7 +2667,16 @@ do
         enforce!ConvOverflowException(!overflow && nextv <= Target.max, "Overflow in integral conversion");
         v = cast(Target) nextv;
         s.popFront();
+        found = true;
     } while (!s.empty);
+
+    if (!found)
+    {
+        static if (isNarrowString!Source)
+            throw convError!(Source, Target)(cast(Source) source);
+        else
+            throw convError!(Source, Target)(source);
+    }
 
     static if (isNarrowString!Source)
         source = cast(Source) s;
@@ -2679,6 +2724,14 @@ do
 {
     auto str = "0=\x00\x02\x55\x40&\xff\xf0\n\x00\x04\x55\x40\xff\xf0~4+10\n";
     assert(parse!uint(str) == 0);
+}
+
+@safe pure unittest // bugzilla 18248
+{
+    import std.exception : assertThrown;
+
+    auto str = ";";
+    assertThrown(str.parse!uint(16));
 }
 
 /**
@@ -3846,13 +3899,31 @@ if (isInputRange!Source && isSomeChar!(ElementType!Source))
         return isAlpha(c) ? ((c & ~0x20) - ('A' - 10)) : c - '0';
     }
 
+    // We need to do octals separate, because they need a lookahead to find out,
+    // where the escape sequence ends.
+    auto first = s.front;
+    if (first >= '0' && first <= '7')
+    {
+        dchar c1 = s.front;
+        s.popFront();
+        if (s.empty) return c1 - '0';
+        dchar c2 = s.front;
+        if (c2 < '0' || c2 > '7') return c1 - '0';
+        s.popFront();
+        dchar c3 = s.front;
+        if (c3 < '0' || c3 > '7') return 8 * (c1 - '0') + (c2 - '0');
+        s.popFront();
+        if (c1 > '3')
+            throw parseError("Octal sequence is larger than \\377");
+        return 64 * (c1 - '0') + 8 * (c2 - '0') + (c3 - '0');
+    }
+
     dchar result;
 
-    switch (s.front)
+    switch (first)
     {
         case '"':   result = '\"';  break;
         case '\'':  result = '\'';  break;
-        case '0':   result = '\0';  break;
         case '?':   result = '\?';  break;
         case '\\':  result = '\\';  break;
         case 'a':   result = '\a';  break;
@@ -3897,7 +3968,7 @@ if (isInputRange!Source && isSomeChar!(ElementType!Source))
 {
     string[] s1 = [
         `\"`, `\'`, `\?`, `\\`, `\a`, `\b`, `\f`, `\n`, `\r`, `\t`, `\v`, //Normal escapes
-        //`\141`, //@@@9621@@@ Octal escapes.
+        `\141`,
         `\x61`,
         `\u65E5`, `\U00012456`
         //`\&amp;`, `\&quot;`, //@@@9621@@@ Named Character Entities.
@@ -3905,7 +3976,7 @@ if (isInputRange!Source && isSomeChar!(ElementType!Source))
 
     const(dchar)[] s2 = [
         '\"', '\'', '\?', '\\', '\a', '\b', '\f', '\n', '\r', '\t', '\v', //Normal escapes
-        //'\141', //@@@9621@@@ Octal escapes.
+        '\141',
         '\x61',
         '\u65E5', '\U00012456'
         //'\&amp;', '\&quot;', //@@@9621@@@ Named Character Entities.
@@ -3931,7 +4002,8 @@ if (isInputRange!Source && isSomeChar!(ElementType!Source))
         `\x0`,     //Premature hex end
         `\XB9`,    //Not legal hex syntax
         `\u!!`,    //Not a unicode hex
-        `\777`,    //Octal is larger than a byte //Note: Throws, but simply because octals are unsupported
+        `\777`,    //Octal is larger than a byte
+        `\80`,     //Wrong digit at beginning of octal
         `\u123`,   //Premature hex end
         `\U123123` //Premature hex end
     ];

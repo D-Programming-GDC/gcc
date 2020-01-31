@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/objc.d, _objc.d)
@@ -35,12 +35,12 @@ import dmd.identifier;
 import dmd.mtype;
 import dmd.root.outbuffer;
 import dmd.root.stringtable;
+import dmd.target;
 
 struct ObjcSelector
 {
     // MARK: Selector
-    private __gshared StringTable stringtable;
-    private __gshared StringTable vTableDispatchSelectors;
+    private __gshared StringTable!(ObjcSelector*) stringtable;
     private __gshared int incnum = 0;
     const(char)* stringvalue;
     size_t stringlen;
@@ -75,12 +75,12 @@ struct ObjcSelector
 
     extern (D) static ObjcSelector* lookup(const(char)* s, size_t len, size_t pcount)
     {
-        StringValue* sv = stringtable.update(s, len);
-        ObjcSelector* sel = cast(ObjcSelector*)sv.ptrvalue;
+        auto sv = stringtable.update(s, len);
+        ObjcSelector* sel = sv.value;
         if (!sel)
         {
             sel = new ObjcSelector(sv.toDchars(), len, pcount);
-            sv.ptrvalue = cast(char*)sel;
+            sv.value = sel;
         }
         return sel;
     }
@@ -183,7 +183,7 @@ extern(C++) abstract class Objc
 {
     static void _init()
     {
-        if (global.params.isOSX && global.params.is64bit)
+        if (target.objc.supported)
             _objc = new Supported;
         else
             _objc = new Unsupported;
@@ -492,7 +492,7 @@ extern(C++) private final class Supported : Objc
     {
         assert(id.classKind == ClassKind.objc);
     }
-    body
+    do
     {
         // don't report deprecations for the metaclass to avoid duplicated
         // messages.
@@ -566,7 +566,7 @@ extern(C++) private final class Supported : Objc
         assert(fd.selector);
         assert(fd.isMember);
     }
-    body
+    do
     {
         // * final member functions are kept virtual with Objective-C linkage
         //   because the Objective-C runtime always use dynamic dispatch.
@@ -581,7 +581,7 @@ extern(C++) private final class Supported : Objc
     {
         assert(metaclass);
     }
-    body
+    do
     {
         if (cd.classKind == ClassKind.objc && fd.isStatic && !cd.objc.isMeta)
             return cd.objc.metaclass;
@@ -594,7 +594,7 @@ extern(C++) private final class Supported : Objc
     {
         assert(fd.parent.isClassDeclaration);
     }
-    body
+    do
     {
         if (cd.classKind != ClassKind.objc)
             return;
@@ -632,7 +632,7 @@ extern(C++) private final class Supported : Objc
     {
         assert(fd.selectorParameter is null);
     }
-    body
+    do
     {
         if (!fd.selector)
             return null;

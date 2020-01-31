@@ -233,6 +233,7 @@ public import std.range.interfaces;
 public import std.range.primitives;
 public import std.typecons : Flag, Yes, No;
 
+import std.internal.attributes : betterC;
 import std.meta : allSatisfy, staticMap;
 import std.traits : CommonType, isCallable, isFloatingPoint, isIntegral,
     isPointer, isSomeFunction, isStaticArray, Unqual, isInstanceOf;
@@ -3299,13 +3300,6 @@ if (isInputRange!R)
     range.popFrontN(n);
     return range;
 }
-/// ditto
-R dropBack(R)(R range, size_t n)
-if (isBidirectionalRange!R)
-{
-    range.popBackN(n);
-    return range;
-}
 
 ///
 @safe unittest
@@ -3318,6 +3312,15 @@ if (isBidirectionalRange!R)
     assert("hello world".take(6).drop(3).equal("lo "));
 }
 
+/// ditto
+R dropBack(R)(R range, size_t n)
+if (isBidirectionalRange!R)
+{
+    range.popBackN(n);
+    return range;
+}
+
+///
 @safe unittest
 {
     import std.algorithm.comparison : equal;
@@ -9883,7 +9886,7 @@ Returns:
 
 See_Also: $(LREF chain) to chain ranges
  */
-auto only(Values...)(return scope auto ref Values values)
+auto only(Values...)(return scope Values values)
 if (!is(CommonType!Values == void) || Values.length == 0)
 {
     return OnlyResult!(CommonType!Values, Values.length)(values);
@@ -9919,6 +9922,16 @@ if (!is(CommonType!Values == void) || Values.length == 0)
 
     static assert(is(typeof(only((const(char)[]).init, string.init)) ==
         typeof(only((const(char)[]).init, (const(char)[]).init))));
+}
+
+// https://issues.dlang.org/show_bug.cgi?id=20314
+@safe unittest
+{
+    import std.algorithm.iteration : joiner;
+
+    const string s = "foo", t = "bar";
+
+    assert([only(s, t), only(t, s)].joiner(only(", ")).join == "foobar, barfoo");
 }
 
 // Tests the zero-element result
@@ -10645,6 +10658,7 @@ if (isInputRange!Range && !isInstanceOf!(SortedRange, Range))
     }
 
     // Assertion only.
+    static if (opt == SortedRangeOptions.checkRoughly)
     private void roughlyVerifySorted(Range r)
     {
         if (!__ctfe)
@@ -10669,6 +10683,7 @@ if (isInputRange!Range && !isInstanceOf!(SortedRange, Range))
     }
 
     // Assertion only.
+    static if (opt == SortedRangeOptions.checkStrictly)
     private void strictlyVerifySorted(Range r)
     {
         if (!__ctfe)
@@ -11223,9 +11238,9 @@ that break its sorted-ness, `SortedRange` will work erratically.
     assert(!r.contains(42));            // passes although it shouldn't
 }
 
-@safe unittest
+@betterC @nogc nothrow @safe unittest
 {
-    immutable(int)[] arr = [ 1, 2, 3 ];
+    static immutable(int)[] arr = [ 1, 2, 3 ];
     auto s = assumeSorted(arr);
 }
 

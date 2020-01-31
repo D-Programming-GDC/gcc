@@ -2,7 +2,7 @@
  * Compiler implementation of the
  * $(LINK2 http://www.dlang.org, D programming language).
  *
- * Copyright:   Copyright (C) 1999-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright:   Copyright (C) 1999-2020 by The D Language Foundation, All Rights Reserved
  * Authors:     $(LINK2 http://www.digitalmars.com, Walter Bright)
  * License:     $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:      $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/statementsem.d, _statementsem.d)
@@ -13,7 +13,6 @@
 module dmd.statementsem;
 
 import core.stdc.stdio;
-import core.stdc.string;
 
 import dmd.aggregate;
 import dmd.aliasthis;
@@ -49,6 +48,7 @@ import dmd.mtype;
 import dmd.nogc;
 import dmd.opover;
 import dmd.root.outbuffer;
+import dmd.root.string;
 import dmd.semantic2;
 import dmd.sideeffect;
 import dmd.statement;
@@ -2654,7 +2654,7 @@ else
                     sl = new DotIdExp(ss.loc, sl, Id.__switch_error);
 
                     Expressions* args = new Expressions(2);
-                    (*args)[0] = new StringExp(ss.loc, ss.loc.filename[0 .. strlen(ss.loc.filename)]);
+                    (*args)[0] = new StringExp(ss.loc, ss.loc.filename.toDString());
                     (*args)[1] = new IntegerExp(ss.loc.linnum);
 
                     sl = new CallExp(ss.loc, sl, args);

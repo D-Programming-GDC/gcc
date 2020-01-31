@@ -5,7 +5,7 @@ import core.thread : Thread;
 
 void main()
 {
-    foreach (t; 0 .. 10)
+    //foreach (t; 0 .. 10)
         new Thread({
             foreach (n; 0 .. 100)
             {

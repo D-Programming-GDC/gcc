@@ -147,6 +147,9 @@ Target::_init (const Param &)
   this->cpp.exceptions = true;
   this->cpp.twoDtorInVtable = true;
 
+  /* Set-up target Objective-C ABI.  */
+  this->objc.supported = false;
+
   /* Initialize all compile-time properties for floating-point types.
      Should ensure that our real_t type is able to represent real_value.  */
   gcc_assert (sizeof (real_t) >= sizeof (real_value));

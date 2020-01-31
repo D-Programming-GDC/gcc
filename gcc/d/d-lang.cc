@@ -525,6 +525,7 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       global.params.vsafe = value;
       global.params.ehnogc = value;
       global.params.useDIP25 = value;
+      global.params.useDIP1021 = value;
       global.params.dtorFields = value;
       global.params.fieldwise = value;
       global.params.fixAliasThis = value;
@@ -540,6 +541,10 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 
     case OPT_fpreview_dip1008:
       global.params.ehnogc = value;
+      break;
+
+    case OPT_fpreview_dip1021:
+      global.params.useDIP1021 = value;
       break;
 
     case OPT_fpreview_dip25:
@@ -837,6 +842,10 @@ d_post_options (const char ** fn)
       global.params.checkAction = CHECKACTION_C;
     }
 
+  /* Enabling DIP1021 implies DIP1000.  */
+  if (global.params.useDIP1021)
+    global.params.vsafe = true;
+
   /* Turn off partitioning unless it was explicitly requested, as it doesn't
      work with D exception chaining, where EH handler uses LSDA to determine
      whether two thrown exception are in the same context.  */
@@ -1109,7 +1118,7 @@ d_parse_file (void)
 	  int c;
 
 	  Module *m = Module::create (in_fnames[i],
-				      Identifier::generateId ("__stdin"),
+				      Identifier::idPool ("__stdin"),
 				      global.params.doDocComments,
 				      global.params.doHdrGeneration);
 	  modules.push (m);
@@ -1186,6 +1195,8 @@ d_parse_file (void)
 	}
     }
 
+  bool dump_headers = false;
+
   if (global.errors)
     goto had_errors;
 
@@ -1205,6 +1216,10 @@ d_parse_file (void)
 
 	  genhdrfile (m);
 	}
+
+      /* If an error occurs later during compilation, remember that we generated
+	 the headers, so that they can be removed before exit.  */
+      dump_headers = true;
     }
 
   if (global.errors)
@@ -1441,6 +1456,19 @@ d_parse_file (void)
 	{
 	  fatal_error (input_location, "opening mixin file %s: %m",
 		       global.params.mixinFile);
+	}
+    }
+
+  /* Remove generated .di files on error.  */
+  if (errorcount && dump_headers)
+    {
+      for (size_t i = 0; i < modules.length; i++)
+	{
+	  Module *m = modules[i];
+	  if (m->isHdrFile || (d_option.fonly && m != Module::rootModule))
+	    continue;
+
+	  remove (m->hdrfile.toChars ());
 	}
     }
 

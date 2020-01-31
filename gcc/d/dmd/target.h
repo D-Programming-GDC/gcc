@@ -1,6 +1,6 @@
 
 /* Compiler implementation of the D programming language
- * Copyright (C) 2013-2019 by The D Language Foundation, All Rights Reserved
+ * Copyright (C) 2013-2020 by The D Language Foundation, All Rights Reserved
  * written by Iain Buclaw
  * http://www.digitalmars.com
  * Distributed under the Boost Software License, Version 1.0.
@@ -44,6 +44,11 @@ struct TargetCPP
     bool fundamentalType(const Type *t, bool& isFundamental);
 };
 
+struct TargetObjC
+{
+    bool supported;     // set if compiler can interface with Objective-C
+};
+
 struct Target
 {
     // D ABI
@@ -59,6 +64,9 @@ struct Target
 
     // C++ ABI
     TargetCPP cpp;
+
+    // Objective-C ABI
+    TargetObjC objc;
 
     template <typename T>
     struct FPTypeProperties

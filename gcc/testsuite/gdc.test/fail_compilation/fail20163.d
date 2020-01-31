@@ -3,7 +3,7 @@
 /*
 TEST_OUTPUT:
 ---
-fail_compilation/fail20163.d-mixin-10(10): Deprecation: module `imports.fail20164` is deprecated
+fail_compilation/fail20163.d-mixin-11(11): Deprecation: module `imports.fail20164` is deprecated
 ---
 */
 module fail20163;

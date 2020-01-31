@@ -309,6 +309,8 @@ version (Windows)
             scope (exit)
             {
                 Thread.remove(obj);
+                rt_tlsgc_destroy( obj.m_tlsgcdata );
+                obj.m_tlsgcdata = null;
             }
             Thread.add(&obj.m_main);
 
@@ -425,6 +427,8 @@ else version (Posix)
             {
                 Thread.remove(obj);
                 atomicStore!(MemoryOrder.raw)(obj.m_isRunning, false);
+                rt_tlsgc_destroy( obj.m_tlsgcdata );
+                obj.m_tlsgcdata = null;
             }
             Thread.add(&obj.m_main);
 
@@ -700,6 +704,12 @@ class Thread
      */
     ~this() nothrow @nogc
     {
+        if (m_tlsgcdata !is null)
+        {
+            rt_tlsgc_destroy( m_tlsgcdata );
+            m_tlsgcdata = null;
+        }
+
         bool no_context = m_addr == m_addr.init;
         bool not_registered = !next && !prev && (sm_tbeg !is this);
 
@@ -723,8 +733,6 @@ class Thread
         {
             m_tmach = m_tmach.init;
         }
-        rt_tlsgc_destroy( m_tlsgcdata );
-        m_tlsgcdata = null;
     }
 
 

@@ -878,10 +878,7 @@ public:
 	this->layout_field (build_integer_cst (flags, d_uint_type));
 
 	/* void *deallocator;  */
-	tree ddtor = (cd->aggDelete)
-	  ? build_address (get_symbol_decl (cd->aggDelete))
-	  : null_pointer_node;
-	this->layout_field (ddtor);
+	this->layout_field (null_pointer_node);
 
 	/* OffsetTypeInfo[] m_offTi;  (not implemented)  */
 	this->layout_field (null_array_node);

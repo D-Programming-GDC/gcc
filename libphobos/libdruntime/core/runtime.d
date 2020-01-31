@@ -13,6 +13,8 @@
  */
 module core.runtime;
 
+private import core.internal.execinfo;
+
 version (OSX)
     version = Darwin;
 else version (iOS)
@@ -564,47 +566,24 @@ extern (C) void profilegc_setlogfilename(string name);
  */
 extern (C) UnitTestResult runModuleUnitTests()
 {
-    // backtrace
     version (GNU)
         import gcc.backtrace;
-    else version (CRuntime_Glibc)
-        import core.sys.linux.execinfo;
-    else version (Darwin)
-        import core.sys.darwin.execinfo;
-    else version (FreeBSD)
-        import core.sys.freebsd.execinfo;
-    else version (NetBSD)
-        import core.sys.netbsd.execinfo;
-    else version (DragonFlyBSD)
-        import core.sys.dragonflybsd.execinfo;
     else version (Windows)
         import core.sys.windows.stacktrace;
-    else version (Solaris)
-        import core.sys.solaris.execinfo;
-    else version (CRuntime_UClibc)
-        import core.sys.linux.execinfo;
 
     static if (__traits(compiles, new LibBacktrace(0)))
     {
         import core.sys.posix.signal; // segv handler
 
-        static extern (C) void unittestSegvHandler( int signum, siginfo_t* info, void* ptr )
+        static extern (C) void unittestSegvHandler(int signum, siginfo_t* info, void* ptr)
         {
             import core.stdc.stdio;
             fprintf(stderr, "Segmentation fault while running unittests:\n");
             fprintf(stderr, "----------------\n");
 
-            enum alignment = LibBacktrace.MaxAlignment;
-            enum classSize = __traits(classInstanceSize, LibBacktrace);
-
-            void[classSize + alignment] bt_store = void;
-            void* alignedAddress = cast(byte*)((cast(size_t)(bt_store.ptr + alignment - 1))
-                & ~(alignment - 1));
-
-            (alignedAddress[0 .. classSize]) = typeid(LibBacktrace).initializer[];
-            auto bt = cast(LibBacktrace)(alignedAddress);
-            // First frame is LibBacktrace ctor. Second is signal handler, but include that for now
-            bt.__ctor(1);
+            // First frame is LibBacktrace ctor. Second is signal handler,
+            // but include that for now
+            scope bt = new LibBacktrace(1);
 
             foreach (size_t i, const(char[]) msg; bt)
                 fprintf(stderr, "%s\n", msg.ptr ? msg.ptr : "???");
@@ -615,18 +594,18 @@ extern (C) UnitTestResult runModuleUnitTests()
         sigaction_t oldbus = void;
 
         (cast(byte*) &action)[0 .. action.sizeof] = 0;
-        sigfillset( &action.sa_mask ); // block other signals
+        sigfillset(&action.sa_mask); // block other signals
         action.sa_flags = SA_SIGINFO | SA_RESETHAND;
         action.sa_sigaction = &unittestSegvHandler;
-        sigaction( SIGSEGV, &action, &oldseg );
-        sigaction( SIGBUS, &action, &oldbus );
-        scope( exit )
+        sigaction(SIGSEGV, &action, &oldseg);
+        sigaction(SIGBUS, &action, &oldbus);
+        scope (exit)
         {
-            sigaction( SIGSEGV, &oldseg, null );
-            sigaction( SIGBUS, &oldbus, null );
+            sigaction(SIGSEGV, &oldseg, null);
+            sigaction(SIGBUS, &oldbus, null);
         }
     }
-    else static if ( __traits( compiles, backtrace ) )
+    else static if (hasExecinfo)
     {
         import core.sys.posix.signal; // segv handler
 
@@ -711,8 +690,6 @@ extern (C) UnitTestResult runModuleUnitTests()
     }
     else switch (rt_configOption("testmode", null, false))
     {
-    case "":
-        // By default, run main. Switch to only doing unit tests in 2.080
     case "run-main":
         results.runMain = true;
         break;
@@ -720,6 +697,8 @@ extern (C) UnitTestResult runModuleUnitTests()
         // Never run main, always summarize
         results.summarize = true;
         break;
+    case "":
+        // By default, do not run main if tests are present.
     case "test-or-main":
         // only run main if there were no tests. Only summarize if we are not
         // running main.
@@ -815,40 +794,10 @@ unittest
     }
 }
 
-/// Default implementation for POSIX systems
-version (GNU)
-{
-    static if (!__traits(compiles, { import gcc.backtrace; new LibBacktrace(0); }) &&
-               !__traits(compiles, { import gcc.backtrace; new UnwindBacktrace(0); }))
-        version = HasBacktrace;
-}
-else version (CRuntime_Glibc)       version = HasBacktrace;
-else version (Darwin)          version = HasBacktrace;
-else version (FreeBSD)         version = HasBacktrace;
-else version (NetBSD)          version = HasBacktrace;
-else version (DragonFlyBSD)    version = HasBacktrace;
-else version (Solaris)         version = HasBacktrace;
-else version (CRuntime_UClibc) version = HasBacktrace;
-
 /// Default implementation for most POSIX systems
-version (HasBacktrace) private class DefaultTraceInfo : Throwable.TraceInfo
+version (GNU) {} else
+static if (hasExecinfo) private class DefaultTraceInfo : Throwable.TraceInfo
 {
-    // backtrace
-    version (CRuntime_Glibc)
-        import core.sys.linux.execinfo;
-    else version (Darwin)
-        import core.sys.darwin.execinfo;
-    else version (FreeBSD)
-        import core.sys.freebsd.execinfo;
-    else version (NetBSD)
-        import core.sys.netbsd.execinfo;
-    else version (DragonFlyBSD)
-        import core.sys.dragonflybsd.execinfo;
-    else version (Solaris)
-        import core.sys.solaris.execinfo;
-    else version (CRuntime_UClibc)
-        import core.sys.linux.execinfo;
-
     import core.demangle;
     import core.stdc.stdlib : free;
     import core.stdc.string : strlen, memchr, memmove;
@@ -971,75 +920,8 @@ private:
     const(char)[] fixline( const(char)[] buf, return ref char[4096] fixbuf ) const
     {
         size_t symBeg, symEnd;
-        version (Darwin)
-        {
-            // format is:
-            //  1  module    0x00000000 D6module4funcAFZv + 0
-            for ( size_t i = 0, n = 0; i < buf.length; i++ )
-            {
-                if ( ' ' == buf[i] )
-                {
-                    n++;
-                    while ( i < buf.length && ' ' == buf[i] )
-                        i++;
-                    if ( 3 > n )
-                        continue;
-                    symBeg = i;
-                    while ( i < buf.length && ' ' != buf[i] )
-                        i++;
-                    symEnd = i;
-                    break;
-                }
-            }
-        }
-        else version (CRuntime_Glibc)
-        {
-            // format is:  module(_D6module4funcAFZv) [0x00000000]
-            // or:         module(_D6module4funcAFZv+0x78) [0x00000000]
-            auto bptr = cast(char*) memchr( buf.ptr, '(', buf.length );
-            auto eptr = cast(char*) memchr( buf.ptr, ')', buf.length );
-            auto pptr = cast(char*) memchr( buf.ptr, '+', buf.length );
 
-            if (pptr && pptr < eptr)
-                eptr = pptr;
-
-            if ( bptr++ && eptr )
-            {
-                symBeg = bptr - buf.ptr;
-                symEnd = eptr - buf.ptr;
-            }
-        }
-        else
-        {
-            // format is: 0x00000000 <_D6module4funcAFZv+0x78> at module
-            version (FreeBSD)
-                enum StartChar = '<';
-            else version (NetBSD)
-                enum StartChar = '<';
-            else version (DragonFlyBSD)
-                enum StartChar = '<';
-            // format is object'symbol+offset [pc]
-            else version (Solaris)
-                enum StartChar = '\'';
-            // fallthrough
-            else
-                enum StartChar = '\0';
-
-            if (StartChar != '\0')
-            {
-                auto bptr = cast(char*) memchr(buf.ptr, StartChar, buf.length);
-                auto eptr = cast(char*) memchr(buf.ptr, '+', buf.length);
-
-                if (bptr++ && eptr)
-                {
-                    symBeg = bptr - buf.ptr;
-                    symEnd = eptr - buf.ptr;
-                }
-            }
-        }
-
-        assert(symBeg < buf.length && symEnd < buf.length);
-        assert(symBeg <= symEnd);
+        getMangledSymbolName(buf, symBeg, symEnd);
 
         enum min = (size_t a, size_t b) => a <= b ? a : b;
         if (symBeg == symEnd || symBeg >= fixbuf.length)

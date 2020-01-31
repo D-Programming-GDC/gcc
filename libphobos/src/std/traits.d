@@ -4999,7 +4999,7 @@ template ImplicitConversionTargets(T)
             AliasSeq!(int, uint, long, ulong, CentTypeList, float, double, real);
     else static if (is(T : typeof(null)))
         alias ImplicitConversionTargets = AliasSeq!(typeof(null));
-    else static if (is(T : Object))
+    else static if (is(T == class))
         alias ImplicitConversionTargets = TransitiveBaseTypeTuple!(T);
     else static if (isDynamicArray!T && !is(typeof(T.init[0]) == const))
     {
@@ -8409,7 +8409,7 @@ private template isDesiredUDA(alias attribute)
 
 /**
 Params:
-    symbol = The aggregate type to search
+    symbol = The aggregate type or module to search
     attribute = The user-defined attribute to search for
 
 Returns:
@@ -8420,7 +8420,6 @@ Note:
     nested structs or unions.
  */
 template getSymbolsByUDA(alias symbol, alias attribute)
-if (isAggregateType!symbol)
 {
     alias membersWithUDA = getSymbolsByUDAImpl!(symbol, attribute, __traits(allMembers, symbol));
 
@@ -8547,15 +8546,6 @@ if (isAggregateType!symbol)
     static assert(getSymbolsByUDA!(A, attr2).length == 1);
 }
 
-// Issue 19105
-@safe unittest
-{
-    struct A(Args...) {}
-    struct B {}
-    // modules cannot be passed as the first argument of getSymbolsByUDA
-    static assert(!__traits(compiles, A!( getSymbolsByUDA!(traits, B))));
-}
-
 // #15335: getSymbolsByUDA fails if type has private members
 @safe unittest
 {
@@ -8608,6 +8598,14 @@ if (isAggregateType!symbol)
     }
 
     static assert(getSymbolsByUDA!(A, Attr).stringof == "tuple(a, a, c)");
+}
+
+// Issue 20054: getSymbolsByUDA no longer works on modules
+version (unittest)
+{
+    @("Issue20054")
+    void issue20054() {}
+    static assert(__traits(compiles, getSymbolsByUDA!(mixin(__MODULE__), "Issue20054")));
 }
 
 private template getSymbolsByUDAImpl(alias symbol, alias attribute, names...)
