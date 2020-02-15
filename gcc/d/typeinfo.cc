@@ -345,8 +345,29 @@ class TypeInfoVisitor : public Visitor
 {
   using Visitor::visit;
 
+  tree decl_;
   tree type_;
   vec<constructor_elt, va_gc> *init_;
+
+  /* Build an internal comdat symbol for the manifest constant VALUE, so that
+     its address can be taken.  */
+
+  tree internal_reference (tree value)
+  {
+    /* Use the typeinfo decl mangle as a prefix for the internal symbol.  */
+    const char *prefix = IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (this->decl_));
+    tree decl = build_artificial_decl (TREE_TYPE (value), value, prefix);
+
+    /* The internal pointer reference should be public, but not visible outside
+       the compilation unit.  */
+    DECL_EXTERNAL (decl) = 0;
+    TREE_PUBLIC (decl) = 1;
+    DECL_VISIBILITY (decl) = VISIBILITY_INTERNAL;
+    DECL_COMDAT (decl) = 1;
+    d_pushdecl (decl);
+
+    return decl;
+  }
 
   /* Add VALUE to the constructor values list.  */
 
@@ -368,10 +389,8 @@ class TypeInfoVisitor : public Visitor
     TREE_STATIC (value) = 1;
 
     /* Taking the address, so assign the literal to a static var.  */
-    tree decl = build_artificial_decl (TREE_TYPE (value), value);
+    tree decl = this->internal_reference (value);
     TREE_READONLY (decl) = 1;
-    DECL_EXTERNAL (decl) = 0;
-    d_pushdecl (decl);
 
     value = d_array_value (build_ctype (Type::tchar->arrayOf ()),
 			   size_int (len), build_address (decl));
@@ -505,8 +524,9 @@ class TypeInfoVisitor : public Visitor
 
 
 public:
-  TypeInfoVisitor (tree type)
+  TypeInfoVisitor (tree decl, tree type)
   {
+    this->decl_ = decl;
     this->type_ = type;
     this->init_ = NULL;
   }
@@ -1118,21 +1138,12 @@ public:
 				build_typeinfo (d->loc, arg->type));
       }
     tree ctor = build_constructor (build_ctype (satype), elms);
-    const char *prefix = concat (GDC_PREFIX ("__tuple"),
-				 d_mangle_decl (Module::rootModule), NULL);
-    tree decl = build_artificial_decl (TREE_TYPE (ctor), ctor, prefix);
-
-    /* The internal pointer reference should be public, but not visible outside
-       the compilation unit, as it's referencing COMDAT decls.  */
-    TREE_PUBLIC (decl) = 1;
-    DECL_VISIBILITY (decl) = VISIBILITY_INTERNAL;
-    DECL_COMDAT (decl) = 1;
+    tree decl = this->internal_reference (ctor);
 
     tree length = size_int (ti->arguments->length);
     tree ptr = build_address (decl);
     this->layout_field (d_array_value (array_type_node, length, ptr));
 
-    d_pushdecl (decl);
     rest_of_decl_compilation (decl, 1, 0);
   }
 };
@@ -1147,8 +1158,9 @@ layout_typeinfo (TypeInfoDeclaration *d)
   if (!Type::dtypeinfo)
     create_frontend_tinfo_types ();
 
-  tree type = TREE_TYPE (get_typeinfo_decl (d));
-  TypeInfoVisitor v = TypeInfoVisitor (type);
+  tree decl = get_typeinfo_decl (d);
+  tree type = TREE_TYPE (decl);
+  TypeInfoVisitor v = TypeInfoVisitor (decl, type);
   d->accept (&v);
   return v.result ();
 }
@@ -1163,8 +1175,9 @@ layout_classinfo (ClassDeclaration *cd)
     create_frontend_tinfo_types ();
 
   TypeInfoClassDeclaration *d = TypeInfoClassDeclaration::create (cd->type);
-  tree type = TREE_TYPE (get_classinfo_decl (cd));
-  TypeInfoVisitor v = TypeInfoVisitor (type);
+  tree decl = get_classinfo_decl (cd);
+  tree type = TREE_TYPE (decl);
+  TypeInfoVisitor v = TypeInfoVisitor (decl, type);
   d->accept (&v);
   return v.result ();
 }

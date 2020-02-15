@@ -1372,7 +1372,7 @@ if (isIntegral!S &&
     isExactSomeString!T)
 in
 {
-    assert(radix >= 2 && radix <= 36);
+    assert(radix >= 2 && radix <= 36, "radix must be in range [2,36]");
 }
 do
 {
@@ -1469,7 +1469,8 @@ if (!isImplicitlyConvertible!(S, T) &&
         }
         else
         {
-            static assert(tSmallest < 0);
+            static assert(tSmallest < 0,
+                "minimum value of T must be smaller than 0");
             immutable good = value >= tSmallest;
         }
         if (!good)
@@ -1700,77 +1701,74 @@ if (!isImplicitlyConvertible!(S, T) && isAssociativeArray!S &&
     assert(a.to!(const(int)[int]).byPair.equal(a.byPair));
 }
 
-version (unittest)
-private void testIntegralToFloating(Integral, Floating)()
-{
-    Integral a = 42;
-    auto b = to!Floating(a);
-    assert(a == b);
-    assert(a == to!Integral(b));
-}
-
-version (unittest)
-private void testFloatingToIntegral(Floating, Integral)()
-{
-    bool convFails(Source, Target, E)(Source src)
-    {
-        try
-            cast(void) to!Target(src);
-        catch (E)
-            return true;
-        return false;
-    }
-
-    // convert some value
-    Floating a = 4.2e1;
-    auto b = to!Integral(a);
-    assert(is(typeof(b) == Integral) && b == 42);
-    // convert some negative value (if applicable)
-    a = -4.2e1;
-    static if (Integral.min < 0)
-    {
-        b = to!Integral(a);
-        assert(is(typeof(b) == Integral) && b == -42);
-    }
-    else
-    {
-        // no go for unsigned types
-        assert(convFails!(Floating, Integral, ConvOverflowException)(a));
-    }
-    // convert to the smallest integral value
-    a = 0.0 + Integral.min;
-    static if (Integral.min < 0)
-    {
-        a = -a; // -Integral.min not representable as an Integral
-        assert(convFails!(Floating, Integral, ConvOverflowException)(a)
-                || Floating.sizeof <= Integral.sizeof);
-    }
-    a = 0.0 + Integral.min;
-    assert(to!Integral(a) == Integral.min);
-    --a; // no more representable as an Integral
-    assert(convFails!(Floating, Integral, ConvOverflowException)(a)
-            || Floating.sizeof <= Integral.sizeof);
-    a = 0.0 + Integral.max;
-    assert(to!Integral(a) == Integral.max || Floating.sizeof <= Integral.sizeof);
-    ++a; // no more representable as an Integral
-    assert(convFails!(Floating, Integral, ConvOverflowException)(a)
-            || Floating.sizeof <= Integral.sizeof);
-    // convert a value with a fractional part
-    a = 3.14;
-    assert(to!Integral(a) == 3);
-    a = 3.99;
-    assert(to!Integral(a) == 3);
-    static if (Integral.min < 0)
-    {
-        a = -3.14;
-        assert(to!Integral(a) == -3);
-        a = -3.99;
-        assert(to!Integral(a) == -3);
-    }
-}
-
 @safe pure unittest
 {
+    static void testIntegralToFloating(Integral, Floating)()
+    {
+        Integral a = 42;
+        auto b = to!Floating(a);
+        assert(a == b);
+        assert(a == to!Integral(b));
+    }
+    static void testFloatingToIntegral(Floating, Integral)()
+    {
+        bool convFails(Source, Target, E)(Source src)
+        {
+            try
+                cast(void) to!Target(src);
+            catch (E)
+                return true;
+            return false;
+        }
+
+        // convert some value
+        Floating a = 4.2e1;
+        auto b = to!Integral(a);
+        assert(is(typeof(b) == Integral) && b == 42);
+        // convert some negative value (if applicable)
+        a = -4.2e1;
+        static if (Integral.min < 0)
+        {
+            b = to!Integral(a);
+            assert(is(typeof(b) == Integral) && b == -42);
+        }
+        else
+        {
+            // no go for unsigned types
+            assert(convFails!(Floating, Integral, ConvOverflowException)(a));
+        }
+        // convert to the smallest integral value
+        a = 0.0 + Integral.min;
+        static if (Integral.min < 0)
+        {
+            a = -a; // -Integral.min not representable as an Integral
+            assert(convFails!(Floating, Integral, ConvOverflowException)(a)
+                    || Floating.sizeof <= Integral.sizeof);
+        }
+        a = 0.0 + Integral.min;
+        assert(to!Integral(a) == Integral.min);
+        --a; // no more representable as an Integral
+        assert(convFails!(Floating, Integral, ConvOverflowException)(a)
+                || Floating.sizeof <= Integral.sizeof);
+        a = 0.0 + Integral.max;
+        assert(to!Integral(a) == Integral.max || Floating.sizeof <= Integral.sizeof);
+        ++a; // no more representable as an Integral
+        assert(convFails!(Floating, Integral, ConvOverflowException)(a)
+                || Floating.sizeof <= Integral.sizeof);
+        // convert a value with a fractional part
+        a = 3.14;
+        assert(to!Integral(a) == 3);
+        a = 3.99;
+        assert(to!Integral(a) == 3);
+        static if (Integral.min < 0)
+        {
+            a = -3.14;
+            assert(to!Integral(a) == -3);
+            a = -3.99;
+            assert(to!Integral(a) == -3);
+        }
+    }
+
     alias AllInts = AliasSeq!(byte, ubyte, short, ushort, int, uint, long, ulong);
     alias AllFloats = AliasSeq!(float, double, real);
     alias AllNumerics = AliasSeq!(AllInts, AllFloats);
@@ -2615,7 +2613,7 @@ if (isSomeChar!(ElementType!Source) &&
     isIntegral!Target && !is(Target == enum))
 in
 {
-    assert(radix >= 2 && radix <= 36);
+    assert(radix >= 2 && radix <= 36, "radix must be in range [2,36]");
 }
 do
 {
@@ -4051,7 +4049,7 @@ if (isInputRange!Source && isSomeChar!(ElementType!Source) && !is(Source == enum
                 break;
         }
     }
-    assert(0);
+    assert(false, "Unexpected fallthrough");
 }
 
 // ditto
@@ -4209,7 +4207,7 @@ if (isOctalLiteral(num))
     else static if ((!octalFitsInInt!(num) || literalIsLong!(num)) && literalIsUnsigned!(num))
         enum octal = octal!ulong(num);
     else
-        static assert(false);
+        static assert(false, "Unusable input " ~ num);
 }
 
 /// Ditto
@@ -4236,7 +4234,7 @@ if (is(typeof(decimalInteger)) && isIntegral!(typeof(decimalInteger)))
 */
 private T octal(T)(const string num)
 {
-    assert(isOctalLiteral(num));
+    assert(isOctalLiteral(num), num ~ " is not an octal literal");
 
     T value = 0;
 
@@ -4760,6 +4758,22 @@ if (is(T == class))
 
 @nogc pure nothrow @safe unittest
 {
+    static class __conv_EmplaceTestClass
+    {
+        int i = 3;
+        this(int i) @nogc @safe pure nothrow
+        {
+            assert(this.i == 3 && i == 5);
+            this.i = i;
+        }
+        this(int i, ref int j) @nogc @safe pure nothrow
+        {
+            assert(i == 5 && j == 6);
+            this.i = i;
+            ++j;
+        }
+    }
+
     int var = 6;
     align(__conv_EmplaceTestClass.alignof) ubyte[__traits(classInstanceSize, __conv_EmplaceTestClass)] buf;
     auto support = (() @trusted => cast(__conv_EmplaceTestClass)(buf.ptr))();
@@ -4827,42 +4841,7 @@ if (!is(T == class))
     assert(u1.a == "hello");
 }
 
-version (unittest) private struct __conv_EmplaceTest
-{
-    int i = 3;
-    this(int i)
-    {
-        assert(this.i == 3 && i == 5);
-        this.i = i;
-    }
-    this(int i, ref int j)
-    {
-        assert(i == 5 && j == 6);
-        this.i = i;
-        ++j;
-    }
 
-@disable:
-    this();
-    this(this);
-    void opAssign();
-}
-
-version (unittest) private class __conv_EmplaceTestClass
-{
-    int i = 3;
-    this(int i) @nogc @safe pure nothrow
-    {
-        assert(this.i == 3 && i == 5);
-        this.i = i;
-    }
-    this(int i, ref int j) @nogc @safe pure nothrow
-    {
-        assert(i == 5 && j == 6);
-        this.i = i;
-        ++j;
-    }
-}
 
 @system unittest // bugzilla 15772
 {
@@ -4997,17 +4976,40 @@ version (unittest) private class __conv_EmplaceTestClass
 
 @system unittest
 {
+    static struct __conv_EmplaceTest
+    {
+        int i = 3;
+        this(int i)
+        {
+            assert(this.i == 3 && i == 5);
+            this.i = i;
+        }
+        this(int i, ref int j)
+        {
+            assert(i == 5 && j == 6);
+            this.i = i;
+            ++j;
+        }
+
+    @disable:
+        this();
+        this(this);
+        void opAssign();
+    }
+
     __conv_EmplaceTest k = void;
     emplace(&k, 5);
     assert(k.i == 5);
-}
 
-@system unittest
-{
     int var = 6;
-    __conv_EmplaceTest k = void;
-    emplace(&k, 5, var);
-    assert(k.i == 5);
+    __conv_EmplaceTest x = void;
+    emplace(&x, 5, var);
+    assert(x.i == 5);
+    assert(var == 7);
+
+    var = 6;
+    auto z = emplace!__conv_EmplaceTest(new void[__conv_EmplaceTest.sizeof], 5, var);
+    assert(z.i == 5);
     assert(var == 7);
 }
 
@@ -5269,7 +5271,7 @@ version (unittest) private class __conv_EmplaceTestClass
     }
 }
 
-version (unittest)
+version (StdUnittest)
 {
     //Ambiguity
     private struct __std_conv_S
@@ -5687,10 +5689,6 @@ pure nothrow @safe /* @nogc */ unittest
 
 @system unittest
 {
-    int var = 6;
-    auto k = emplace!__conv_EmplaceTest(new void[__conv_EmplaceTest.sizeof], 5, var);
-    assert(k.i == 5);
-    assert(var == 7);
 }
 
 @system unittest
@@ -5785,6 +5783,15 @@ if (isIntegral!T)
     immutable u3 = unsigned(s); //explicitly qualified
 }
 
+/// Ditto
+auto unsigned(T)(T x)
+if (isSomeChar!T)
+{
+    // All characters are unsigned
+    static assert(T.min == 0, T.stringof ~ ".min must be zero");
+    return cast(Unqual!T) x;
+}
+
 @safe unittest
 {
     static foreach (T; AliasSeq!(byte, ubyte))
@@ -5814,14 +5821,6 @@ if (isIntegral!T)
         static assert(is(typeof(unsigned(cast(const T) 1)) == ulong));
         static assert(is(typeof(unsigned(cast(immutable T) 1)) == ulong));
     }
-}
-
-auto unsigned(T)(T x)
-if (isSomeChar!T)
-{
-    // All characters are unsigned
-    static assert(T.min == 0);
-    return cast(Unqual!T) x;
 }
 
 @safe unittest
@@ -6331,7 +6330,7 @@ if ((radix == 2 || radix == 8 || radix == 10 || radix == 16) &&
         else static if (radix == 16)
             enum SHIFT = 4;
         else
-            static assert(0);
+            static assert(false, "radix must be 2, 8, 10, or 16");
         static struct Result
         {
             this(UT value)

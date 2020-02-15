@@ -1,3 +1,4 @@
+// { dg-options "-fpreview=dip1008" }
 class E : Exception
 {
     static int instances;

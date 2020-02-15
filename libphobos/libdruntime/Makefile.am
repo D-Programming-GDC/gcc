@@ -202,9 +202,10 @@ DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	rt/util/typeinfo.d rt/util/utility.d
 
 DRUNTIME_DSOURCES_STDCXX = core/stdcpp/allocator.d core/stdcpp/array.d \
-	core/stdcpp/exception.d core/stdcpp/new_.d core/stdcpp/string.d \
-	core/stdcpp/string_view.d core/stdcpp/type_traits.d \
-	core/stdcpp/typeinfo.d core/stdcpp/vector.d core/stdcpp/xutility.d
+	core/stdcpp/exception.d core/stdcpp/memory.d core/stdcpp/new_.d \
+	core/stdcpp/string.d core/stdcpp/string_view.d \
+	core/stdcpp/type_traits.d core/stdcpp/typeinfo.d core/stdcpp/vector.d \
+	core/stdcpp/xutility.d
 
 DRUNTIME_DSOURCES_GC = gc/bits.d gc/impl/conservative/gc.d \
 	gc/impl/manual/gc.d gc/impl/proto/gc.d gc/os.d gc/pooltable.d \
@@ -371,30 +372,30 @@ DRUNTIME_DSOURCES_WINDOWS = core/sys/windows/accctrl.d \
 	core/sys/windows/rpcdcep.d core/sys/windows/rpcndr.d \
 	core/sys/windows/rpcnsi.d core/sys/windows/rpcnsip.d \
 	core/sys/windows/rpcnterr.d core/sys/windows/schannel.d \
-	core/sys/windows/secext.d core/sys/windows/security.d \
-	core/sys/windows/servprov.d core/sys/windows/setupapi.d \
-	core/sys/windows/shellapi.d core/sys/windows/shldisp.d \
-	core/sys/windows/shlguid.d core/sys/windows/shlobj.d \
-	core/sys/windows/shlwapi.d core/sys/windows/snmp.d \
-	core/sys/windows/sql.d core/sys/windows/sqlext.d \
-	core/sys/windows/sqltypes.d core/sys/windows/sqlucode.d \
-	core/sys/windows/sspi.d core/sys/windows/stacktrace.d \
-	core/sys/windows/stat.d core/sys/windows/subauth.d \
-	core/sys/windows/threadaux.d core/sys/windows/tlhelp32.d \
-	core/sys/windows/tmschema.d core/sys/windows/unknwn.d \
-	core/sys/windows/uuid.d core/sys/windows/vfw.d \
-	core/sys/windows/w32api.d core/sys/windows/winbase.d \
-	core/sys/windows/winber.d core/sys/windows/wincon.d \
-	core/sys/windows/wincrypt.d core/sys/windows/windef.d \
-	core/sys/windows/windows.d core/sys/windows/winerror.d \
-	core/sys/windows/wingdi.d core/sys/windows/winhttp.d \
-	core/sys/windows/wininet.d core/sys/windows/winioctl.d \
-	core/sys/windows/winldap.d core/sys/windows/winnetwk.d \
-	core/sys/windows/winnls.d core/sys/windows/winnt.d \
-	core/sys/windows/winperf.d core/sys/windows/winreg.d \
-	core/sys/windows/winsock2.d core/sys/windows/winspool.d \
-	core/sys/windows/winsvc.d core/sys/windows/winuser.d \
-	core/sys/windows/winver.d core/sys/windows/wtsapi32.d \
-	core/sys/windows/wtypes.d
+	core/sys/windows/sdkddkver.d core/sys/windows/secext.d \
+	core/sys/windows/security.d core/sys/windows/servprov.d \
+	core/sys/windows/setupapi.d core/sys/windows/shellapi.d \
+	core/sys/windows/shldisp.d core/sys/windows/shlguid.d \
+	core/sys/windows/shlobj.d core/sys/windows/shlwapi.d \
+	core/sys/windows/snmp.d core/sys/windows/sql.d \
+	core/sys/windows/sqlext.d core/sys/windows/sqltypes.d \
+	core/sys/windows/sqlucode.d core/sys/windows/sspi.d \
+	core/sys/windows/stacktrace.d core/sys/windows/stat.d \
+	core/sys/windows/subauth.d core/sys/windows/threadaux.d \
+	core/sys/windows/tlhelp32.d core/sys/windows/tmschema.d \
+	core/sys/windows/unknwn.d core/sys/windows/uuid.d \
+	core/sys/windows/vfw.d core/sys/windows/w32api.d \
+	core/sys/windows/winbase.d core/sys/windows/winber.d \
+	core/sys/windows/wincon.d core/sys/windows/wincrypt.d \
+	core/sys/windows/windef.d core/sys/windows/windows.d \
+	core/sys/windows/winerror.d core/sys/windows/wingdi.d \
+	core/sys/windows/winhttp.d core/sys/windows/wininet.d \
+	core/sys/windows/winioctl.d core/sys/windows/winldap.d \
+	core/sys/windows/winnetwk.d core/sys/windows/winnls.d \
+	core/sys/windows/winnt.d core/sys/windows/winperf.d \
+	core/sys/windows/winreg.d core/sys/windows/winsock2.d \
+	core/sys/windows/winspool.d core/sys/windows/winsvc.d \
+	core/sys/windows/winuser.d core/sys/windows/winver.d \
+	core/sys/windows/wtsapi32.d core/sys/windows/wtypes.d
 
 DRUNTIME_DISOURCES = __entrypoint.di __main.di

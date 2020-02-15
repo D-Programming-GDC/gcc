@@ -2556,7 +2556,7 @@ else version (OpenBSD)
 {
     char*      crypt(const scope char*, const scope char*);
     //char*      ctermid(char*);
-    void       encrypt(ref char[64], int) @trusted;
+    //void       encrypt(ref char[64], int) @trusted;
     int        fchdir(int) @trusted;
     c_long     gethostid() @trusted;
     pid_t      getpgid(pid_t) @trusted;

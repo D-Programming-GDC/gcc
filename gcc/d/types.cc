@@ -854,7 +854,7 @@ public:
 
   void visit (TypeStruct *t)
   {
-    /* Merge types in the back-end if the frontend did not itself do so.  */
+    /* Merge types in the back-end if the front-end did not itself do so.  */
     tree deco = get_identifier (d_mangle_decl (t->sym));
     if (IDENTIFIER_DAGGREGATE (deco))
       {
@@ -916,7 +916,7 @@ public:
 
   void visit (TypeClass *t)
   {
-    /* Merge types in the back-end if the frontend did not itself do so.  */
+    /* Merge types in the back-end if the front-end did not itself do so.  */
     tree deco = get_identifier (d_mangle_decl (t->sym));
     if (IDENTIFIER_DAGGREGATE (deco))
       {

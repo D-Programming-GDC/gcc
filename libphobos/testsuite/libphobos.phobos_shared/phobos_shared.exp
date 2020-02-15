@@ -22,6 +22,8 @@ if { ![isnative] || ![is-effective-target shared] } {
 # Gather a list of all tests.
 set tests [lsort [filter_libphobos_unittests [find $srcdir/../src "*.d"]]]
 
+set version_flags "-fversion=StdUnittest -fversion=Shared"
+
 set libphobos_skip_tests {
     # Skip curl tests if library is not available
     { libphobos.phobos_shared/etc/c/curl.d { ! libcurl_available } }
@@ -34,8 +36,8 @@ dg-init
 # Main loop.
 foreach test $tests {
     set libphobos_test_name "$subdir/[dg-trim-dirname $srcdir/../src $test]"
-    dg-runtest $test "-fversion=Shared -shared-libphobos" \
-	"-fmain -fbuilding-libphobos-tests -fno-moduleinfo"
+    dg-runtest $test "-shared-libphobos" \
+	"-fmain -fbuilding-libphobos-tests -fno-moduleinfo $version_flags"
     set libphobos_test_name ""
 }
 

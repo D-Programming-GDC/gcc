@@ -285,7 +285,7 @@ enum ENUMTY : int
     Tvector,
     Tint128,
     Tuns128,
-    TTraits,
+    Ttraits,
     Tmixin,
     TMAX,
 }
@@ -334,7 +334,7 @@ alias Tnull = ENUMTY.Tnull;
 alias Tvector = ENUMTY.Tvector;
 alias Tint128 = ENUMTY.Tint128;
 alias Tuns128 = ENUMTY.Tuns128;
-alias Ttraits = ENUMTY.TTraits;
+alias Ttraits = ENUMTY.Ttraits;
 alias Tmixin = ENUMTY.Tmixin;
 alias TMAX = ENUMTY.TMAX;
 
@@ -5190,6 +5190,20 @@ extern (C++) final class TypeMixin : Type
     override Type syntaxCopy()
     {
         return new TypeMixin(loc, Expression.arraySyntaxCopy(exps));
+    }
+
+   override Dsymbol toDsymbol(Scope* sc)
+    {
+        Type t;
+        Expression e;
+        Dsymbol s;
+        resolve(this, loc, sc, &e, &t, &s);
+        if (t)
+            s = t.toDsymbol(sc);
+        else if (e)
+            s = getDsymbol(e);
+
+        return s;
     }
 
     override void accept(Visitor v)

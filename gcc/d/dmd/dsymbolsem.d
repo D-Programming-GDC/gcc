@@ -1226,7 +1226,8 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             // @@@DEPRECATED@@@  https://dlang.org/deprecate.html#scope%20as%20a%20type%20constraint
             // Deprecated in 2.087
             // Remove this when the feature is removed from the language
-            if (!(dsym.storage_class & STC.scope_))
+            if (0 &&          // deprecation disabled for now to accommodate existing extensive use
+               !(dsym.storage_class & STC.scope_))
             {
                 if (!(dsym.storage_class & STC.parameter) && dsym.ident != Id.withSym)
                     dsym.error("reference to `scope class` must be `scope`");
@@ -1438,7 +1439,9 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                 {
                     uint errors = global.errors;
                     dsym.inuse++;
-                    if (ei)
+                    // Bug 20549. Don't try this on modules or packages, syntaxCopy
+                    // could crash (inf. recursion) on a mod/pkg referencing itself
+                    if (ei && (ei.exp.op != TOK.scope_ ? true : !(cast(ScopeExp)ei.exp).sds.isPackage()))
                     {
                         Expression exp = ei.exp.syntaxCopy();
 
@@ -2090,16 +2093,13 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         const len = buf.length;
         buf.writeByte(0);
         const str = buf.extractSlice()[0 .. len];
-        scope diagnosticReporter = new StderrDiagnosticReporter(global.params.useDeprecated);
-        scope p = new Parser!ASTCodegen(cd.loc, sc._module, str, false, diagnosticReporter);
+        scope p = new Parser!ASTCodegen(cd.loc, sc._module, str, false);
         p.nextToken();
 
         auto d = p.parseDeclDefs(0);
-        if (p.errors)
-        {
-            assert(global.errors != errors);    // should have caught all these cases
+        if (global.errors != errors)
             return null;
-        }
+
         if (p.token.value != TOK.endOfFile)
         {
             cd.error("incomplete mixin declaration `%s`", str.ptr);
@@ -4606,8 +4606,6 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             sd.alignment = sc.alignment();
 
             sd.storage_class |= sc.stc;
-            if (sd.storage_class & STC.deprecated_)
-                sd.isdeprecated = true;
             if (sd.storage_class & STC.abstract_)
                 sd.error("structs, unions cannot be `abstract`");
 
@@ -4821,8 +4819,6 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             cldec.protection = sc.protection;
 
             cldec.storage_class |= sc.stc;
-            if (cldec.storage_class & STC.deprecated_)
-                cldec.isdeprecated = true;
             if (cldec.storage_class & STC.auto_)
                 cldec.error("storage class `auto` is invalid when declaring a class, did you mean to use `scope`?");
             if (cldec.storage_class & STC.scope_)
@@ -4927,7 +4923,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                     if (!cldec.isDeprecated())
                     {
                         // Deriving from deprecated class makes this one deprecated too
-                        cldec.isdeprecated = true;
+                        cldec.setDeprecated();
                         tc.checkDeprecated(cldec.loc, sc);
                     }
                 }
@@ -5019,7 +5015,7 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                     if (!cldec.isDeprecated())
                     {
                         // Deriving from deprecated class makes this one deprecated too
-                        cldec.isdeprecated = true;
+                        cldec.setDeprecated();
                         tc.checkDeprecated(cldec.loc, sc);
                     }
                 }
@@ -5424,7 +5420,8 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         // Deprecated in 2.087
         // Make an error in 2.091
         // Don't forget to remove code at https://github.com/dlang/dmd/blob/b2f8274ba76358607fc3297a1e9f361480f9bcf9/src/dmd/dsymbolsem.d#L1032-L1036
-        if (cldec.storage_class & STC.scope_)
+        if (0 &&          // deprecation disabled for now to accommodate existing extensive use
+            cldec.storage_class & STC.scope_)
             deprecation(cldec.loc, "`scope` as a type constraint is deprecated.  Use `scope` at the usage site.");
     }
 
@@ -5479,9 +5476,6 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
             idec.protection = sc.protection;
 
             idec.storage_class |= sc.stc;
-            if (idec.storage_class & STC.deprecated_)
-                idec.isdeprecated = true;
-
             idec.userAttribDecl = sc.userAttribDecl;
         }
         else if (idec.symtab)
@@ -5595,8 +5589,8 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
                 {
                     if (!idec.isDeprecated())
                     {
-                        // Deriving from deprecated class makes this one deprecated too
-                        idec.isdeprecated = true;
+                        // Deriving from deprecated interface makes this one deprecated too
+                        idec.setDeprecated();
                         tc.checkDeprecated(idec.loc, sc);
                     }
                 }
@@ -5846,6 +5840,8 @@ void templateInstanceSemantic(TemplateInstance tempinst, Scope* sc, Expressions*
 
     // Copy the tempdecl namespace (not the scope one)
     tempinst.cppnamespace = tempdecl.cppnamespace;
+    if (tempinst.cppnamespace)
+        tempinst.cppnamespace.dsymbolSemantic(sc);
 
     /* See if there is an existing TemplateInstantiation that already
      * implements the typeargs. If so, just refer to that one instead.

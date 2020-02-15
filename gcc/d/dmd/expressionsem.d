@@ -175,7 +175,7 @@ private Expression extractOpDollarSideEffect(Scope* sc, UnaExp ue)
     // https://issues.dlang.org/show_bug.cgi?id=12585
     // Extract the side effect part if ue.e1 is comma.
 
-    if (!isTrivialExp(e1))
+    if ((sc.flags & SCOPE.ctfe) ? hasSideEffect(e1) : !isTrivialExp(e1)) // match logic in extractSideEffect()
     {
         /* Even if opDollar is needed, 'e1' should be evaluate only once. So
          * Rewrite:
@@ -536,10 +536,6 @@ private Expression resolveUFCS(Scope* sc, CallExp ce)
         }
         else
         {
-            // even opDispatch and ufcs must have valid arguments.
-            if (arrayExpressionSemantic(ce.arguments, sc))
-                return new ErrorExp();
-
             if (Expression ey = die.semanticY(sc, 1))
             {
                 if (ey.op == TOK.error)
@@ -551,6 +547,15 @@ private Expression resolveUFCS(Scope* sc, CallExp ce)
                     e = ce.syntaxCopy().expressionSemantic(sc);
                     if (!global.endGagging(errors))
                         return e;
+
+                    // even opDispatch and UFCS must have valid arguments,
+                    // so now that we've seen indication of a problem,
+                    // check them for issues.
+                    Expressions* originalArguments = Expression.arraySyntaxCopy(ce.arguments);
+
+                    if (arrayExpressionSemantic(originalArguments, sc))
+                        return new ErrorExp();
+
                     /* fall down to UFCS */
                 }
                 else
@@ -1567,12 +1572,15 @@ private Expression rewriteOpAssign(BinExp exp)
 
 /****************************************
  * Preprocess arguments to function.
+ * Input:
+ *      reportErrors    whether or not to report errors here.  Some callers are not
+ *                      checking actual function params, so they'll do their own error reporting
  * Output:
  *      exps[]  tuples expanded, properties resolved, rewritten in place
  * Returns:
  *      true    a semantic error occurred
  */
-private bool preFunctionParameters(Scope* sc, Expressions* exps)
+private bool preFunctionParameters(Scope* sc, Expressions* exps, const bool reportErrors = true)
 {
     bool err = false;
     if (exps)
@@ -1590,15 +1598,21 @@ private bool preFunctionParameters(Scope* sc, Expressions* exps)
 
                 if (arg.op == TOK.type)
                 {
-                    arg.error("cannot pass type `%s` as a function argument", arg.toChars());
-                    arg = new ErrorExp();
+                    if (reportErrors)
+                    {
+                        arg.error("cannot pass type `%s` as a function argument", arg.toChars());
+                        arg = new ErrorExp();
+                    }
                     err = true;
                 }
             }
             else if (arg.type.toBasetype().ty == Tfunction)
             {
-                arg.error("cannot pass function `%s` as a function argument", arg.toChars());
-                arg = new ErrorExp();
+                if (reportErrors)
+                {
+                    arg.error("cannot pass function `%s` as a function argument", arg.toChars());
+                    arg = new ErrorExp();
+                }
                 err = true;
             }
             else if (checkNonAssignmentArrayOp(arg))
@@ -3311,6 +3325,9 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             return;
         }
 
+        //for error messages if the argument in [] is not convertible to size_t
+        const originalNewtype = exp.newtype;
+
         // https://issues.dlang.org/show_bug.cgi?id=11581
         // With the syntax `new T[edim]` or `thisexp.new T[edim]`,
         // T should be analyzed first and edim should go into arguments iff it's
@@ -3369,14 +3386,27 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         exp.newtype = exp.type; // in case type gets cast to something else
         Type tb = exp.type.toBasetype();
         //printf("tb: %s, deco = %s\n", tb.toChars(), tb.deco);
-
         if (arrayExpressionSemantic(exp.newargs, sc) ||
             preFunctionParameters(sc, exp.newargs))
         {
             return setError();
         }
-        if (arrayExpressionSemantic(exp.arguments, sc) ||
-            preFunctionParameters(sc, exp.arguments))
+        if (arrayExpressionSemantic(exp.arguments, sc))
+        {
+            return setError();
+        }
+        //https://issues.dlang.org/show_bug.cgi?id=20547
+        //exp.arguments are the "parameters" to [], not to a real function
+        //so the errors that come from preFunctionParameters are misleading
+        if (originalNewtype.ty == Tsarray)
+        {
+            if (preFunctionParameters(sc, exp.arguments, false))
+            {
+                exp.error("cannot create a `%s` with `new`", originalNewtype.toChars());
+                return setError();
+            }
+        }
+        else if (preFunctionParameters(sc, exp.arguments))
         {
             return setError();
         }
@@ -3387,7 +3417,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             return setError();
         }
 
-        size_t nargs = exp.arguments ? exp.arguments.dim : 0;
+        const size_t nargs = exp.arguments ? exp.arguments.dim : 0;
         Expression newprefix = null;
 
         if (tb.ty == Tclass)
@@ -3740,7 +3770,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         }
         else
         {
-            exp.error("new can only create structs, dynamic arrays or class objects, not `%s`'s", exp.type.toChars());
+            exp.error("cannot create a `%s` with `new`", exp.type.toChars());
             return setError();
         }
 
@@ -5663,17 +5693,14 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         uint errors = global.errors;
         const len = buf.length;
         const str = buf.extractChars()[0 .. len];
-        scope diagnosticReporter = new StderrDiagnosticReporter(global.params.useDeprecated);
-        scope p = new Parser!ASTCodegen(exp.loc, sc._module, str, false, diagnosticReporter);
+        scope p = new Parser!ASTCodegen(exp.loc, sc._module, str, false);
         p.nextToken();
         //printf("p.loc.linnum = %d\n", p.loc.linnum);
 
         Expression e = p.parseExpression();
-        if (p.errors)
-        {
-            assert(global.errors != errors); // should have caught all these cases
+        if (global.errors != errors)
             return null;
-        }
+
         if (p.token.value != TOK.endOfFile)
         {
             exp.error("incomplete mixin expression `%s`", str.ptr);
@@ -5818,7 +5845,8 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             {
                 if (op.hasSideEffect)
                 {
-                    auto tmp = copyToTemp(0, "__assertOp", op);
+                    const stc = STC.exptemp | (op.isLvalue() ? STC.ref_ : STC.rvalue);
+                    auto tmp = copyToTemp(stc, "__assertOp", op);
                     tmp.dsymbolSemantic(sc);
 
                     auto decl = new DeclarationExp(op.loc, tmp);
@@ -6351,10 +6379,25 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 {
                     if (callExp.e1.type.toBasetype().ty == Tdelegate)
                     {
-                        VarExp ve2 = callExp.e1.isVarExp();
-                        ve2.delegateWasExtracted = true;
-                        ve2.var.storage_class |= STC.scope_;
-                        result = ve2;
+                        /* https://issues.dlang.org/show_bug.cgi?id=20551
+                         *
+                         * Cannot take address of lazy parameter in @safe code
+                         * because it might end up being a pointer to undefined
+                         * memory.
+                         */
+                        if (sc.func && !sc.intypeof && !(sc.flags & SCOPE.debug_) && sc.func.setUnsafe())
+                        {
+                            exp.error("cannot take address of lazy parameter `%s` in `@safe` function `%s`",
+                                     ve.toChars(), sc.func.toChars());
+                            setError();
+                        }
+                        else
+                        {
+                            VarExp ve2 = callExp.e1.isVarExp();
+                            ve2.delegateWasExtracted = true;
+                            ve2.var.storage_class |= STC.scope_;
+                            result = ve2;
+                        }
                         return;
                     }
                 }
@@ -8781,12 +8824,44 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
 
                 // May be block or element-wise assignment, so
                 // convert e1 to e1[]
-                // flatten into a 1D array unless e2 is an array type
-                if (exp.op != TOK.assign && e2x.type.ty != Tarray && e2x.type.ty != Tsarray)
+                if (exp.op != TOK.assign)
                 {
                     // If multidimensional static array, treat as one large array
-                    const dim = t1.numberOfElems(exp.loc);
-                    e1x.type = t1.baseElemOf().sarrayOf(dim);
+                    //
+                    // Find the appropriate array type depending on the assignment, e.g.
+                    // int[3] = int => int[3]
+                    // int[3][2] = int => int[6]
+                    // int[3][2] = int[] => int[3][2]
+                    // int[3][2][4] + int => int[24]
+                    // int[3][2][4] + int[] => int[3][8]
+                    ulong dim = t1.isTypeSArray().dim.toUInteger();
+                    auto type = t1.nextOf();
+
+                    for (TypeSArray tsa; (tsa = type.isTypeSArray()) !is null; )
+                    {
+                        import core.checkedint : mulu;
+
+                        // Accumulate skipped dimensions
+                        bool overflow = false;
+                        dim = mulu(dim, tsa.dim.toUInteger(), overflow);
+                        if (overflow || dim >= uint.max)
+                        {
+                            // dym exceeds maximum array size
+                            exp.error("static array `%s` size overflowed to %llu",
+                                        e1x.type.toChars(), cast(ulong) dim);
+                            return setError();
+                        }
+
+                        // Move to the element type
+                        type = tsa.nextOf().toBasetype();
+
+                        // Rewrite ex1 as a static array if a matching type was found
+                        if (e2x.implicitConvTo(type) > MATCH.nomatch)
+                        {
+                            e1x.type = type.sarrayOf(dim);
+                            break;
+                        }
+                    }
                 }
                 auto sle = new SliceExp(e1x.loc, e1x, null, null);
                 sle.arrayop = true;
@@ -11393,7 +11468,7 @@ Expression semanticY(DotIdExp exp, Scope* sc, int flag)
         if (s)
         {
             auto p = s.isPackage();
-            if (p && checkAccess(exp.loc, sc, p))
+            if (p && checkAccess(sc, p))
             {
                 s = null;
             }
@@ -11882,7 +11957,8 @@ private bool checkAddressVar(Scope* sc, UnaExp exp, VarDeclaration v)
                 // Taking the address of v means it cannot be set to 'scope' later
                 v.storage_class &= ~STC.maybescope;
                 v.doNotInferScope = true;
-                if (v.storage_class & STC.scope_ && !(sc.flags & SCOPE.debug_) && sc.func.setUnsafe())
+                if (exp.e1.type.hasPointers() && v.storage_class & STC.scope_ &&
+                    !(sc.flags & SCOPE.debug_) && sc.func.setUnsafe())
                 {
                     exp.error("cannot take address of `scope` %s `%s` in `@safe` function `%s`", p, v.toChars(), sc.func.toChars());
                     return false;

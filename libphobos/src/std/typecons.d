@@ -4375,6 +4375,17 @@ alias BlackHole(Base) = AutoImplement!(Base, generateEmptyFunction, isAbstractFu
     BlackHole!Foo o;
 }
 
+nothrow pure @nogc @safe unittest
+{
+    static interface I
+    {
+        I foo() nothrow pure @nogc @safe return scope;
+    }
+
+    scope cb = new BlackHole!I();
+    cb.foo();
+}
+
 
 /**
 `WhiteHole!Base` is a subclass of `Base` which automatically implements
@@ -4408,10 +4419,25 @@ alias WhiteHole(Base) = AutoImplement!(Base, generateAssertTrap, isAbstractFunct
     assertThrown!NotImplementedError(c.notYetImplemented()); // throws an Error
 }
 
+// https://issues.dlang.org/show_bug.cgi?id=20232
+nothrow pure @safe unittest
+{
+    static interface I
+    {
+        I foo() nothrow pure @safe return scope;
+    }
+
+    if (0) // Just checking attribute interference
+    {
+        scope cw = new WhiteHole!I();
+        cw.foo();
+    }
+}
+
 // / ditto
 class NotImplementedError : Error
 {
-    this(string method)
+    this(string method) nothrow pure @safe
     {
         super(method ~ " is not implemented");
     }
@@ -4957,7 +4983,7 @@ private static:
     alias Implementation = AutoImplement!(Issue17177, how, templateNot!isFinalFunction);
 }
 
-version (unittest)
+version (StdUnittest)
 {
     // Issue 10647
     // Add prefix "issue10647_" as a workaround for issue 1238
@@ -5185,6 +5211,8 @@ private static:
                 if (atts & FA.property) poatts ~= " @property";
                 if (atts & FA.safe    ) poatts ~= " @safe";
                 if (atts & FA.trusted ) poatts ~= " @trusted";
+                if (atts & FA.scope_ )  poatts ~= " scope";
+                if (atts & FA.return_ ) poatts ~= " return";
                 return poatts;
             }
             enum postAtts = make_postAtts();
@@ -5971,16 +5999,14 @@ private template TypeMod(T)
     enum TypeMod = cast(TypeModifier)(mod1 | mod2);
 }
 
-version (unittest)
+@system unittest
 {
-    private template UnittestFuncInfo(alias f)
+    template UnittestFuncInfo(alias f)
     {
         enum name = __traits(identifier, f);
         alias type = FunctionTypeOf!f;
     }
-}
-@system unittest
-{
+
     class A
     {
         int draw() { return 1; }

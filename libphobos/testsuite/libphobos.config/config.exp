@@ -22,7 +22,7 @@ set dg-output-text [list]
 set config_test_list [list \
     { rt_trap_exceptions_drt "--DRT-trapExceptions=0" 1 } \
     { test19433 "--DRT-dont-eat-me" 0 } \
-    { test20459 "--DRT-gcopts=profile:1" 0 } \
+    { test20459 "foo bar -- --DRT-gcopts=profile:1" 0 } \
 ]
 
 # Initialize dg.

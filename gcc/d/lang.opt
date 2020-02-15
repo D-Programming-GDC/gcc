@@ -273,7 +273,7 @@ Display the frontend AST after parsing and semantic passes.
 
 fextern-std=
 D Joined RejectNegative Enum(extern_stdcpp) Var(flag_extern_stdcpp)
--fextern-std=<standard>	Set C++ name mangling compatibility with <standard>
+-fextern-std=<standard>	Set C++ name mangling compatibility with <standard>.
 
 Enum
 Name(extern_stdcpp) Type(int) UnknownError(unknown C++ standard %qs)

@@ -278,6 +278,7 @@ d_init_options (unsigned int, cl_decoded_option *decoded_options)
   /* Warnings and deprecations are disabled by default.  */
   global.params.useDeprecated = DIAGNOSTICoff;
   global.params.warnings = DIAGNOSTICoff;
+  global.params.messageStyle = MESSAGESTYLEgnu;
 
   global.params.imppath = d_gc_malloc<Strings> ();
   global.params.fileImppath = d_gc_malloc<Strings> ();

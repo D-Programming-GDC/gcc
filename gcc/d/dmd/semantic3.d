@@ -456,8 +456,10 @@ private extern(C++) final class Semantic3Visitor : Visitor
                             stc |= STC.scope_;
                         }
                     }
-                    if (funcdecl.flags & FUNCFLAG.inferScope && !(fparam.storageClass & STC.scope_))
+
+                    if ((funcdecl.flags & FUNCFLAG.inferScope) && !(fparam.storageClass & STC.scope_))
                         stc |= STC.maybescope;
+
                     stc |= fparam.storageClass & (STC.in_ | STC.out_ | STC.ref_ | STC.return_ | STC.scope_ | STC.lazy_ | STC.final_ | STC.TYPECTOR | STC.nodtor);
                     v.storage_class = stc;
                     v.dsymbolSemantic(sc2);
@@ -629,7 +631,9 @@ private extern(C++) final class Semantic3Visitor : Visitor
                     if (funcdecl.storage_class & STC.auto_)
                         funcdecl.storage_class &= ~STC.auto_;
                 }
-                if (!target.isReturnOnStack(f, funcdecl.needThis()))
+
+                // handle NRVO
+                if (!target.isReturnOnStack(f, funcdecl.needThis()) || funcdecl.checkNrvo())
                     funcdecl.nrvo_can = 0;
 
                 if (funcdecl.fbody.isErrorStatement())
