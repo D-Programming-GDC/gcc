@@ -1,0 +1,69 @@
+common_tasks_template: &COMMON_TASKS_TEMPLATE
+  # Location of downloaded prerequesites
+  gcc_deps_cache:
+    folder: gcc-deps
+    fingerprint_script: cat gcc/BASE-VER
+  # Typical build time is ~25 minutes, factor in twice that for waiting time
+  timeout_in: 120m
+  # Scripts to configure, build, and test
+  setup_script: ./buildci.sh setup
+  build_script: ./buildci.sh build
+  test_script: |
+    if [ "${RUN_TESTSUITE:-0}" = "1" ]
+    then
+      ./buildci.sh testsuite
+    else
+      ./buildci.sh unittests
+    fi
+  # Location of compressed testsuite logs
+  testsuite_artifacts:
+    path: logs/**
+
+environment:
+  CIRRUS_CLONE_DEPTH: 50
+
+# Linux
+task:
+  name: Ubuntu $TASK_NAME_SUFFIX
+  container:
+    image: ubuntu:20.04
+    cpu: 8
+    memory: 16G
+  environment:
+    matrix:
+      - TASK_NAME_SUFFIX: Testsuite
+        RUN_TESTSUITE: 1
+      - TASK_NAME_SUFFIX: Unit Tests
+        RUN_TESTSUITE: 0
+  << : *COMMON_TASKS_TEMPLATE
+
+# FreeBSD
+task:
+  name: FreeBSD $TASK_NAME_SUFFIX
+  freebsd_instance:
+    image_family: freebsd-12-2
+    cpu: 8
+    memory: 16G
+  environment:
+    matrix:
+      - TASK_NAME_SUFFIX: Testsuite
+        RUN_TESTSUITE: 1
+      - TASK_NAME_SUFFIX: Unit Tests
+        RUN_TESTSUITE: 0
+  install_bash_script: |
+    pkg install -y bash
+    ln -s /usr/local/bin/bash /bin/bash
+  << : *COMMON_TASKS_TEMPLATE
+
+# Mac
+task:
+  name: Darwin $TASK_NAME_SUFFIX
+  osx_instance:
+    image: catalina-xcode
+  environment:
+    matrix:
+      - TASK_NAME_SUFFIX: Testsuite
+        RUN_TESTSUITE: 1
+      - TASK_NAME_SUFFIX: Unit Tests
+        RUN_TESTSUITE: 0
+  << : *COMMON_TASKS_TEMPLATE
