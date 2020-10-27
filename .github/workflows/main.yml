@@ -1,0 +1,56 @@
+# https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
+
+name: Main
+on:
+  - push # branch or tag
+
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - job_name: ubuntu-x86_64 (testsuite)
+            target: x86_64-linux-gnu
+          - job_name: ubuntu-x86_64 (unittests)
+            target: x86_64-linux-gnu
+          - job_name: ubuntu-x86_64 (bootstrap)
+            target: x86_64-linux-gnu
+            bootstrap: enable
+          - job_name: ubuntu-arm
+            target: arm-linux-gnueabi
+          - job_name: ubuntu-armhf
+            target: arm-linux-gnueabihf
+          - job_name: ubuntu-aarch64
+            target: aarch64-linux-gnu
+          - job_name: ubuntu-mips
+            target: mips-linux-gnu
+          - job_name: ubuntu-mips64el
+            target: mips64el-linux-gnuabi64
+          - job_name: ubuntu-mipsel
+            target: mipsel-linux-gnu
+          - job_name: ubuntu-powerpc64le
+            target: powerpc64le-linux-gnu
+          - job_name: ubuntu-systemz
+            target: s390x-linux-gnu
+          - job_name: ubuntu-sparc64
+            target: sparc64-linux-gnu
+    name: ${{ matrix.job_name }}
+    runs-on: ubuntu-22.04
+    env:
+      GCC_CI_TARGET: ${{ matrix.target }}
+      GCC_CI_BOOTSTRAP: ${{ matrix.bootstrap || 'disable' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+      - name: Install dependencies
+        run: ./buildci.sh installdeps
+      - name: Configure gdc
+        run: ./buildci.sh configure
+      - name: Build gdc
+        run: ./buildci.sh build
+      - name: Run testsuite
+        run: ${{ contains(matrix.job_name, 'testsuite') && './buildci.sh testsuite' || 'echo disabled' }}
+      - name: Run unittests
+        run: ${{ contains(matrix.job_name, 'unittests') && './buildci.sh unittests' || 'echo disabled' }}
