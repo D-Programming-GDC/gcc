@@ -1,0 +1,48 @@
+jobs:
+- job: Windows
+  timeoutInMinutes: 120
+  pool:
+    vmImage: 'vs2017-win2016'
+  strategy:
+    matrix:
+      x64:
+        OS: win64
+        MODEL: 64
+        ARCH: x64
+      x86:
+        OS: win32
+        MODEL: 32
+        ARCH: x86
+  steps:
+    - checkout: self
+      fetchDepth: 1
+    - script: |
+        git clone https://github.com/lazka/msys2-ci-base.git %CD:~0,2%\msys64
+        %CD:~0,2%\msys64\usr\bin\rm -rf %CD:~0,2%\msys64\.git
+      displayName: Install MSYS2
+    - script: |
+        set PATH=%CD:~0,2%\msys64\usr\bin;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem
+        %CD:~0,2%\msys64\usr\bin\pacman --noconfirm -Syyuu
+      displayName: Update MSYS2
+
+- job: Linux_X86_ML
+  timeoutInMinutes: 120
+  pool:
+    vmImage: 'ubuntu-16.04'
+  variables:
+    AZURE: 'true'
+  steps:
+    - checkout: self
+      fetchDepth: 1
+    - script: |
+        ./buildci.sh setup
+      displayName: Install prerequisites
+    - script: |
+        ./buildci.sh build
+      displayName: Building GCC
+    - script: |
+        ./buildci.sh testsuite
+      displayName: Running testsuite
+    - script: |
+        ./buildci.sh unittests
+      displayName: Running unit tests
