@@ -1,0 +1,48 @@
+version: v1.0
+name: GDC
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu1804
+execution_time_limit:
+  hours: 3
+
+blocks:
+  - name: "Ubuntu 18.04"
+    dependencies: []
+    execution_time_limit:
+      hours: 2
+    task:
+      jobs:
+      - name: "Testsuite"
+        commands:
+          - checkout
+          - ./buildci.sh setup
+          - ./buildci.sh build
+          - ./buildci.sh testsuite
+      - name: "Unit Tests"
+        commands:
+          - checkout
+          - ./buildci.sh setup
+          - ./buildci.sh build
+          - ./buildci.sh unittests
+  - name: "OSX 10.15"
+    dependencies: []
+    task:
+      agent:
+        machine:
+          type: a1-standard-4
+          os_image: macos-xcode11
+      jobs:
+      - name: "Testsuite"
+        commands:
+          - checkout
+          - ./buildci.sh setup
+          - ./buildci.sh build
+          - ./buildci.sh testsuite
+      - name: "Unit Tests"
+        commands:
+          - checkout
+          - ./buildci.sh setup
+          - ./buildci.sh build
+          - ./buildci.sh unittests
