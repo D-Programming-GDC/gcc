@@ -90,6 +90,10 @@ proc libphobos-dg-test { prog do_what extra_tool_flags } {
 }
 
 proc libphobos-dg-prune { system text } {
+
+    # Ignore warnings from cctools.
+    regsub -all "(^|\n)clang: warning: argument unused during compilation:\[^\n\]*" $text "" text
+
     return $text
 }
 
