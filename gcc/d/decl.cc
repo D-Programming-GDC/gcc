@@ -116,6 +116,27 @@ gcc_attribute_p (Dsymbol *decl)
   return false;
 }
 
+/* Returns true if DECL is either lexically nested inside a unittest function,
+   or a `version(unittest)' condition.  */
+
+static bool
+in_unittest_p (Declaration *decl)
+{
+  for (Dsymbol *p = decl->parent; p != NULL; p = p->parent)
+    {
+      if (p->isUnitTestDeclaration ())
+	return true;
+      if (FuncDeclaration *fd = p->isFuncDeclaration ())
+	{
+	  tree t = get_symbol_decl (fd);
+	  if (DECL_IN_UNITTEST_CONDITION_P (t))
+	    return true;
+	}
+    }
+
+  return false;
+}
+
 /* Implements the visitor interface to lower all Declaration AST classes
    emitted from the D Front-end to GCC trees.
    All visit methods accept one parameter D, which holds the frontend AST
@@ -655,6 +676,16 @@ public:
       }
     else if (d->isDataseg () && !(d->storage_class & STCextern))
       {
+	/* For libphobos-internal use only.  When compiling unittests, only
+	   generate code for unittest or instantiated variables.  */
+	if (flag_building_libphobos_tests)
+	  {
+	    if (!this->in_version_unittest_
+		&& !in_unittest_p (d)
+		&& !d->isInstantiated ())
+	      return;
+	  }
+
 	tree decl = get_symbol_decl (d);
 
 	/* Duplicated VarDeclarations map to the same symbol.  Check if this
@@ -766,6 +797,20 @@ public:
     /* Not emitting unittest functions.  */
     if (!global.params.useUnitTests && d->isUnitTestDeclaration ())
       return;
+
+    /* For libphobos-internal use only.  When compiling unittests, only
+       generate code for unittest or instantiated functions.  */
+    if (flag_building_libphobos_tests)
+      {
+	if (!d->isUnitTestDeclaration ()
+	    && !this->in_version_unittest_
+	    && !in_unittest_p (d)
+	    && !d->isArrayOp
+	    && !d->isInstantiated ()
+	    && !d->isMain ()
+	    && !d->isCMain ())
+	  return;
+      }
 
     /* Check if any errors occurred when running semantic.  */
     if (TypeFunction *tf = d->type->isTypeFunction ())
