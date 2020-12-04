@@ -31,6 +31,7 @@
 #include "module.h"
 #include "attrib.h"
 #include "parse.h"
+#include "target.h"
 #include "root/speller.h"
 #include "target.h"
 
