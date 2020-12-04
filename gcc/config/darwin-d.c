@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm_d.h"
 #include "d/d-target.h"
 #include "d/d-target-def.h"
+#include "diagnostic.h"
 
 /* Implement TARGET_D_OS_VERSIONS for Darwin targets.  */
 
@@ -42,6 +43,58 @@ darwin_d_handle_target_object_format (void)
   return build_string_literal (strlen (objfmt) + 1, objfmt);
 }
 
+/* Given an OS X version VERSION_STR, return it as a six digit integer.  */
+
+static unsigned long
+parse_version (const char *version_str)
+{
+  const size_t version_len = strlen (version_str);
+  if (version_len < 1)
+    return 0;
+
+  /* Version string must consist of digits and periods only.  */
+  if (strspn (version_str, "0123456789.") != version_len)
+    return 0;
+
+  if (!ISDIGIT (version_str[0]) || !ISDIGIT (version_str[version_len - 1]))
+    return 0;
+
+  char *endptr;
+  unsigned long major = strtoul (version_str, &endptr, 10);
+  version_str = endptr + ((*endptr == '.') ? 1 : 0);
+
+  /* Version string must not contain adjacent periods.  */
+  if (*version_str == '.')
+    return 0;
+
+  unsigned long minor = strtoul (version_str, &endptr, 10);
+  version_str = endptr + ((*endptr == '.') ? 1 : 0);
+
+  unsigned long tiny = strtoul (version_str, &endptr, 10);
+
+  /* Version string must contain no more than three tokens.  */
+  if (*endptr != '\0')
+    return 0;
+
+  return (major * 10000) + (minor * 100) + tiny;
+}
+
+/* Handle a call to `__traits(getTargetInfo, "osxVersionMin")'.  */
+
+static tree
+darwin_d_handle_target_version_min (void)
+{
+  const unsigned long version = parse_version (darwin_macosx_version_min);
+
+  if (version == 0)
+    {
+      error ("unknown value %qs of %<-mmacosx-version-min%>",
+	     darwin_macosx_version_min);
+    }
+
+  return build_int_cst_type (integer_type_node, version);
+}
+
 /* Implement TARGET_D_REGISTER_OS_TARGET_INFO for Darwin targets.  */
 
 static void
@@ -49,6 +102,7 @@ darwin_d_register_target_info (void)
 {
   const struct d_target_info_spec handlers[] = {
     { "objectFormat", darwin_d_handle_target_object_format },
+    { "osxVersionMin", darwin_d_handle_target_version_min },
     { NULL, NULL },
   };
 

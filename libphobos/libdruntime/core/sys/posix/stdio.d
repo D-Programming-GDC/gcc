@@ -378,8 +378,11 @@ else version (Darwin)
     int   fseeko(FILE*, off_t, int);
     off_t ftello(FILE*);
 
-    ssize_t getdelim(char**, size_t*, int, FILE*);
-    ssize_t getline(char**, size_t*, FILE*);
+    static if (__traits(getTargetInfo, "osxVersionMin") >= 100700)
+    {
+        ssize_t getdelim(char**, size_t*, int, FILE*);
+        ssize_t getline(char**, size_t*, FILE*);
+    }
 }
 else version (FreeBSD)
 {
