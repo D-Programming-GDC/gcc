@@ -922,6 +922,8 @@ else version (CRuntime_UClibc)
 }
 else version (Darwin)
 {
+    import core.sys.darwin.config;
+
     enum
     {
         ///
@@ -968,7 +970,15 @@ else version (Darwin)
     // Support of OSX < 10.8 needs legacy function names without "l" suffix
     // with exception of __signbitl.  Otherwise could use else version like
     // other Darwins
-    version (OSX)
+    static if (__traits(getTargetInfo, "osxVersionMin") >= __MAC_10_8)
+    {
+        // Available OSX >= 10.8, iOS >= 6.0, all TVOS and WatchOS
+        pure int __fpclassifyl(real x);
+        pure int __isfinitel(real x);
+        pure int __isinfl(real x);
+        pure int __isnanl(real x);
+    }
+    else
     {
         version (AArch64)
         {
@@ -989,14 +999,6 @@ else version (Darwin)
             alias __isinfl = __isinf;
             alias __isnanl = __isnan;
         }
-    }
-    else
-    {
-        // Available OSX >= 10.8, iOS >= 6.0, all TVOS and WatchOS
-        pure int __fpclassifyl(real x);
-        pure int __isfinitel(real x);
-        pure int __isinfl(real x);
-        pure int __isnanl(real x);
     }
 
   extern (D)

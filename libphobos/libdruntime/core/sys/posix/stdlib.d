@@ -119,7 +119,13 @@ else version (Solaris)
 }
 else version (Darwin)
 {
-    int posix_memalign(void**, size_t, size_t);
+    import core.sys.darwin.config;
+
+    // __OSX_AVAILABLE_STARTING(__MAC_10_6, __IPHONE_3_0)
+    static if (__traits(getTargetInfo, "osxVersionMin") >= __MAC_10_6)
+    {
+        int posix_memalign(void**, size_t, size_t);
+    }
 }
 else version (CRuntime_Bionic)
 {

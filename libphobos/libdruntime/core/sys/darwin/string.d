@@ -9,6 +9,7 @@ module core.sys.darwin.string;
 
 public import core.stdc.string;
 import core.sys.darwin.sys.cdefs;
+import core.sys.darwin.config;
 
 version (OSX)
     version = Darwin;
@@ -26,6 +27,9 @@ nothrow:
 
 static if (__DARWIN_C_LEVEL >= __DARWIN_C_FULL)
 {
-    // ^ __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_4_3);
-    pure void* memmem(return const void* haystack, size_t haystacklen, scope const void* needle, size_t needlelen);
+    // __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_4_3)
+    static if (__traits(getTargetInfo, "osxVersionMin") >= __MAC_10_7)
+    {
+        pure void* memmem(return const void* haystack, size_t haystacklen, scope const void* needle, size_t needlelen);
+    }
 }

@@ -28,14 +28,18 @@ nothrow:
 
 public import core.stdc.stdint; // for intptr_t
 public import core.sys.darwin.mach.loader;
+import core.sys.darwin.config;
 
-uint         _dyld_image_count();
-const(char)* _dyld_get_image_name(uint image_index);
-mach_header* _dyld_get_image_header(uint image_index);
-intptr_t     _dyld_get_image_vmaddr_slide(uint image_index);
-
-void         _dyld_register_func_for_add_image(void function(const scope mach_header* mh, intptr_t vmaddr_slide));
-void         _dyld_register_func_for_remove_image(void function(const scope mach_header* mh, intptr_t vmaddr_slide));
+// __OSX_AVAILABLE_STARTING(__MAC_10_1, __IPHONE_2_0)
+static if (__traits(getTargetInfo, "osxVersionMin") >= __MAC_10_1)
+{
+    uint         _dyld_image_count();
+    const(char)* _dyld_get_image_name(uint image_index);
+    mach_header* _dyld_get_image_header(uint image_index);
+    intptr_t     _dyld_get_image_vmaddr_slide(uint image_index);
+    void         _dyld_register_func_for_add_image(void function(in mach_header* mh, intptr_t vmaddr_slide));
+    void         _dyld_register_func_for_remove_image(void function(in mach_header* mh, intptr_t vmaddr_slide));
+}
 
 int NSVersionOfRunTimeLibrary(const char* libraryPath);
 int NSVersionOfLinkTimeLibrary(const char* libraryPath);

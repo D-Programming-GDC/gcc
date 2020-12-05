@@ -19,6 +19,14 @@ version (Darwin):
 
 public import core.sys.posix.config;
 
+// The compiler exposes `__traits(getTargetInfo, "osxVersionMin")` as a way to
+// obtain the lower bound support OSX version. In some compilers this is
+// controlled by a command-line option:
+//  -mmacosx-version-min=   (on OSX).
+//  -miphoneos-version-min= (on iOS)
+//  -mtvos-version-min=     (on TVOS)
+//  -mwatchos-version-min=  (on WatchOS)
+
 enum __MAC_10_0    = 100000;
 enum __MAC_10_1    = 100100;
 enum __MAC_10_2    = 100200;

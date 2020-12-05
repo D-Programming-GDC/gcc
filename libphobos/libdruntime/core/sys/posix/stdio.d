@@ -373,12 +373,14 @@ else version (CRuntime_Bionic)
 }
 else version (Darwin)
 {
+    import core.sys.darwin.config;
+
     enum L_ctermid = 1024;
 
     int   fseeko(FILE*, off_t, int);
     off_t ftello(FILE*);
 
-    static if (__traits(getTargetInfo, "osxVersionMin") >= 100700)
+    static if (__traits(getTargetInfo, "osxVersionMin") >= __MAC_10_7)
     {
         ssize_t getdelim(char**, size_t*, int, FILE*);
         ssize_t getline(char**, size_t*, FILE*);

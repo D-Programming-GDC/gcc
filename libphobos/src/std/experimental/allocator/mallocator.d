@@ -194,6 +194,84 @@ version (Windows)
     }
 }
 
+version (Posix)
+{
+    // Not all platforms have posix_memalign available, supply own implementation
+    // if this is the case.  Avoid calling it posix_memalign because it needs
+    // special handling for realloc and free cases.
+    static if (!__traits(compiles, { import core.sys.posix.stdlib : posix_memalign; }))
+    {
+        // Helper to cast the infos written before the aligned pointer
+        // this header keeps track of the size (required to realloc) and of
+        // the base ptr (required to free).
+        private struct AlignInfo
+        {
+            void* basePtr;
+            size_t size;
+
+            @nogc nothrow
+            static AlignInfo* opCall(void* ptr)
+            {
+                return cast(AlignInfo*) (ptr - AlignInfo.sizeof);
+            }
+        }
+
+        @nogc nothrow
+        private void* _aligned_malloc(size_t size, size_t alignment)
+        {
+            import core.stdc.stdlib : malloc;
+            size_t offset = alignment + size_t.sizeof * 2 - 1;
+
+            // unaligned chunk
+            void* basePtr = malloc(size + offset);
+            if (!basePtr) return null;
+
+            // get aligned location within the chunk
+            void* alignedPtr = cast(void**)((cast(size_t)(basePtr) + offset)
+                & ~(alignment - 1));
+
+            // write the header before the aligned pointer
+            AlignInfo* head = AlignInfo(alignedPtr);
+            head.basePtr = basePtr;
+            head.size = size;
+
+            return alignedPtr;
+        }
+
+        @nogc nothrow
+        private void* _aligned_realloc(void* ptr, size_t size, size_t alignment)
+        {
+            import core.stdc.stdlib : free;
+            import core.stdc.string : memcpy;
+
+            if (!ptr) return _aligned_malloc(size, alignment);
+
+            // gets the header from the exising pointer
+            AlignInfo* head = AlignInfo(ptr);
+
+            // gets a new aligned pointer
+            void* alignedPtr = _aligned_malloc(size, alignment);
+            if (!alignedPtr)
+                return null;
+
+            // copy exising data
+            memcpy(alignedPtr, ptr, head.size);
+            free(head.basePtr);
+
+            return alignedPtr;
+        }
+
+        @nogc nothrow
+        private void _aligned_free(void *ptr)
+        {
+            import core.stdc.stdlib : free;
+            if (!ptr) return;
+            AlignInfo* head = AlignInfo(ptr);
+            free(head.basePtr);
+        }
+    }
+}
+
 /**
    Aligned allocator using OS-specific primitives, under a uniform API.
  */
@@ -226,24 +304,32 @@ struct AlignedMallocator
     @trusted @nogc nothrow
     void[] alignedAllocate(size_t bytes, uint a) shared
     {
-        import core.stdc.errno : ENOMEM, EINVAL;
-        import core.sys.posix.stdlib : posix_memalign;
-        assert(a.isGoodDynamicAlignment);
-        void* result;
-        auto code = posix_memalign(&result, a, bytes);
-        if (code == ENOMEM)
-            return null;
-
-        else if (code == EINVAL)
+        static if (__traits(compiles, _aligned_malloc))
         {
-            assert(0, "AlignedMallocator.alignment is not a power of two "
-                ~"multiple of (void*).sizeof, according to posix_memalign!");
+            auto result = _aligned_malloc(bytes, a);
+            return result ? result[0 .. bytes] : null;
         }
-        else if (code != 0)
-            assert(0, "posix_memalign returned an unknown code!");
-
         else
-            return result[0 .. bytes];
+        {
+            import core.stdc.errno : ENOMEM, EINVAL;
+            import core.sys.posix.stdlib : posix_memalign;
+            assert(a.isGoodDynamicAlignment);
+            void* result;
+            auto code = posix_memalign(&result, a, bytes);
+            if (code == ENOMEM)
+                return null;
+
+            else if (code == EINVAL)
+            {
+                assert(0, "AlignedMallocator.alignment is not a power of two "
+                    ~"multiple of (void*).sizeof, according to posix_memalign!");
+            }
+            else if (code != 0)
+                assert(0, "posix_memalign returned an unknown code!");
+
+            else
+                return result[0 .. bytes];
+        }
     }
     else version (Windows)
     @trusted @nogc nothrow
@@ -263,8 +349,13 @@ struct AlignedMallocator
     @system @nogc nothrow
     bool deallocate(void[] b) shared
     {
-        import core.stdc.stdlib : free;
-        free(b.ptr);
+        static if (__traits(compiles, _aligned_free))
+            _aligned_free(b.ptr);
+        else
+        {
+            import core.stdc.stdlib : free;
+            free(b.ptr);
+        }
         return true;
     }
     else version (Windows)
@@ -284,7 +375,21 @@ struct AlignedMallocator
     @system @nogc nothrow
     bool reallocate(ref void[] b, size_t newSize) shared
     {
-        return Mallocator.instance.reallocate(b, newSize);
+        static if (__traits(compiles, _aligned_realloc))
+        {
+            if (!newSize)
+            {
+                deallocate(b);
+                b = null;
+                return true;
+            }
+            auto p = cast(ubyte*) _aligned_realloc(b.ptr, newSize, alignment);
+            if (!p) return false;
+            b = p[0 .. newSize];
+            return true;
+        }
+        else
+            return Mallocator.instance.reallocate(b, newSize);
     }
     version (Windows)
     @system @nogc nothrow
