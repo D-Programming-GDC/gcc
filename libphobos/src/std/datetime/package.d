@@ -115,7 +115,6 @@ public import std.datetime.interval;
 public import std.datetime.systime;
 public import std.datetime.timezone;
 
-import core.exception : AssertError;
 import std.functional : unaryFun;
 import std.traits;
 import std.typecons : Flag, Yes, No;
@@ -267,12 +266,7 @@ public:
         StopWatch sw;
         sw.start();
         auto t1 = sw.peek();
-        bool doublestart = true;
-        try
-            sw.start();
-        catch (AssertError e)
-            doublestart = false;
-        assert(!doublestart);
+        assert(sw._flagStarted);
         sw.stop();
         assert((t1 - sw.peek()).to!("seconds", real)() <= 0);
     }
@@ -294,12 +288,7 @@ public:
         sw.start();
         sw.stop();
         auto t1 = sw.peek();
-        bool doublestop = true;
-        try
-            sw.stop();
-        catch (AssertError e)
-            doublestop = false;
-        assert(!doublestop);
+        assert(!sw._flagStarted);
         assert((t1 - sw.peek()).to!("seconds", real)() == 0);
     }
 
