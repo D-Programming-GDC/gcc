@@ -622,7 +622,8 @@ allocator can be cast to $(D shared).
 
     testAllocatorObject(processAllocator);
     testAllocatorObject(theAllocator);
-    assertThrown!AssertError(processAllocator = null);
+    // XBUG: Asserts are not thrown in release code, so is a pointless check.
+    //assertThrown!AssertError(processAllocator = null);
 
     // Restore initial processAllocator state
     processAllocator = oldProcessAllocator;
