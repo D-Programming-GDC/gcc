@@ -76,6 +76,11 @@ private
             // fiber_switchContext does not support shadow stack from
             // Intel CET.  So use ucontext implementation.
         }
+        else version (OSX)
+        {
+            version = AsmExternal;
+            version = AsmX86_Posix;
+        }
         else
         {
             version = AsmExternal;
@@ -100,6 +105,11 @@ private
         else version (D_X32)
         {
             // let X32 be handled by ucontext swapcontext
+        }
+        else version (OSX)
+        {
+            version = AsmExternal;
+            version = AsmX86_Posix;
         }
         else
         {
