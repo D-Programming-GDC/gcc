@@ -899,9 +899,13 @@ else version (CRuntime_Musl)
 }
 else version (Darwin)
 {
+    import core.sys.darwin.config;
     version (D_LP64)
     {
-        enum __PTHREAD_SIZE__               = 8176;
+        static if (__traits(getTargetInfo, "osxVersionMin") >= __MAC_10_10)
+            enum __PTHREAD_SIZE__           = 8176;
+        else
+            enum __PTHREAD_SIZE__           = 1168;
         enum __PTHREAD_ATTR_SIZE__          = 56;
         enum __PTHREAD_MUTEXATTR_SIZE__     = 8;
         enum __PTHREAD_MUTEX_SIZE__         = 56;
@@ -913,7 +917,10 @@ else version (Darwin)
     }
     else
     {
-        enum __PTHREAD_SIZE__               = 4088;
+        static if (__traits(getTargetInfo, "osxVersionMin") >= __MAC_10_10)
+            enum __PTHREAD_SIZE__           = 4088;
+        else
+            enum __PTHREAD_SIZE__           = 596;
         enum __PTHREAD_ATTR_SIZE__          = 36;
         enum __PTHREAD_MUTEXATTR_SIZE__     = 8;
         enum __PTHREAD_MUTEX_SIZE__         = 40;
