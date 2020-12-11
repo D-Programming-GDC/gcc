@@ -147,6 +147,7 @@ private
         }
         else version (Posix)
         {
+            version = AsmPPC64_Posix;
             version = AlignFiberStackTo16Byte;
         }
     }

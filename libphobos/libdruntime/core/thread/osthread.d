@@ -37,6 +37,11 @@ else version (TVOS)
     version = Darwin;
 else version (WatchOS)
     version = Darwin;
+version (Darwin)
+{
+    version (PPC) version = Darwin_AnyPPC;
+    version (PPC64) version = Darwin_AnyPPC;
+}
 
 version (Shared)
     version (GNU)
