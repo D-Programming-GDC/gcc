@@ -1395,6 +1395,31 @@ private:
               *cast(size_t*)(pstack + wsize) = cast(size_t) Thread.getThis().m_addr;
             assert( (cast(size_t) pstack & 0x0f) == 0 );
         }
+        else version (AsmPPC64_Posix)
+        {
+            version (StackGrowsDown)
+            {
+                pstack -= long.sizeof * 5;
+            }
+            else
+            {
+                pstack += long.sizeof * 5;
+            }
+
+            push( cast(size_t) &fiber_entryPoint );     // link register
+            push( 0x00000000_00000000 );                // control register
+            push( 0x00000000_00000000 );                // old stack pointer
+
+            // GPR values
+            version (StackGrowsDown)
+            {
+                pstack -= long.sizeof * 20;
+            }
+            else
+            {
+                pstack += long.sizeof * 20;
+            }
+        }
         else version (AsmMIPS_O32_Posix)
         {
             version (StackGrowsDown) {}
