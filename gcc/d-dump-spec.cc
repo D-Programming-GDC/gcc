@@ -1457,6 +1457,13 @@ format_type (struct ddump_container &container, tree type, format_info &info)
   return ret;
 }
 
+static void
+output_location (location_t loc)
+{
+  expanded_location xloc = expand_location (loc);
+  fprintf (d_dump_file, "#line %d \"%s\"\n", xloc.line, xloc.file);
+}
+
 /* Output the type which was built on the type obstack, and then free
    it.  */
 
@@ -1502,6 +1509,8 @@ output_fndecl (struct ddump_container &container, tree decl)
 
   if (!format_function_args (container, TREE_TYPE (decl)))
     is_valid = false;
+
+  output_location (DECL_SOURCE_LOCATION (decl));
 
   if (!is_valid)
     fprintf (d_dump_file, "// ");
@@ -1573,6 +1582,8 @@ output_typedef (struct ddump_container &container, tree decl)
       if (TREE_CODE (type) == FUNCTION_TYPE)
 	info.flags |= DFI_FUNCTION;
 
+      output_location (DECL_SOURCE_LOCATION (decl));
+
       if (!format_type (container, type, info))
 	{
 	  fprintf (d_dump_file, "// ");
@@ -1604,6 +1615,8 @@ output_typedef (struct ddump_container &container, tree decl)
 
        *slot = CONST_CAST (void *, (const void *) ident);
 
+       output_location (DECL_SOURCE_LOCATION (decl));
+
        format_info info (DFI_CONST_QUAL);
        if (!format_type (container, type, info))
 	 {
@@ -1633,6 +1646,8 @@ output_typedef (struct ddump_container &container, tree decl)
 
 	  *slot = CONST_CAST (void *, (const void *) ident);
 	}
+
+      output_location (DECL_SOURCE_LOCATION (decl));
 
       format_info info (DFI_CONST_QUAL);
       if (!format_type (container, type, info))
@@ -1673,8 +1688,7 @@ output_var (struct ddump_container &container, tree decl)
   if (type_name != NULL_TREE && TREE_CODE (type_name) == IDENTIFIER_NODE)
     id = type_name;
   else if (type_name != NULL_TREE && TREE_CODE (type_name) == TYPE_DECL
-	   && DECL_SOURCE_LOCATION (type_name) != BUILTINS_LOCATION
-	   && DECL_NAME (type_name))
+	   && !DECL_IS_UNDECLARED_BUILTIN (type_name) && DECL_NAME (type_name))
     id = DECL_NAME (type_name);
 
   if (id != NULL_TREE
@@ -1707,6 +1721,8 @@ output_var (struct ddump_container &container, tree decl)
 	 struct tag.  Prefer the type to the variable.  */
       is_valid = false;
     }
+
+  output_location (DECL_SOURCE_LOCATION (decl));
 
   if (!is_valid)
     fprintf (d_dump_file, "// ");
