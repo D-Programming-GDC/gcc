@@ -257,6 +257,8 @@ else static if (floatTraits!(real).realFormat == RealFormat.ieeeExtended53)
     enum real MAXGAMMA = 1755.5483429L;
 else static if (floatTraits!(real).realFormat == RealFormat.ieeeDouble)
     enum real MAXGAMMA = 171.6243769L;
+else static if (floatTraits!(real).realFormat == RealFormat.ibmExtended)
+    enum real MAXGAMMA = 1755.5483429L;
 else
     static assert(0, "missing MAXGAMMA for other real types");
 
@@ -614,6 +616,11 @@ else static if (floatTraits!(real).realFormat == RealFormat.ieeeDouble)
 {
     enum real MAXLOG = 0x1.62e42fefa39efp+9L;  // log(real.max)
     enum real MINLOG = -0x1.74385446d71c3p+9L; // log(real.min_normal*real.epsilon) = log(smallest denormal)
+}
+else static if (floatTraits!(real).realFormat == RealFormat.ibmExtended)
+{
+    enum real MAXLOG = 0x1.62e42fefa39ef35793c7673007e6p+9L;  // log(real.max)
+    enum real MINLOG = -0x1.6546282207802c89d24d65e96274p+9L; // log(real.min_normal*real.epsilon) = log(
 }
 else
     static assert(0, "missing MAXLOG and MINLOG for other real types");
