@@ -460,108 +460,118 @@ else
 T floorImpl(T)(const T x) @trusted pure nothrow @nogc
 {
     alias F = floatTraits!(T);
-    // Take care not to trigger library calls from the compiler,
-    // while ensuring that we don't get defeated by some optimizers.
-    union floatBits
-    {
-        T rv;
-        ushort[T.sizeof/2] vu;
 
-        // Other kinds of extractors for real formats.
-        static if (F.realFormat == RealFormat.ieeeSingle)
-            int vi;
+    static if (F.realFormat == RealFormat.ibmExtended)
+    {
+        import gcc.builtins;
+        return __builtin_floorl(x);
     }
-    floatBits y = void;
-    y.rv = x;
-
-    // Find the exponent (power of 2)
-    // Do this by shifting the raw value so that the exponent lies in the low bits,
-    // then mask out the sign bit, and subtract the bias.
-    static if (F.realFormat == RealFormat.ieeeSingle)
-    {
-        int exp = ((y.vi >> (T.mant_dig - 1)) & 0xff) - 0x7f;
-    }
-    else static if (F.realFormat == RealFormat.ieeeDouble)
-    {
-        int exp = ((y.vu[F.EXPPOS_SHORT] >> 4) & 0x7ff) - 0x3ff;
-
-        version (LittleEndian)
-            int pos = 0;
-        else
-            int pos = 3;
-    }
-    else static if (F.realFormat == RealFormat.ieeeExtended ||
-                    F.realFormat == RealFormat.ieeeExtended53)
-    {
-        int exp = (y.vu[F.EXPPOS_SHORT] & 0x7fff) - 0x3fff;
-
-        version (LittleEndian)
-            int pos = 0;
-        else
-            int pos = 4;
-    }
-    else static if (F.realFormat == RealFormat.ieeeQuadruple)
-    {
-        int exp = (y.vu[F.EXPPOS_SHORT] & 0x7fff) - 0x3fff;
-
-        version (LittleEndian)
-            int pos = 0;
-        else
-            int pos = 7;
-        }
     else
-        static assert(false, "Not implemented for this architecture");
-
-    if (exp < 0)
     {
-        if (x < 0.0)
-            return -1.0;
-        else
-            return 0.0;
-    }
-
-    static if (F.realFormat == RealFormat.ieeeSingle)
-    {
-        if (exp < (T.mant_dig - 1))
+        // Take care not to trigger library calls from the compiler,
+        // while ensuring that we don't get defeated by some optimizers.
+        union floatBits
         {
-            // Clear all bits representing the fraction part.
-            const uint fraction_mask = F.MANTISSAMASK_INT >> exp;
+            T rv;
+            ushort[T.sizeof/2] vu;
 
-            if ((y.vi & fraction_mask) != 0)
+            // Other kinds of extractors for real formats.
+            static if (F.realFormat == RealFormat.ieeeSingle)
+                int vi;
+        }
+        floatBits y = void;
+        y.rv = x;
+
+        // Find the exponent (power of 2)
+        // Do this by shifting the raw value so that the exponent lies in the
+        // low bits, then mask out the sign bit, and subtract the bias.
+        static if (F.realFormat == RealFormat.ieeeSingle)
+        {
+            int exp = ((y.vi >> (T.mant_dig - 1)) & 0xff) - 0x7f;
+        }
+        else static if (F.realFormat == RealFormat.ieeeDouble)
+        {
+            int exp = ((y.vu[F.EXPPOS_SHORT] >> 4) & 0x7ff) - 0x3ff;
+
+            version (LittleEndian)
+                int pos = 0;
+            else
+                int pos = 3;
+        }
+        else static if (F.realFormat == RealFormat.ieeeExtended ||
+                    F.realFormat == RealFormat.ieeeExtended53)
+        {
+            int exp = (y.vu[F.EXPPOS_SHORT] & 0x7fff) - 0x3fff;
+
+            version (LittleEndian)
+                int pos = 0;
+            else
+                int pos = 4;
+        }
+        else static if (F.realFormat == RealFormat.ieeeQuadruple)
+        {
+            int exp = (y.vu[F.EXPPOS_SHORT] & 0x7fff) - 0x3fff;
+
+            version (LittleEndian)
+                int pos = 0;
+            else
+                int pos = 7;
+        }
+        else
+            static assert(false, "Not implemented for this architecture");
+
+        if (exp < 0)
+        {
+            if (x < 0.0)
+                return -1.0;
+            else
+                return 0.0;
+        }
+
+        static if (F.realFormat == RealFormat.ieeeSingle)
+        {
+            if (exp < (T.mant_dig - 1))
             {
-                // If 'x' is negative, then first substract 1.0 from the value.
-                if (y.vi < 0)
-                    y.vi += 0x00800000 >> exp;
-                y.vi &= ~fraction_mask;
+                // Clear all bits representing the fraction part.
+                const uint fraction_mask = F.MANTISSAMASK_INT >> exp;
+
+                if ((y.vi & fraction_mask) != 0)
+                {
+                    // If 'x' is negative, then first substract 1.0 from
+                    // the value.
+                    if (y.vi < 0)
+                        y.vi += 0x00800000 >> exp;
+                    y.vi &= ~fraction_mask;
+                }
             }
         }
-    }
-    else
-    {
-        static if (F.realFormat == RealFormat.ieeeExtended53)
-            exp = (T.mant_dig + 11 - 1) - exp; // mant_dig is really 64
         else
-            exp = (T.mant_dig - 1) - exp;
-
-        // Zero 16 bits at a time.
-        while (exp >= 16)
         {
-            version (LittleEndian)
-                y.vu[pos++] = 0;
+            static if (F.realFormat == RealFormat.ieeeExtended53)
+                exp = (T.mant_dig + 11 - 1) - exp; // mant_dig is really 64
             else
-                y.vu[pos--] = 0;
-            exp -= 16;
+                exp = (T.mant_dig - 1) - exp;
+
+            // Zero 16 bits at a time.
+            while (exp >= 16)
+            {
+                version (LittleEndian)
+                    y.vu[pos++] = 0;
+                else
+                    y.vu[pos--] = 0;
+                exp -= 16;
+            }
+
+            // Clear the remaining bits.
+            if (exp > 0)
+                y.vu[pos] &= 0xffff ^ ((1 << exp) - 1);
+
+            if ((x < 0.0) && (x != y.rv))
+                y.rv -= 1.0;
         }
 
-        // Clear the remaining bits.
-        if (exp > 0)
-            y.vu[pos] &= 0xffff ^ ((1 << exp) - 1);
-
-        if ((x < 0.0) && (x != y.rv))
-            y.rv -= 1.0;
+        return y.rv;
     }
-
-    return y.rv;
 }
 
 public:
@@ -1767,6 +1777,13 @@ real exp(real x) @trusted pure nothrow @nogc
     else
     {
         alias F = floatTraits!real;
+        static if (F.realFormat == RealFormat.ibmExtended)
+        {
+         import gcc.builtins;
+         return __builtin_expl(x);
+        }
+        else
+        {
         static if (F.realFormat == RealFormat.ieeeDouble)
         {
             // Coefficients for exp(x)
@@ -1871,6 +1888,7 @@ real exp(real x) @trusted pure nothrow @nogc
         x = ldexp(x, n);
 
         return x;
+    }
     }
 }
 
@@ -3897,7 +3915,8 @@ real hypot(real x, real y) @safe pure nothrow @nogc
     static assert(2*(SQRTMAX/2)*(SQRTMAX/2) <= real.max);
 
     // Proves that sqrt(real.max) ~~  0.5/sqrt(real.min_normal)
-    static assert(real.min_normal*real.max > 2 && real.min_normal*real.max <= 4);
+    static assert((real.min_normal*real.max > 2 && real.min_normal*real.max <= 4)
+                  || floatTraits!real.realFormat == RealFormat.ibmExtended);
 
     real u = fabs(x);
     real v = fabs(y);
@@ -4524,7 +4543,7 @@ long lrint(real x) @trusted pure nothrow @nogc
         }
         else
         {
-            static assert(false, "real type not supported by lrint()");
+            assert(false, "real type not supported by lrint()");
         }
     }
 }
