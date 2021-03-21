@@ -18,6 +18,13 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+ #define SUBTARGET_OVERRIDE_OPTIONS                                     \
+ do {                                                                   \
+   flag_pic = TARGET_64BIT ? 1 : 0;                                      \
+   if (!global_options_set.x_dwarf_version)                             \
+     dwarf_version = 4;                                                 \
+ } while (0)
+
 #define DBX_DEBUGGING_INFO 1
 #if TARGET_64BIT_DEFAULT || defined (HAVE_GAS_PE_SECREL32_RELOC)
 #define DWARF2_DEBUGGING_INFO 1
