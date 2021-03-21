@@ -53,6 +53,17 @@ along with GCC; see the file COPYING3.  If not see
     }								\
   while (0)
 
+#define EXTRA_TARGET_D_OS_VERSIONS()				\
+  do								\
+    {								\
+      builtin_version ("MinGW");				\
+      if (TARGET_64BIT && ix86_abi == MS_ABI)			\
+	builtin_version ("Win64");				\
+      else if (!TARGET_64BIT)					\
+	builtin_version ("Win32");				\
+    }								\
+  while (0)
+  
 #ifndef TARGET_USE_PTHREAD_BY_DEFAULT
 #define SPEC_PTHREAD1 "pthread"
 #define SPEC_PTHREAD2 "!no-pthread"
@@ -165,7 +176,7 @@ along with GCC; see the file COPYING3.  If not see
 #define REAL_LIBGCC_SPEC \
   "%{mthreads:-lmingwthrd} -lmingw32 \
    " SHARED_LIBGCC_SPEC " \
-   -lmoldname -lmingwex -lmsvcrt"
+   -lmoldname -lmingwex -lmsvcrt -lkernel32"
 
 #undef STARTFILE_SPEC
 #define STARTFILE_SPEC "%{shared|mdll:dllcrt2%O%s} \
