@@ -23,6 +23,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "tm.h"
 #include "d/d-target.h"
 #include "d/d-target-def.h"
+#include "d/dmd/globaltypes.h"  /* For enum LINK.  */
 
 /* Implement TARGET_D_CPU_VERSIONS for x86 targets.  */
 
