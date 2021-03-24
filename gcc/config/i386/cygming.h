@@ -209,6 +209,8 @@ along with GCC; see the file COPYING3.  If not see
 #define SUBTARGET_OVERRIDE_OPTIONS					\
 do {									\
   flag_pic = TARGET_64BIT ? 1 : 0;                                      \
+  if (!global_options_set.x_dwarf_version)				\
+    dwarf_version = 4;							\
 } while (0)
 
 /* Define this macro if references to a symbol must be treated
