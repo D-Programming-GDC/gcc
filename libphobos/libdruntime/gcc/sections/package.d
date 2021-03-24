@@ -22,26 +22,20 @@
 
 module gcc.sections;
 
-version (CRuntime_Glibc)
-    public import gcc.sections.elf_shared;
-else version (CRuntime_Musl)
-    public import gcc.sections.elf_shared;
-else version (CRuntime_UClibc)
-    public import gcc.sections.elf_shared;
-else version (FreeBSD)
-    public import gcc.sections.elf_shared;
-else version (NetBSD)
-    public import gcc.sections.elf_shared;
-else version (DragonFlyBSD)
-    public import gcc.sections.elf_shared;
-else version (Solaris)
+version (CRuntime_Glibc)  version = ElfShared;
+version (CRuntime_Musl)   version = ElfShared;
+version (CRuntime_UClibc) version = ElfShared;
+version (FreeBSD)         version = ElfShared;
+version (NetBSD)          version = ElfShared;
+version (DragonFlyBSD)    version = ElfShared;
+version (Solaris)         version = ElfShared;
+
+version (ElfShared)
     public import gcc.sections.elf_shared;
 else version (OSX)
     public import gcc.sections.osx;
-else version (CRuntime_DigitalMars)
-    public import gcc.sections.win32;
-else version (CRuntime_Microsoft)
-    public import gcc.sections.win64;
+else version (Windows)
+    public import gcc.sections.pecoff;
 else version (CRuntime_Bionic)
     public import gcc.sections.android;
 else

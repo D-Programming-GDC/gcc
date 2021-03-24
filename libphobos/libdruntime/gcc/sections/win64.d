@@ -51,14 +51,6 @@ struct SectionGroup
         return _moduleGroup;
     }
 
-    version (Win64)
-    @property immutable(FuncTable)[] ehTables() const nothrow @nogc
-    {
-        auto pbeg = cast(immutable(FuncTable)*)&_deh_beg;
-        auto pend = cast(immutable(FuncTable)*)&_deh_end;
-        return pbeg[0 .. pend - pbeg];
-    }
-
     @property inout(void[])[] gcRanges() inout nothrow @nogc
     {
         return _gcRanges[];

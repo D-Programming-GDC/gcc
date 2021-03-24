@@ -417,11 +417,14 @@ TargetCPP::fundamentalType (const Type *, bool &)
   return false;
 }
 
-/* Return the default system linkage for the target.  */
+/* Return the default `extern (System)` linkage for the target.  */
 
 LINK
 Target::systemLinkage (void)
 {
+  if (targetdm.d_extern_system_linkage)
+    return (LINK) targetdm.d_extern_system_linkage ();
+
   return LINKc;
 }
 

@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define IN_TARGET_CODE 1
+
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -29,6 +31,11 @@ static void
 winnt_d_os_builtins (void)
 {
   d_add_builtin_version ("Windows");
+
+  if (ix86_abi == SYSV_ABI)
+    d_add_builtin_version ("SYSV_ABI");
+  else
+    d_add_builtin_version ("MS_ABI");
 
 #define builtin_version(TXT) d_add_builtin_version (TXT)
 

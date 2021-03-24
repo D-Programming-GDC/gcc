@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#define IN_TARGET_CODE 1
+
 #include "config.h"
 #include "system.h"
 #include "coretypes.h"
@@ -41,4 +43,15 @@ ix86_d_target_versions (void)
     d_add_builtin_version ("D_HardFloat");
   else
     d_add_builtin_version ("D_SoftFloat");
+}
+
+/* Implement TARGET_D_EXTERN_SYSTEM_LINKAGE for x86 targets.  */
+
+int
+ix86_d_extern_system_linkage (void)
+{
+  if (ix86_abi == MS_ABI)
+    return LINKwindows;
+
+  return LINKc;
 }

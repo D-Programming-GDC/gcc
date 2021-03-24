@@ -46,6 +46,16 @@ relating to the target operating system.",
  void, (void),
  hook_void_void)
 
+/* */
+DEFHOOK
+(d_extern_system_linkage,
+ "If defined, this hook returns the extern linkage which should be applied\n\
+ for all declarations annotated with @code{extern (System)}.  Typically,\n\
+ @code{extern (System)} is the same as @code{extern (Windows)} on Microsoft\n\
+ Windows platforms, and @code{extern (C)} on other platforms.",
+ int, (void),
+ NULL)
+
 /* ModuleInfo section name and brackets.  */
 DEFHOOKPOD
 (d_minfo_section,

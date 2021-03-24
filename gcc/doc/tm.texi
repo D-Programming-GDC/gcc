@@ -10808,6 +10808,13 @@ Similarly to @code{TARGET_D_CPU_VERSIONS}, but is used for versions
 relating to the target operating system.
 @end deftypefn
 
+@deftypefn {D Target Hook} int TARGET_D_EXTERN_SYSTEM_LINKAGE (void)
+If defined, this hook returns the extern linkage which should be applied
+ for all declarations annotated with @code{extern (System)}.  Typically,
+ @code{extern (System)} is the same as @code{extern (Windows)} on Microsoft
+ Windows platforms, and @code{extern (C)} on other platforms.
+@end deftypefn
+
 @deftypevr {D Target Hook} {const char *} TARGET_D_MINFO_SECTION
 Contains the name of the section in which module info references should be
 placed.  This section is expected to be bracketed by two symbols to indicate

@@ -1539,9 +1539,9 @@ package extern(D) void* getStackBottom() nothrow @nogc
             void *bottom;
 
             version (X86)
-                asm pure nothrow @nogc { "movl %%fs:4, %0;" : "=r" bottom; }
+                asm pure nothrow @nogc { "movl %%fs:4, %0;" : "=r" (bottom); }
             else version (X86_64)
-                asm pure nothrow @nogc { "movq %%gs:8, %0;" : "=r" bottom; }
+                asm pure nothrow @nogc { "movq %%gs:8, %0;" : "=r" (bottom); }
             else
                 static assert(false, "Platform not supported.");
 

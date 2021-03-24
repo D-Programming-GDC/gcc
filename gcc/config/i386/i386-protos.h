@@ -264,6 +264,7 @@ extern void ix86_register_pragmas (void);
 
 /* In i386-d.c  */
 extern void ix86_d_target_versions (void);
+extern int ix86_d_extern_system_linkage (void);
 
 /* In winnt.c  */
 extern void i386_pe_unique_section (tree, int);

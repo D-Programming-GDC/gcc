@@ -23,7 +23,7 @@ D_EXTRA_DFLAGS=-nostdinc -I $(srcdir) -I .
 
 # D flags for compilation
 AM_DFLAGS= \
-	$(phobos_compiler_pic_flag) \
+	$(phobos_lt_pic_flag) $(phobos_compiler_shared_flag) \
 	$(WARN_DFLAGS) $(CHECKING_DFLAGS) $(CET_DFLAGS)
 
 # Flags for other kinds of sources
@@ -69,7 +69,8 @@ if DRUNTIME_OS_LINUX
     DRUNTIME_SOURCES_CONFIGURED += $(DRUNTIME_DSOURCES_LINUX)
 endif
 if DRUNTIME_OS_MINGW
-    DRUNTIME_SOURCES_CONFIGURED += $(DRUNTIME_DSOURCES_WINDOWS)
+    DRUNTIME_SOURCES_CONFIGURED += $(DRUNTIME_DSOURCES_WINDOWS) \
+				   config/mingw/msvc.c
 endif
 if DRUNTIME_OS_SOLARIS
     DRUNTIME_SOURCES_CONFIGURED += $(DRUNTIME_DSOURCES_SOLARIS)
@@ -187,7 +188,7 @@ DRUNTIME_DSOURCES = core/atomic.d core/attribute.d core/bitop.d \
 	gc/pooltable.d gc/proxy.d gcc/attribute.d gcc/backtrace.d \
 	gcc/builtins.d gcc/deh.d gcc/emutls.d gcc/gthread.d \
 	gcc/sections/android.d gcc/sections/elf_shared.d gcc/sections/osx.d \
-	gcc/sections/package.d gcc/sections/win32.d gcc/sections/win64.d \
+	gcc/sections/package.d gcc/sections/pecoff.d \
 	gcc/unwind/arm.d gcc/unwind/arm_common.d gcc/unwind/c6x.d \
 	gcc/unwind/generic.d gcc/unwind/package.d gcc/unwind/pe.d object.d \
 	rt/aApply.d rt/aApplyR.d rt/aaA.d rt/adi.d rt/arrayassign.d \
