@@ -391,7 +391,21 @@ else version (CRuntime_Microsoft)
     ///
     struct _iobuf
     {
+      version (MinGW)
+      {
+        char* _ptr;
+        int _cnt;
+        char* _base;
+        int _flag;
+        int _file;
+        int _charbuf;
+        int _bufsiz;
+        char* _tmpfname;
+      }
+      else
+      {
         void* undefined;
+      }
     }
 
     ///
@@ -1322,7 +1336,8 @@ version (CRuntime_DigitalMars)
     ///
     pure int  fileno()(FILE* stream)   { return stream._file; }
   }
-  ///
+
+    ///
     int   _snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);
     ///
     alias _snprintf snprintf;
@@ -1331,6 +1346,25 @@ version (CRuntime_DigitalMars)
     int   _vsnprintf(scope char* s, size_t n, scope const char* format, va_list arg);
     ///
     alias _vsnprintf vsnprintf;
+
+    //
+    // Digital Mars under-the-hood C I/O functions.
+    //
+
+    ///
+    int _fputc_nlock(int c, FILE* fp);
+    ///
+    int _fputwc_nlock(int c, FILE* fp);
+    ///
+    int _fgetc_nlock(FILE* fp);
+    ///
+    int _fgetwc_nlock(FILE* fp);
+    ///
+    int __fp_lock(FILE* fp);
+    ///
+    void __fp_unlock(FILE* fp);
+    ///
+    int setmode(int fd, int mode);
 }
 else version (CRuntime_Microsoft)
 {
@@ -1346,7 +1380,10 @@ else version (CRuntime_Microsoft)
     ///
     pure int  ferror(FILE* stream);
     ///
-    pure int  fileno(FILE* stream);
+    pure int  _fileno(FILE* stream);
+    ///
+    alias fileno = _fileno;
+
   }
 
   version (MinGW)
@@ -1377,16 +1414,72 @@ else version (CRuntime_Microsoft)
     int  vsnprintf(scope char* s, size_t n, scope const char* format, va_list arg);
   }
 
-    ///
-    int _fputc_nolock(int c, FILE *fp);
-    ///
-    int _fgetc_nolock(FILE *fp);
+    //
+    // Microsoft under-the-hood C I/O functions
+    // Uses _iobuf* for the unshared version of FILE*,
+    // usable when the FILE is locked.
+    //
+
+  version (MinGW)
+  {
+    private int _filbuf(FILE*);
+    private int _flsbuf(int, FILE*);
 
     ///
-    int _lock_file(FILE *fp);
+    int _fputc_nolock()(int c, FILE* fp)
+    {
+        pragma(inline, true);
+        fp._cnt = fp._cnt - 1;
+        if (fp._cnt >= 0)
+        {
+            immutable ch = cast(char)c;
+            *fp._ptr = ch;
+            fp._ptr = fp._ptr + 1;
+            return ch & 0xFF;
+        }
+        else
+            return _flsbuf(c, fp);
+    }
     ///
-    int _unlock_file(FILE *fp);
-
+    int _fgetc_nolock()(FILE* fp)
+    {
+        pragma(inline, true);
+        fp._cnt = fp._cnt - 1;
+        if (fp._cnt >= 0)
+        {
+            immutable ch = *fp._ptr;
+            fp._ptr = fp._ptr + 1;
+            return ch & 0xFF;
+        }
+        else
+            return _filbuf(fp);
+    }
+  }
+  else
+  {
+    ///
+    int _fputc_nolock(int c, FILE* fp);
+    ///
+    int _fgetc_nolock(FILE* fp);
+  }
+    ///
+    int _fputwc_nolock(int c, FILE* fp);
+    ///
+    int _fgetwc_nolock(FILE* fp);
+    ///
+    void _lock_file(FILE* fp);
+    ///
+    void _unlock_file(FILE* fp);
+    ///
+    int _setmode(int fd, int mode);
+    ///
+    FILE* _fdopen(int fd, const (char)* mode);
+    ///
+    FILE* _wfdopen(int fd, const (wchar)* mode);
+    ///
+    int _fseeki64(FILE* stream, long offset, int origin);
+    ///
+    long _ftelli64(FILE* stream);
     ///
     intptr_t _get_osfhandle(int fd);
     ///

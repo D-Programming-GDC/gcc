@@ -233,17 +233,3 @@ AC_DEFUN([DRUNTIME_LIBRARIES_UCONTEXT],
       AC_MSG_ERROR([swapcontext required but not found]))
   fi
 ])
-
-# DRUNTIME_LIBRARIES_IO
-# -----------------------
-# Autodetect and add IO library to LIBS if necessary.
-AC_DEFUN([DRUNTIME_LIBRARIES_IO],
-[
-  AC_LANG_PUSH([C])
-  case "$druntime_cv_target_os" in
-    mingw*)
-      AC_SEARCH_LIBS([_fputc_nolock], [ucrtbase])
-      ;;
-  esac
-  AC_LANG_POP([C])
-])
