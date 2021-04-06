@@ -1,4 +1,4 @@
-// Copyright (C) 2018-2020 Free Software Foundation, Inc.
+// Copyright (C) 2018-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -27,3 +27,6 @@ test01()
   return s.rfind((const char*)nullptr);		// { dg-warning "\\\[-Wnonnull" }
   return s.rfind((const char*)nullptr, 1);	// { dg-warning "\\\[-Wnonnull" }
 }
+
+// Ignore additional diagnostic given with -Wsystem-headers:
+// { dg-prune-output "argument . null where non-null expected" }

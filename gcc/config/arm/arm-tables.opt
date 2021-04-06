@@ -2,7 +2,7 @@
 ; Generated automatically by parsecpu.awk from arm-cpus.in.
 ; Do not edit.
 
-; Copyright (C) 2011-2020 Free Software Foundation, Inc.
+; Copyright (C) 2011-2021 Free Software Foundation, Inc.
 
 ; This file is part of GCC.
 
@@ -247,13 +247,13 @@ EnumValue
 Enum(processor_type) String(cortex-a78ae) Value( TARGET_CPU_cortexa78ae)
 
 EnumValue
+Enum(processor_type) String(cortex-a78c) Value( TARGET_CPU_cortexa78c)
+
+EnumValue
 Enum(processor_type) String(cortex-x1) Value( TARGET_CPU_cortexx1)
 
 EnumValue
 Enum(processor_type) String(neoverse-n1) Value( TARGET_CPU_neoversen1)
-
-EnumValue
-Enum(processor_type) String(neoverse-n2) Value( TARGET_CPU_neoversen2)
 
 EnumValue
 Enum(processor_type) String(cortex-a75.cortex-a55) Value( TARGET_CPU_cortexa75cortexa55)
@@ -263,6 +263,9 @@ Enum(processor_type) String(cortex-a76.cortex-a55) Value( TARGET_CPU_cortexa76co
 
 EnumValue
 Enum(processor_type) String(neoverse-v1) Value( TARGET_CPU_neoversev1)
+
+EnumValue
+Enum(processor_type) String(neoverse-n2) Value( TARGET_CPU_neoversen2)
 
 EnumValue
 Enum(processor_type) String(cortex-m23) Value( TARGET_CPU_cortexm23)

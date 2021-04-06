@@ -1,5 +1,5 @@
 /* JSON trees
-   Copyright (C) 2017-2020 Free Software Foundation, Inc.
+   Copyright (C) 2017-2021 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -70,7 +70,10 @@ object::print (pretty_printer *pp) const
 	pp_string (pp, ", ");
       const char *key = const_cast <char *>((*it).first);
       value *value = (*it).second;
-      pp_printf (pp, "\"%s\": ", key); // FIXME: escaping?
+      pp_doublequote (pp);
+      pp_string (pp, key); // FIXME: escaping?
+      pp_doublequote (pp);
+      pp_string (pp, ": ");
       value->print (pp);
     }
   pp_character (pp, '}');

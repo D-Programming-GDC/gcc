@@ -1,6 +1,6 @@
 /* Offload image generation tool for PTX.
 
-   Copyright (C) 2014-2020 Free Software Foundation, Inc.
+   Copyright (C) 2014-2021 Free Software Foundation, Inc.
 
    Contributed by Nathan Sidwell <nathan@codesourcery.com> and
    Bernd Schmidt <bernds@codesourcery.com>.
@@ -399,7 +399,8 @@ compile_native (const char *infile, const char *outfile, const char *compiler,
   obstack_ptr_grow (&argv_obstack, NULL);
 
   const char **new_argv = XOBFINISH (&argv_obstack, const char **);
-  fork_execute (new_argv[0], CONST_CAST (char **, new_argv), true);
+  fork_execute (new_argv[0], CONST_CAST (char **, new_argv), true,
+		".gccnative_args");
   obstack_free (&argv_obstack, NULL);
 }
 
@@ -582,7 +583,8 @@ main (int argc, char **argv)
       unsetenv ("COMPILER_PATH");
       unsetenv ("LIBRARY_PATH");
 
-      fork_execute (new_argv[0], CONST_CAST (char **, new_argv), true);
+      fork_execute (new_argv[0], CONST_CAST (char **, new_argv), true,
+		    ".gcc_args");
       obstack_free (&argv_obstack, NULL);
 
       xputenv (concat ("GCC_EXEC_PREFIX=", execpath, NULL));
@@ -594,6 +596,7 @@ main (int argc, char **argv)
 	fatal_error (input_location, "cannot open intermediate ptx file");
 
       process (in, out);
+      fclose (in);
     }
 
   fclose (out);

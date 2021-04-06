@@ -1,5 +1,5 @@
 /* IPA predicates.
-   Copyright (C) 2003-2020 Free Software Foundation, Inc.
+   Copyright (C) 2003-2021 Free Software Foundation, Inc.
    Contributed by Jan Hubicka
 
 This file is part of GCC.
@@ -508,7 +508,7 @@ predicate::remap_after_inlining (class ipa_fn_summary *info,
 				 class ipa_node_params *params_summary,
 				 class ipa_fn_summary *callee_info,
 				 vec<int> operand_map,
-				 vec<int> offset_map,
+				 vec<HOST_WIDE_INT> offset_map,
 				 clause_t possible_truths,
 				 const predicate &toplev_predicate)
 {

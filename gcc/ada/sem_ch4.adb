@@ -976,7 +976,7 @@ package body Sem_Ch4 is
       Nam     : Node_Id;
       X       : Interp_Index;
       It      : Interp;
-      Nam_Ent : Entity_Id;
+      Nam_Ent : Entity_Id := Empty;
       Success : Boolean := False;
 
       Deref : Boolean := False;
@@ -1254,6 +1254,25 @@ package body Sem_Ch4 is
 
          Analyze_One_Call (N, Nam_Ent, True, Success);
 
+         --  If the nonoverloaded interpretation is a call to an abstract
+         --  nondispatching operation, then flag an error and return.
+
+         --  Should this be incorporated in Remove_Abstract_Operations (which
+         --  currently only deals with cases where the name is overloaded)? ???
+
+         if Is_Overloadable (Nam_Ent)
+           and then Is_Abstract_Subprogram (Nam_Ent)
+           and then not Is_Dispatching_Operation (Nam_Ent)
+         then
+            Set_Etype (N, Any_Type);
+
+            Error_Msg_Sloc := Sloc (Nam_Ent);
+            Error_Msg_NE
+              ("cannot call abstract operation& declared#", N, Nam_Ent);
+
+            return;
+         end if;
+
          --  If this is an indirect call, the return type of the access_to
          --  subprogram may be an incomplete type. At the point of the call,
          --  use the full type if available, and at the same time update the
@@ -1450,6 +1469,46 @@ package body Sem_Ch4 is
          end if;
 
          End_Interp_List;
+      end if;
+
+      --  Check the accessibility level for actuals for explicitly aliased
+      --  formals.
+
+      if Nkind (N) = N_Function_Call
+        and then Comes_From_Source (N)
+        and then Present (Nam_Ent)
+        and then In_Return_Value (N)
+      then
+         declare
+            Form : Node_Id;
+            Act  : Node_Id;
+         begin
+            Act  := First_Actual (N);
+            Form := First_Formal (Nam_Ent);
+
+            while Present (Form) and then Present (Act) loop
+               --  Check whether the formal is aliased and if the accessibility
+               --  level of the actual is deeper than the accessibility level
+               --  of the enclosing subprogam to which the current return
+               --  statement applies.
+
+               --  Should we be checking Is_Entity_Name on Act? Won't this miss
+               --  other cases ???
+
+               if Is_Explicitly_Aliased (Form)
+                 and then Is_Entity_Name (Act)
+                 and then Static_Accessibility_Level
+                            (Act, Zero_On_Dynamic_Level)
+                              > Subprogram_Access_Level (Current_Subprogram)
+               then
+                  Error_Msg_N ("actual for explicitly aliased formal is too"
+                                & " short lived", Act);
+               end if;
+
+               Next_Formal (Form);
+               Next_Actual (Act);
+            end loop;
+         end;
       end if;
 
       if Ada_Version >= Ada_2012 then
@@ -2238,7 +2297,7 @@ package body Sem_Ch4 is
                end if;
 
                if Aliased_Present (A) then
-                  Error_Msg_N ("aliased not allowed in declare_expression", A);
+                  Error_Msg_N ("ALIASED not allowed in declare_expression", A);
                end if;
 
                if Constant_Present (A)
@@ -2390,7 +2449,7 @@ package body Sem_Ch4 is
 
             if Etype (N) = Any_Type then
                Error_Msg_N
-                 ("type incompatible with that of `THEN` expression",
+                 ("type incompatible with that of THEN expression",
                   Else_Expr);
                return;
             end if;
@@ -3136,7 +3195,7 @@ package body Sem_Ch4 is
    begin
       --  A special warning check, if we have an expression of the form:
       --    expr mod 2 * literal
-      --  where literal is 64 or less, then probably what was meant was
+      --  where literal is 128 or less, then probably what was meant was
       --    expr mod 2 ** literal
       --  so issue an appropriate warning.
 
@@ -3145,7 +3204,7 @@ package body Sem_Ch4 is
         and then Intval (Right_Opnd (N)) = Uint_2
         and then Nkind (Parent (N)) = N_Op_Multiply
         and then Nkind (Right_Opnd (Parent (N))) = N_Integer_Literal
-        and then Intval (Right_Opnd (Parent (N))) <= Uint_64
+        and then Intval (Right_Opnd (Parent (N))) <= Uint_128
       then
          Error_Msg_N
            ("suspicious MOD value, was '*'* intended'??M?", Parent (N));
@@ -3355,7 +3414,7 @@ package body Sem_Ch4 is
          Success := True;
 
          --  If the prefix of the call is a name, indicate the entity
-         --  being called. If it is not a name,  it is an expression that
+         --  being called. If it is not a name, it is an expression that
          --  denotes an access to subprogram or else an entry or family. In
          --  the latter case, the name is a selected component, and the entity
          --  being called is noted on the selector.
@@ -4220,6 +4279,7 @@ package body Sem_Ch4 is
 
       if Warn_On_Suspicious_Contract
         and then not Referenced (Loop_Id, Cond)
+        and then not Is_Internal_Name (Chars (Loop_Id))
       then
          --  Generating C, this check causes spurious warnings on inlined
          --  postconditions; we can safely disable it because this check
@@ -5395,7 +5455,7 @@ package body Sem_Ch4 is
                      Apply_Compile_Time_Constraint_Error
                        (N, "component not present in }??",
                         CE_Discriminant_Check_Failed,
-                        Ent => Prefix_Type, Rep => False);
+                        Ent => Prefix_Type);
 
                      Set_Raises_Constraint_Error (N);
                      return;
@@ -5640,7 +5700,7 @@ package body Sem_Ch4 is
          Error_Msg_N ("\use qualified expression instead", N);
 
       elsif Nkind (Expr) = N_Allocator then
-         Error_Msg_N ("argument of conversion cannot be an allocator", N);
+         Error_Msg_N ("argument of conversion cannot be allocator", N);
          Error_Msg_N ("\use qualified expression instead", N);
 
       elsif Nkind (Expr) = N_String_Literal then
@@ -5651,8 +5711,8 @@ package body Sem_Ch4 is
          if Ada_Version = Ada_83 then
             Resolve (Expr, Typ);
          else
-            Error_Msg_N ("argument of conversion cannot be character literal",
-              N);
+            Error_Msg_N
+              ("argument of conversion cannot be character literal", N);
             Error_Msg_N ("\use qualified expression instead", N);
          end if;
 
@@ -5661,7 +5721,8 @@ package body Sem_Ch4 is
                                         | Name_Unchecked_Access
                                         | Name_Unrestricted_Access
       then
-         Error_Msg_N ("argument of conversion cannot be access", N);
+         Error_Msg_N
+           ("argument of conversion cannot be access attribute", N);
          Error_Msg_N ("\use qualified expression instead", N);
       end if;
 
@@ -8028,8 +8089,7 @@ package body Sem_Ch4 is
             --  resolution does not depend on the type of the parameter that
             --  includes the indexing operation.
 
-            elsif Nkind (Parent (Par)) in
-                    N_Function_Call | N_Procedure_Call_Statement
+            elsif Nkind (Parent (Par)) in N_Subprogram_Call
               and then Is_Entity_Name (Name (Parent (Par)))
             then
                declare
@@ -8990,16 +9050,20 @@ package body Sem_Ch4 is
             Rewrite (First_Actual, Obj);
          end if;
 
-         --  The operation is obtained from the dispatch table and not by
-         --  visibility, and may be declared in a unit that is not explicitly
-         --  referenced in the source, but is nevertheless required in the
-         --  context of the current unit. Indicate that operation and its scope
-         --  are referenced, to prevent spurious and misleading warnings. If
-         --  the operation is overloaded, all primitives are in the same scope
-         --  and we can use any of them.
+         if In_Extended_Main_Source_Unit (Current_Scope) then
+            --  The operation is obtained from the dispatch table and not by
+            --  visibility, and may be declared in a unit that is not
+            --  explicitly referenced in the source, but is nevertheless
+            --  required in the context of the current unit. Indicate that
+            --  operation and its scope are referenced, to prevent spurious and
+            --  misleading warnings. If the operation is overloaded, all
+            --  primitives are in the same scope and we can use any of them.
+            --  Don't do that outside the main unit since otherwise this will
+            --  e.g. prevent the detection of some unused with clauses.
 
-         Set_Referenced (Entity (Subprog), True);
-         Set_Referenced (Scope (Entity (Subprog)), True);
+            Set_Referenced (Entity (Subprog), True);
+            Set_Referenced (Scope (Entity (Subprog)), True);
+         end if;
 
          Rewrite (Node_To_Replace, Call_Node);
 
@@ -9338,6 +9402,7 @@ package body Sem_Ch4 is
                         Error_Msg_NE ("ambiguous call to&", N, Hom);
                         Report_Ambiguity (Matching_Op);
                         Report_Ambiguity (Hom);
+                        Check_Ambiguous_Aggregate (New_Call_Node);
                         Error := True;
                         return;
                      end if;
@@ -9960,6 +10025,7 @@ package body Sem_Ch4 is
                      Error_Msg_NE ("ambiguous call to&", N, Prim_Op);
                      Report_Ambiguity (Matching_Op);
                      Report_Ambiguity (Prim_Op);
+                     Check_Ambiguous_Aggregate (Call_Node);
                      return True;
                   end if;
                end if;

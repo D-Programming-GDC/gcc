@@ -1,5 +1,5 @@
 /* Profile counter container type.
-   Copyright (C) 2017-2020 Free Software Foundation, Inc.
+   Copyright (C) 2017-2021 Free Software Foundation, Inc.
    Contributed by Jan Hubicka
 
 This file is part of GCC.
@@ -270,8 +270,8 @@ profile_count::to_frequency (struct function *fun) const
     return BB_FREQ_MAX;
   if (*this == zero ())
     return 0;
-  gcc_assert (REG_BR_PROB_BASE == BB_FREQ_MAX
-	      && fun->cfg->count_max.initialized_p ());
+  STATIC_ASSERT (REG_BR_PROB_BASE == BB_FREQ_MAX);
+  gcc_assert (fun->cfg->count_max.initialized_p ());
   profile_probability prob = probability_in (fun->cfg->count_max);
   if (!prob.initialized_p ())
     return REG_BR_PROB_BASE;

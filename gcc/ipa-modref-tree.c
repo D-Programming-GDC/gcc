@@ -1,5 +1,5 @@
 /* Data structure for the modref pass.
-   Copyright (C) 2020 Free Software Foundation, Inc.
+   Copyright (C) 2020-2021 Free Software Foundation, Inc.
    Contributed by David Cepelik and Jan Hubicka
 
 This file is part of GCC.
@@ -35,7 +35,7 @@ test_insert_search_collapse ()
 {
   modref_base_node<alias_set_type> *base_node;
   modref_ref_node<alias_set_type> *ref_node;
-  modref_access_node a = { -1 };
+  modref_access_node a = unspecified_modref_access_node;
 
   modref_tree<alias_set_type> *t = new modref_tree<alias_set_type>(1, 2, 2);
   ASSERT_FALSE (t->every_base);
@@ -111,6 +111,8 @@ test_insert_search_collapse ()
   ASSERT_TRUE (t->every_base);
   ASSERT_EQ (t->bases, NULL);
   ASSERT_EQ (t->search (1), NULL);
+
+  delete t;
 }
 
 static void
@@ -118,7 +120,7 @@ test_merge ()
 {
   modref_tree<alias_set_type> *t1, *t2;
   modref_base_node<alias_set_type> *base_node;
-  modref_access_node a = { -1 };
+  modref_access_node a = unspecified_modref_access_node;
 
   t1 = new modref_tree<alias_set_type>(3, 4, 1);
   t1->insert (1, 1, a);
@@ -155,6 +157,9 @@ test_merge ()
   base_node = t1->search (3);
   ASSERT_EQ (base_node->refs, NULL);
   ASSERT_TRUE (base_node->every_ref);
+
+  delete t1;
+  delete t2;
 }
 
 

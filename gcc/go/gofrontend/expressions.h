@@ -549,6 +549,16 @@ class Expression
   location() const
   { return this->location_; }
 
+  // Set the location of an expression and all its subexpressions.
+  // This is used for const declarations where the expression is
+  // copied from an earlier declaration.
+  void
+  set_location(Location loc);
+
+  // For set_location.  This should really be a local class in
+  // Expression, but it needs types defined in gogo.h.
+  friend class Set_location;
+
   // Return whether this is a constant expression.
   bool
   is_constant() const
@@ -906,6 +916,11 @@ class Expression
   bool
   is_local_variable() const;
 
+  // Return true if multiple evaluations of this expression are OK.
+  // This is true for simple variable references and constants.
+  bool
+  is_multi_eval_safe();
+
   // Return true if two expressions refer to the same variable or
   // struct field.
   static bool
@@ -1236,6 +1251,14 @@ class Expression
   // Child class implements dumping to a dump context.
   virtual void
   do_dump_expression(Ast_dump_context*) const = 0;
+
+  // Start exporting a type conversion for a constant, if needed.
+  static bool
+  export_constant_type(Export_function_body*, Type*);
+
+  // Finish exporting a type conversion for a constant.
+  static void
+  finish_export_constant_type(Export_function_body*, bool);
 
   // Varargs lowering creates a slice object (unnamed compiler temp)
   // to contain the variable length collection of values. The enum
@@ -2318,8 +2341,8 @@ class Call_expression : public Expression
       fn_(fn), args_(args), type_(NULL), call_(NULL), call_temp_(NULL)
     , expected_result_count_(0), is_varargs_(is_varargs),
       varargs_are_lowered_(false), types_are_determined_(false),
-      is_deferred_(false), is_concurrent_(false), issued_error_(false),
-      is_multi_value_arg_(false), is_flattened_(false)
+      is_deferred_(false), is_concurrent_(false), is_equal_function_(false),
+      issued_error_(false), is_multi_value_arg_(false), is_flattened_(false)
   { }
 
   // The function to call.
@@ -2399,6 +2422,11 @@ class Call_expression : public Expression
   void
   set_is_concurrent()
   { this->is_concurrent_ = true; }
+
+  // Note that this is a call to a generated equality function.
+  void
+  set_is_equal_function()
+  { this->is_equal_function_ = true; }
 
   // We have found an error with this call expression; return true if
   // we should report it.
@@ -2537,6 +2565,8 @@ class Call_expression : public Expression
   bool is_deferred_;
   // True if the call is an argument to a go statement.
   bool is_concurrent_;
+  // True if this is a call to a generated equality function.
+  bool is_equal_function_;
   // True if we reported an error about a mismatch between call
   // results and uses.  This is to avoid producing multiple errors
   // when there are multiple Call_result_expressions.

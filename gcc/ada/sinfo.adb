@@ -13,24 +13,15 @@
 -- ware  Foundation;  either version 3,  or (at your option) any later ver- --
 -- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
 -- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
--- or FITNESS FOR A PARTICULAR PURPOSE.                                     --
---                                                                          --
--- As a special exception under Section 7 of GPL version 3, you are granted --
--- additional permissions described in the GCC Runtime Library Exception,   --
--- version 3.1, as published by the Free Software Foundation.               --
---                                                                          --
--- You should have received a copy of the GNU General Public License and    --
--- a copy of the GCC Runtime Library Exception along with this program;     --
--- see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see    --
--- <http://www.gnu.org/licenses/>.                                          --
+-- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+-- for  more details.  You should have  received  a copy of the GNU General --
+-- Public License  distributed with GNAT; see file COPYING3.  If not, go to --
+-- http://www.gnu.org/licenses for a complete copy of the license.          --
 --                                                                          --
 -- GNAT was originally developed  by the GNAT team at  New York University. --
 -- Extensive contributions were provided by Ada Core Technologies Inc.      --
 --                                                                          --
 ------------------------------------------------------------------------------
-
-pragma Style_Checks (All_Checks);
---  No subprogram ordering check, due to logical grouping
 
 with Atree; use Atree;
 
@@ -371,7 +362,8 @@ package body Sinfo is
         or else NT (N).Nkind = N_Formal_Concrete_Subprogram_Declaration
         or else NT (N).Nkind = N_Formal_Package_Declaration
         or else NT (N).Nkind = N_Generic_Association
-        or else NT (N).Nkind = N_Iterated_Component_Association);
+        or else NT (N).Nkind = N_Iterated_Component_Association
+        or else NT (N).Nkind = N_Iterated_Element_Association);
       return Flag15 (N);
    end Box_Present;
 
@@ -3543,6 +3535,14 @@ package body Sinfo is
       return Flag2 (N);
    end Was_Attribute_Reference;
 
+   function Was_Default_Init_Box_Association
+     (N : Node_Id) return Boolean is
+   begin
+      pragma Assert (False
+        or else NT (N).Nkind = N_Component_Association);
+      return Flag14 (N);
+   end Was_Default_Init_Box_Association;
+
    function Was_Expression_Function
       (N : Node_Id) return Boolean is
    begin
@@ -3876,7 +3876,8 @@ package body Sinfo is
         or else NT (N).Nkind = N_Formal_Concrete_Subprogram_Declaration
         or else NT (N).Nkind = N_Formal_Package_Declaration
         or else NT (N).Nkind = N_Generic_Association
-        or else NT (N).Nkind = N_Iterated_Component_Association);
+        or else NT (N).Nkind = N_Iterated_Component_Association
+        or else NT (N).Nkind = N_Iterated_Element_Association);
       Set_Flag15 (N, Val);
    end Set_Box_Present;
 
@@ -7042,6 +7043,14 @@ package body Sinfo is
         or else NT (N).Nkind = N_Subprogram_Body);
       Set_Flag2 (N, Val);
    end Set_Was_Attribute_Reference;
+
+   procedure Set_Was_Default_Init_Box_Association
+     (N : Node_Id; Val : Boolean := True) is
+   begin
+      pragma Assert (False
+        or else NT (N).Nkind = N_Component_Association);
+      Set_Flag14 (N, Val);
+   end Set_Was_Default_Init_Box_Association;
 
    procedure Set_Was_Expression_Function
       (N : Node_Id; Val : Boolean := True) is

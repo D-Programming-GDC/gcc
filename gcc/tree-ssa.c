@@ -1,5 +1,5 @@
 /* Miscellaneous SSA utility functions.
-   Copyright (C) 2001-2020 Free Software Foundation, Inc.
+   Copyright (C) 2001-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -607,7 +607,7 @@ release_defs_bitset (bitmap toremove)
 		}
 
 	      if (!remove_now)
-		BREAK_FROM_IMM_USE_STMT (uit);
+		break;
 	    }
 
 	  if (remove_now)
@@ -987,6 +987,12 @@ verify_phi_args (gphi *phi, basic_block bb, basic_block *definition_block)
 	  err = true;
 	}
 
+      if ((e->flags & EDGE_ABNORMAL) && TREE_CODE (op) != SSA_NAME)
+	{
+	  error ("PHI argument on abnormal edge is not SSA_NAME");
+	  err = true;
+	}
+
       if (TREE_CODE (op) == SSA_NAME)
 	{
 	  err = verify_ssa_name (op, virtual_operand_p (gimple_phi_result (phi)));
@@ -1212,15 +1218,16 @@ err:
 #  pragma GCC diagnostic pop
 #endif
 
-/* Initialize global DFA and SSA structures.  */
+/* Initialize global DFA and SSA structures.
+   If SIZE is non-zero allocated ssa names array of a given size.  */
 
 void
-init_tree_ssa (struct function *fn)
+init_tree_ssa (struct function *fn, int size)
 {
   fn->gimple_df = ggc_cleared_alloc<gimple_df> ();
   fn->gimple_df->default_defs = hash_table<ssa_name_hasher>::create_ggc (20);
   pt_solution_reset (&fn->gimple_df->escaped);
-  init_ssanames (fn, 0);
+  init_ssanames (fn, size);
 }
 
 /* Deallocate memory associated with SSA data structures for FNDECL.  */

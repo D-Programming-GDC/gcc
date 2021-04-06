@@ -1,5 +1,5 @@
 /* Library interface to C++ front end.
-   Copyright (C) 2014-2020 Free Software Foundation, Inc.
+   Copyright (C) 2014-2021 Free Software Foundation, Inc.
 
    This file is part of GCC.  As it interacts with GDB through libcc1,
    they all become a single program as regards the GNU GPL's requirements.
@@ -353,8 +353,7 @@ supplement_binding (cxx_binding *binding, tree decl)
 	   /* If TARGET_BVAL is anticipated but has not yet been
 	      declared, pretend it is not there at all.  */
 	   || (TREE_CODE (target_bval) == FUNCTION_DECL
-	       && DECL_ANTICIPATED (target_bval)
-	       && DECL_BUILTIN_P (target_bval)))
+	       && DECL_IS_UNDECLARED_BUILTIN (target_bval)))
     binding->value = decl;
   else if (TREE_CODE (target_bval) == TYPE_DECL
 	   && DECL_ARTIFICIAL (target_bval)
@@ -1650,7 +1649,7 @@ plugin_add_friend (cc1_plugin::connection * /* self */,
     make_friend_class (type, TREE_TYPE (decl), true);
   else
     {
-      DECL_FRIEND_P (decl) = true;
+      DECL_UNIQUE_FRIEND_P (decl) = true;
       add_friend (type, decl, true);
     }
 
@@ -2807,7 +2806,7 @@ plugin_build_unary_expr (cc1_plugin::connection *self,
     case SIZEOF_EXPR:
     case ALIGNOF_EXPR:
       result = cxx_sizeof_or_alignof_expr (input_location,
-					   op0, opcode, true);
+					   op0, opcode, true, true);
       break;
 
     case DELETE_EXPR:
@@ -3643,7 +3642,7 @@ plugin_add_static_assert (cc1_plugin::connection *self,
 
   bool member_p = at_class_scope_p ();
 
-  finish_static_assert (condition, message, loc, member_p);
+  finish_static_assert (condition, message, loc, member_p, false);
 
   return 1;
 }

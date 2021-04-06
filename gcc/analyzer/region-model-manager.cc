@@ -1,5 +1,5 @@
 /* Consolidation of svalues and regions.
-   Copyright (C) 2020 Free Software Foundation, Inc.
+   Copyright (C) 2020-2021 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -248,6 +248,10 @@ region_model_manager::get_or_create_initial_value (const region *reg)
       return get_or_create_cast (cast_reg->get_type (),
 				 get_or_create_initial_value (original_reg));
     }
+
+  /* INIT_VAL (*UNKNOWN_PTR) -> UNKNOWN_VAL.  */
+  if (reg->symbolic_for_unknown_ptr_p ())
+    return get_or_create_unknown_svalue (reg->get_type ());
 
   if (initial_svalue **slot = m_initial_values_map.get (reg))
     return *slot;
@@ -815,6 +819,15 @@ region_model_manager::get_field_region (const region *parent, tree field)
 {
   gcc_assert (TREE_CODE (field) == FIELD_DECL);
 
+  /* (*UNKNOWN_PTR).field is (*UNKNOWN_PTR_OF_&FIELD_TYPE).  */
+  if (parent->symbolic_for_unknown_ptr_p ())
+    {
+      tree ptr_to_field_type = build_pointer_type (TREE_TYPE (field));
+      const svalue *unknown_ptr_to_field
+	= get_or_create_unknown_svalue (ptr_to_field_type);
+      return get_symbolic_region (unknown_ptr_to_field);
+    }
+
   field_region::key_t key (parent, field);
   if (field_region *reg = m_field_regions.get (key))
     return reg;
@@ -1033,13 +1046,19 @@ log_uniq_map (logger *logger, bool show_objs, const char *title,
 	      const hash_map<K, T*> &uniq_map)
 {
   logger->log ("  # %s: %li", title, uniq_map.elements ());
-  if (show_objs)
-    for (typename hash_map<K, T*>::iterator iter = uniq_map.begin ();
-	 iter != uniq_map.end (); ++iter)
-      {
-	T *managed_obj = (*iter).second;
-	log_managed_object<T> (logger, managed_obj);
-      }
+  if (!show_objs)
+    return;
+  auto_vec<const T *> vec_objs (uniq_map.elements ());
+  for (typename hash_map<K, T*>::iterator iter = uniq_map.begin ();
+       iter != uniq_map.end (); ++iter)
+    vec_objs.quick_push ((*iter).second);
+
+  vec_objs.qsort (T::cmp_ptr_ptr);
+
+  unsigned i;
+  const T *obj;
+  FOR_EACH_VEC_ELT (vec_objs, i, obj)
+    log_managed_object<T> (logger, obj);
 }
 
 /* Dump the number of objects that were managed by MAP to LOGGER.
@@ -1051,13 +1070,20 @@ log_uniq_map (logger *logger, bool show_objs, const char *title,
 	      const consolidation_map<T> &map)
 {
   logger->log ("  # %s: %li", title, map.elements ());
-  if (show_objs)
-    for (typename consolidation_map<T>::iterator iter = map.begin ();
-	 iter != map.end (); ++iter)
-      {
-	T *managed_obj = (*iter).second;
-	log_managed_object<T> (logger, managed_obj);
-      }
+  if (!show_objs)
+    return;
+
+  auto_vec<const T *> vec_objs (map.elements ());
+  for (typename consolidation_map<T>::iterator iter = map.begin ();
+       iter != map.end (); ++iter)
+    vec_objs.quick_push ((*iter).second);
+
+  vec_objs.qsort (T::cmp_ptr_ptr);
+
+  unsigned i;
+  const T *obj;
+  FOR_EACH_VEC_ELT (vec_objs, i, obj)
+    log_managed_object<T> (logger, obj);
 }
 
 /* Dump the number of objects of each class that were managed by this

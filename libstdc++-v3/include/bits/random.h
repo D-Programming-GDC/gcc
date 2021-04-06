@@ -1,6 +1,6 @@
 // random number generation -*- C++ -*-
 
-// Copyright (C) 2009-2020 Free Software Foundation, Inc.
+// Copyright (C) 2009-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -146,7 +146,16 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     template<typename _Tp, _Tp __m, _Tp __a = 1, _Tp __c = 0>
       inline _Tp
       __mod(_Tp __x)
-      { return _Mod<_Tp, __m, __a, __c>::__calc(__x); }
+      {
+	if _GLIBCXX17_CONSTEXPR (__a == 0)
+	  return __c;
+	else
+	  {
+	    // _Mod must not be instantiated with a == 0
+	    constexpr _Tp __a1 = __a ? __a : 1;
+	    return _Mod<_Tp, __m, __a1, __c>::__calc(__x);
+	  }
+      }
 
     /*
      * An adaptor class for converting the output of any Generator into
@@ -1090,7 +1099,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
   /**
    * Produces random numbers by combining random numbers from some base
-   * engine to produce random numbers with a specifies number of bits @p __w.
+   * engine to produce random numbers with a specified number of bits @p __w.
    */
   template<typename _RandomNumberEngine, size_t __w, typename _UIntType>
     class independent_bits_engine
@@ -1307,9 +1316,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
 
   /**
-   * @brief Produces random numbers by combining random numbers from some
-   * base engine to produce random numbers with a specifies number of bits
-   * @p __k.
+   * @brief Produces random numbers by reordering random numbers from some
+   * base engine.
+   *
+   * The values from the base engine are stored in a sequence of size @p __k
+   * and shuffled by an algorithm that depends on those values.
    */
   template<typename _RandomNumberEngine, size_t __k>
     class shuffle_order_engine
@@ -2013,12 +2024,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       explicit
       normal_distribution(result_type __mean,
 			  result_type __stddev = result_type(1))
-      : _M_param(__mean, __stddev), _M_saved_available(false)
+      : _M_param(__mean, __stddev)
       { }
 
       explicit
       normal_distribution(const param_type& __p)
-      : _M_param(__p), _M_saved_available(false)
+      : _M_param(__p)
       { }
 
       /**
@@ -2155,8 +2166,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 			const param_type& __p);
 
       param_type  _M_param;
-      result_type _M_saved;
-      bool        _M_saved_available;
+      result_type _M_saved = 0;
+      bool        _M_saved_available = false;
     };
 
   /**
@@ -6063,7 +6074,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
     { }
 
     template<typename _IntType>
-      seed_seq(std::initializer_list<_IntType> il);
+      seed_seq(std::initializer_list<_IntType> __il);
 
     template<typename _InputIterator>
       seed_seq(_InputIterator __begin, _InputIterator __end);

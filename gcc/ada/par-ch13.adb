@@ -23,6 +23,8 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
+with Rident;    use Rident;
+with Restrict; use Restrict;
 pragma Style_Checks (All_Checks);
 --  Turn off subprogram body ordering check. Subprograms are in order
 --  by RM section rather than alphabetical
@@ -153,9 +155,8 @@ package body Ch13 is
             Result := True;
          else
             Scan; -- past identifier
-            Result := Token = Tok_Arrow or else
-                      Token = Tok_Comma or else
-                      Token = Tok_Semicolon;
+            Result := Token in
+              Tok_Arrow | Tok_Comma | Tok_Is | Tok_Semicolon | Tok_Right_Paren;
          end if;
 
       --  If earlier than Ada 2012, check for valid aspect identifier (possibly
@@ -178,7 +179,7 @@ package body Ch13 is
             --  defaulted True value. Further checks when analyzing aspect
             --  specification, which may include further aspects.
 
-            elsif Token = Tok_Comma or else Token = Tok_Semicolon then
+            elsif Token in Tok_Comma | Tok_Semicolon then
                Result := True;
 
             elsif Token = Tok_Apostrophe then
@@ -265,19 +266,28 @@ package body Ch13 is
          --  The aspect mark is not recognized
 
          if A_Id = No_Aspect then
-            Error_Msg_N ("& is not a valid aspect identifier", Token_Node);
-            OK := False;
+            declare
+               Msg_Issued : Boolean := False;
+            begin
+               Check_Restriction (Msg_Issued, No_Unrecognized_Aspects, Aspect);
+               if not Msg_Issued then
+                  Error_Msg_Warn := not Debug_Flag_2;
+                  Error_Msg_N
+                    ("<<& is not a valid aspect identifier", Token_Node);
+                  OK := False;
 
-            --  Check bad spelling
+                  --  Check bad spelling
 
-            for J in Aspect_Id_Exclude_No_Aspect loop
-               if Is_Bad_Spelling_Of (Token_Name, Aspect_Names (J)) then
-                  Error_Msg_Name_1 := Aspect_Names (J);
-                  Error_Msg_N -- CODEFIX
-                    ("\possible misspelling of%", Token_Node);
-                  exit;
+                  for J in Aspect_Id_Exclude_No_Aspect loop
+                     if Is_Bad_Spelling_Of (Token_Name, Aspect_Names (J)) then
+                        Error_Msg_Name_1 := Aspect_Names (J);
+                        Error_Msg_N -- CODEFIX
+                          ("\<<possible misspelling of%", Token_Node);
+                        exit;
+                     end if;
+                  end loop;
                end if;
-            end loop;
+            end;
 
             Scan; -- past incorrect identifier
 
@@ -957,7 +967,7 @@ package body Ch13 is
          --  If Decl is Error, we ignore the aspects, and issue a message
 
          elsif Decl = Error
-            or else not Permits_Aspect_Specifications (Decl)
+           or else not Permits_Aspect_Specifications (Decl)
          then
             Error_Msg ("aspect specifications not allowed here", Ptr);
 

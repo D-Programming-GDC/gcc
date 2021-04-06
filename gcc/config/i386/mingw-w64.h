@@ -1,7 +1,7 @@
 /* Operating system specific defines to be used when targeting GCC for
    hosting on Windows 32/64 via mingw-w64 runtime, using GNU tools and
    the Windows API Library.
-   Copyright (C) 2009-2020 Free Software Foundation, Inc.
+   Copyright (C) 2009-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -98,3 +98,9 @@ along with GCC; see the file COPYING3.  If not see
   %{shared|mdll: " SUB_LINK_ENTRY " --enable-auto-image-base} \
   " LINK_SPEC_LARGE_ADDR_AWARE "\
   %(shared_libgcc_undefs)"
+
+/* Enable sincos optimization, overriding cygming.h.  sincos, sincosf
+   and sincosl functions are available on mingw-w64, but not on the
+   original mingw32.  */
+#undef TARGET_LIBC_HAS_FUNCTION
+#define TARGET_LIBC_HAS_FUNCTION gnu_libc_has_function

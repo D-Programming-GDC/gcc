@@ -13,16 +13,10 @@
 -- ware  Foundation;  either version 3,  or (at your option) any later ver- --
 -- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
 -- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
--- or FITNESS FOR A PARTICULAR PURPOSE.                                     --
---                                                                          --
--- As a special exception under Section 7 of GPL version 3, you are granted --
--- additional permissions described in the GCC Runtime Library Exception,   --
--- version 3.1, as published by the Free Software Foundation.               --
---                                                                          --
--- You should have received a copy of the GNU General Public License and    --
--- a copy of the GCC Runtime Library Exception along with this program;     --
--- see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see    --
--- <http://www.gnu.org/licenses/>.                                          --
+-- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+-- for  more details.  You should have  received  a copy of the GNU General --
+-- Public License  distributed with GNAT; see file COPYING3.  If not, go to --
+-- http://www.gnu.org/licenses for a complete copy of the license.          --
 --                                                                          --
 -- GNAT was originally developed  by the GNAT team at  New York University. --
 -- Extensive contributions were provided by Ada Core Technologies Inc.      --
@@ -50,6 +44,7 @@ package body Aspects is
       Aspect_Discard_Names           => True,
       Aspect_Independent_Components  => True,
       Aspect_Iterator_Element        => True,
+      Aspect_Stable_Properties       => True,
       Aspect_Type_Invariant          => True,
       Aspect_Unchecked_Union         => True,
       Aspect_Variable_Indexing       => True,
@@ -191,7 +186,11 @@ package body Aspects is
    -- Find_Aspect --
    -----------------
 
-   function Find_Aspect (Id : Entity_Id; A : Aspect_Id) return Node_Id is
+   function Find_Aspect
+     (Id            : Entity_Id;
+      A             : Aspect_Id;
+      Class_Present : Boolean := False) return Node_Id
+   is
       Decl  : Node_Id;
       Item  : Node_Id;
       Owner : Entity_Id;
@@ -225,6 +224,7 @@ package body Aspects is
       while Present (Item) loop
          if Nkind (Item) = N_Aspect_Specification
            and then Get_Aspect_Id (Item) = A
+           and then Class_Present = Sinfo.Class_Present (Item)
          then
             return Item;
          end if;
@@ -247,7 +247,9 @@ package body Aspects is
       if Permits_Aspect_Specifications (Decl) then
          Spec := First (Aspect_Specifications (Decl));
          while Present (Spec) loop
-            if Get_Aspect_Id (Spec) = A then
+            if Get_Aspect_Id (Spec) = A
+              and then Class_Present = Sinfo.Class_Present (Spec)
+            then
                return Spec;
             end if;
 
@@ -266,10 +268,12 @@ package body Aspects is
    --------------------------
 
    function Find_Value_Of_Aspect
-     (Id : Entity_Id;
-      A  : Aspect_Id) return Node_Id
+     (Id            : Entity_Id;
+      A             : Aspect_Id;
+      Class_Present : Boolean := False) return Node_Id
    is
-      Spec : constant Node_Id := Find_Aspect (Id, A);
+      Spec : constant Node_Id := Find_Aspect (Id, A,
+                                              Class_Present => Class_Present);
 
    begin
       if Present (Spec) then
@@ -302,9 +306,13 @@ package body Aspects is
    -- Has_Aspect --
    ----------------
 
-   function Has_Aspect (Id : Entity_Id; A : Aspect_Id) return Boolean is
+   function Has_Aspect
+     (Id            : Entity_Id;
+      A             : Aspect_Id;
+      Class_Present : Boolean := False) return Boolean
+   is
    begin
-      return Present (Find_Aspect (Id, A));
+      return Present (Find_Aspect (Id, A, Class_Present => Class_Present));
    end Has_Aspect;
 
    ------------------
@@ -455,6 +463,7 @@ package body Aspects is
       N_Package_Instantiation                  => True,
       N_Package_Specification                  => True,
       N_Package_Renaming_Declaration           => True,
+      N_Parameter_Specification                => True,
       N_Private_Extension_Declaration          => True,
       N_Private_Type_Declaration               => True,
       N_Procedure_Instantiation                => True,

@@ -1,7 +1,7 @@
 /* Generate information regarding function declarations and definitions based
    on information stored in GCC's tree structure.  This code implements the
    -aux-info option.
-   Copyright (C) 1989-2020 Free Software Foundation, Inc.
+   Copyright (C) 1989-2021 Free Software Foundation, Inc.
    Contributed by Ron Guilmette (rfg@segfault.us.com).
 
 This file is part of GCC.
@@ -409,6 +409,7 @@ gen_type (const char *ret_val, tree t, formals_style style)
 	    data_type = concat ("unsigned ", data_type, NULL);
 	  break;
 
+	case OPAQUE_TYPE:
 	case REAL_TYPE:
 	  data_type = IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (t)));
 	  break;

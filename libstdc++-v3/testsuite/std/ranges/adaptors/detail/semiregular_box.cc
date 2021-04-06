@@ -1,4 +1,4 @@
-// Copyright (C) 2020 Free Software Foundation, Inc.
+// Copyright (C) 2020-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -71,3 +71,13 @@ static_assert(requires (__box<U> a) {
   a.operator->();
   a.has_value();
 });
+
+constexpr bool
+test01()
+{
+  // Verify the default constructor value-initializes the underlying object.
+  __box<int> x;
+  __glibcxx_assert(*x == 0);
+  return true;
+}
+static_assert(test01());

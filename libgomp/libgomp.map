@@ -193,6 +193,10 @@ OMP_5.0.1 {
 	omp_destroy_allocator_;
 	omp_alloc;
 	omp_free;
+	omp_get_supported_active_levels;
+	omp_get_supported_active_levels_;
+	omp_fulfill_event;
+	omp_fulfill_event_;
 } OMP_5.0;
 
 GOMP_1.0 {
@@ -356,6 +360,12 @@ GOMP_5.0 {
 	GOMP_teams_reg;
 	GOMP_workshare_task_reduction_unregister;
 } GOMP_4.5;
+
+GOMP_5.0.1 {
+  global:
+	GOMP_alloc;
+	GOMP_free;
+} GOMP_5.0;
 
 OACC_2.0 {
   global:

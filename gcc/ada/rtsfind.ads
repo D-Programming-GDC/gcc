@@ -159,13 +159,15 @@ package Rtsfind is
       Ada_Wide_Wide_Text_IO_Integer_IO,
       Ada_Wide_Wide_Text_IO_Modular_IO,
 
-      --  CUDA
+      --  Package CUDA
 
       CUDA,
 
       --  Children of CUDA
 
       CUDA_Driver_Types,
+      CUDA_Internal,
+      CUDA_Runtime_Api,
       CUDA_Vector_Types,
 
       --  Interfaces
@@ -174,7 +176,12 @@ package Rtsfind is
 
       --  Children of Interfaces
 
+      Interfaces_C,
       Interfaces_Packed_Decimal,
+
+      --  Children of Interfaces.C
+
+      Interfaces_C_Strings,
 
       --  Package System
 
@@ -185,6 +192,7 @@ package Rtsfind is
       System_Address_Image,
       System_Address_To_Access_Conversions,
       System_Arith_64,
+      System_Arith_128,
       System_AST_Handling,
       System_Assertions,
       System_Atomic_Primitives,
@@ -195,14 +203,16 @@ package Rtsfind is
       System_Boolean_Array_Operations,
       System_Byte_Swapping,
       System_Checked_Pools,
+      System_Compare_Array_Signed_8,
       System_Compare_Array_Signed_16,
       System_Compare_Array_Signed_32,
       System_Compare_Array_Signed_64,
-      System_Compare_Array_Signed_8,
+      System_Compare_Array_Signed_128,
+      System_Compare_Array_Unsigned_8,
       System_Compare_Array_Unsigned_16,
       System_Compare_Array_Unsigned_32,
       System_Compare_Array_Unsigned_64,
-      System_Compare_Array_Unsigned_8,
+      System_Compare_Array_Unsigned_128,
       System_Concat_2,
       System_Concat_3,
       System_Concat_4,
@@ -220,15 +230,15 @@ package Rtsfind is
       System_Exn_Int,
       System_Exn_LLF,
       System_Exn_LLI,
+      System_Exn_LLLI,
       System_Exp_Int,
-      System_Exp_LInt,
       System_Exp_LLI,
+      System_Exp_LLLI,
       System_Exp_LLU,
+      System_Exp_LLLU,
       System_Exp_Mod,
       System_Exp_Uns,
       System_Fat_Flt,
-      System_Fat_IEEE_Long_Float,
-      System_Fat_IEEE_Short_Float,
       System_Fat_LFlt,
       System_Fat_LLF,
       System_Fat_SFlt,
@@ -237,16 +247,28 @@ package Rtsfind is
       System_Fat_VAX_G_Float,
       System_Finalization_Masters,
       System_Finalization_Root,
-      System_Fore,
+      System_Fore_Decimal_32,
+      System_Fore_Decimal_64,
+      System_Fore_Decimal_128,
+      System_Fore_Fixed_32,
+      System_Fore_Fixed_64,
+      System_Fore_Fixed_128,
+      System_Fore_Real,
       System_Img_Bool,
       System_Img_Char,
-      System_Img_Dec,
+      System_Img_Decimal_32,
+      System_Img_Decimal_64,
+      System_Img_Decimal_128,
       System_Img_Enum,
       System_Img_Enum_New,
+      System_Img_Fixed_32,
+      System_Img_Fixed_64,
+      System_Img_Fixed_128,
       System_Img_Int,
-      System_Img_LLD,
       System_Img_LLI,
+      System_Img_LLLI,
       System_Img_LLU,
+      System_Img_LLLU,
       System_Img_Name,
       System_Img_Real,
       System_Img_Uns,
@@ -315,6 +337,69 @@ package Rtsfind is
       System_Pack_61,
       System_Pack_62,
       System_Pack_63,
+      System_Pack_65,
+      System_Pack_66,
+      System_Pack_67,
+      System_Pack_68,
+      System_Pack_69,
+      System_Pack_70,
+      System_Pack_71,
+      System_Pack_72,
+      System_Pack_73,
+      System_Pack_74,
+      System_Pack_75,
+      System_Pack_76,
+      System_Pack_77,
+      System_Pack_78,
+      System_Pack_79,
+      System_Pack_80,
+      System_Pack_81,
+      System_Pack_82,
+      System_Pack_83,
+      System_Pack_84,
+      System_Pack_85,
+      System_Pack_86,
+      System_Pack_87,
+      System_Pack_88,
+      System_Pack_89,
+      System_Pack_90,
+      System_Pack_91,
+      System_Pack_92,
+      System_Pack_93,
+      System_Pack_94,
+      System_Pack_95,
+      System_Pack_96,
+      System_Pack_97,
+      System_Pack_98,
+      System_Pack_99,
+      System_Pack_100,
+      System_Pack_101,
+      System_Pack_102,
+      System_Pack_103,
+      System_Pack_104,
+      System_Pack_105,
+      System_Pack_106,
+      System_Pack_107,
+      System_Pack_108,
+      System_Pack_109,
+      System_Pack_110,
+      System_Pack_111,
+      System_Pack_112,
+      System_Pack_113,
+      System_Pack_114,
+      System_Pack_115,
+      System_Pack_116,
+      System_Pack_117,
+      System_Pack_118,
+      System_Pack_119,
+      System_Pack_120,
+      System_Pack_121,
+      System_Pack_122,
+      System_Pack_123,
+      System_Pack_124,
+      System_Pack_125,
+      System_Pack_126,
+      System_Pack_127,
       System_Parameters,
       System_Partition_Interface,
       System_Pool_32_Global,
@@ -340,14 +425,22 @@ package Rtsfind is
       System_Unsigned_Types,
       System_Val_Bool,
       System_Val_Char,
-      System_Val_Dec,
+      System_Val_Decimal_32,
+      System_Val_Decimal_64,
+      System_Val_Decimal_128,
       System_Val_Enum,
+      System_Val_Fixed_32,
+      System_Val_Fixed_64,
+      System_Val_Fixed_128,
+      System_Val_Flt,
       System_Val_Int,
-      System_Val_LLD,
+      System_Val_LFlt,
+      System_Val_LLF,
       System_Val_LLI,
+      System_Val_LLLI,
       System_Val_LLU,
+      System_Val_LLLU,
       System_Val_Name,
-      System_Val_Real,
       System_Val_Uns,
       System_Val_WChar,
       System_Version_Control,
@@ -356,9 +449,13 @@ package Rtsfind is
       System_Wid_Bool,
       System_Wid_Char,
       System_Wid_Enum,
+      System_Wid_Int,
       System_Wid_LLI,
+      System_Wid_LLLI,
       System_Wid_LLU,
+      System_Wid_LLLU,
       System_Wid_Name,
+      System_Wid_Uns,
       System_Wid_WChar,
       System_WWd_Char,
       System_WWd_Enum,
@@ -625,16 +722,31 @@ package Rtsfind is
 
      RE_Stream_T,                        -- CUDA.Driver_Types
 
+     RE_Fatbin_Wrapper,                  -- CUDA.Internal
+     RE_Launch_Kernel,                   -- CUDA.Internal
+     RE_Pop_Call_Configuration,          -- CUDA.Internal
+     RE_Push_Call_Configuration,         -- CUDA.Internal
+     RE_Register_Fat_Binary,             -- CUDA.Internal
+     RE_Register_Fat_Binary_End,         -- CUDA.Internal
+     RE_Register_Function,               -- CUDA.Internal
+
      RE_Dim3,                            -- CUDA.Vector_Types
 
      RE_Integer_8,                       -- Interfaces
      RE_Integer_16,                      -- Interfaces
      RE_Integer_32,                      -- Interfaces
      RE_Integer_64,                      -- Interfaces
+     RE_Integer_128,                     -- Interfaces
      RE_Unsigned_8,                      -- Interfaces
      RE_Unsigned_16,                     -- Interfaces
      RE_Unsigned_32,                     -- Interfaces
      RE_Unsigned_64,                     -- Interfaces
+     RE_Unsigned_128,                    -- Interfaces
+
+     RO_IC_Unsigned,                     -- Interfaces.C
+
+     RE_Chars_Ptr,                       -- Interfaces.C.Strings
+     RE_New_Char_Array,                  -- Interfaces.C.Strings
 
      RE_Address,                         -- System
      RE_Any_Priority,                    -- System
@@ -651,11 +763,17 @@ package Rtsfind is
 
      RE_Address_Image,                   -- System.Address_Image
 
-     RE_Add_With_Ovflo_Check,            -- System.Arith_64
-     RE_Double_Divide,                   -- System.Arith_64
-     RE_Multiply_With_Ovflo_Check,       -- System.Arith_64
-     RE_Scaled_Divide,                   -- System.Arith_64
-     RE_Subtract_With_Ovflo_Check,       -- System.Arith_64
+     RE_Add_With_Ovflo_Check64,          -- System.Arith_64
+     RE_Double_Divide64,                 -- System.Arith_64
+     RE_Multiply_With_Ovflo_Check64,     -- System.Arith_64
+     RE_Scaled_Divide64,                 -- System.Arith_64
+     RE_Subtract_With_Ovflo_Check64,     -- System.Arith_64
+
+     RE_Add_With_Ovflo_Check128,         -- System.Arith_128
+     RE_Double_Divide128,                -- System.Arith_128
+     RE_Multiply_With_Ovflo_Check128,    -- System.Arith_128
+     RE_Subtract_With_Ovflo_Check128,    -- System.Arith_128
+     RE_Scaled_Divide128,                -- System.Arith_128
 
      RE_Create_AST_Handler,              -- System.AST_Handling
 
@@ -731,6 +849,7 @@ package Rtsfind is
      RE_Bswap_16,                        -- System.Byte_Swapping
      RE_Bswap_32,                        -- System.Byte_Swapping
      RE_Bswap_64,                        -- System.Byte_Swapping
+     RE_Bswap_128,                       -- System.Byte_Swapping
 
      RE_Checked_Pool,                    -- System.Checked_Pools
 
@@ -738,15 +857,17 @@ package Rtsfind is
      RE_Compare_Array_S8_Unaligned,      -- System.Compare_Array_Signed_8
 
      RE_Compare_Array_S16,               -- System.Compare_Array_Signed_16
-     RE_Compare_Array_S32,               -- System.Compare_Array_Signed_16
-     RE_Compare_Array_S64,               -- System.Compare_Array_Signed_16
+     RE_Compare_Array_S32,               -- System.Compare_Array_Signed_32
+     RE_Compare_Array_S64,               -- System.Compare_Array_Signed_64
+     RE_Compare_Array_S128,              -- System.Compare_Array_Signed_128
 
      RE_Compare_Array_U8,                -- System.Compare_Array_Unsigned_8
      RE_Compare_Array_U8_Unaligned,      -- System.Compare_Array_Unsigned_8
 
      RE_Compare_Array_U16,               -- System.Compare_Array_Unsigned_16
-     RE_Compare_Array_U32,               -- System.Compare_Array_Unsigned_16
-     RE_Compare_Array_U64,               -- System.Compare_Array_Unsigned_16
+     RE_Compare_Array_U32,               -- System.Compare_Array_Unsigned_32
+     RE_Compare_Array_U64,               -- System.Compare_Array_Unsigned_64
+     RE_Compare_Array_U128,              -- System.Compare_Array_Unsigned_128
 
      RE_Str_Concat_2,                    -- System.Concat_2
      RE_Str_Concat_3,                    -- System.Concat_3
@@ -786,11 +907,17 @@ package Rtsfind is
 
      RE_Exn_Long_Long_Integer,           -- System.Exn_LLI
 
+     RE_Exn_Long_Long_Long_Integer,      -- System.Exn_LLLI
+
      RE_Exp_Integer,                     -- System.Exp_Int
 
      RE_Exp_Long_Long_Integer,           -- System.Exp_LLI
 
+     RE_Exp_Long_Long_Long_Integer,      -- System.Exp_LLLI
+
      RE_Exp_Long_Long_Unsigned,          -- System.Exp_LLU
+
+     RE_Exp_Long_Long_Long_Unsigned,     -- System.Exp_LLLU
 
      RE_Exp_Modular,                     -- System.Exp_Mod
 
@@ -798,17 +925,9 @@ package Rtsfind is
 
      RE_Attr_Float,                      -- System.Fat_Flt
 
-     RE_Attr_IEEE_Long,                  -- System.Fat_IEEE_Long_Float
-     RE_Fat_IEEE_Long,                   -- System.Fat_IEEE_Long_Float
-
-     RE_Attr_IEEE_Short,                 -- System.Fat_IEEE_Short_Float
-     RE_Fat_IEEE_Short,                  -- System.Fat_IEEE_Short_Float
-
      RE_Attr_Long_Float,                 -- System.Fat_LFlt
 
      RE_Attr_Long_Long_Float,            -- System.Fat_LLF
-
-     RE_Attr_Short_Float,                -- System.Fat_SFlt
 
      RE_Attr_VAX_D_Float,                -- System.Fat_VAX_D_Float
      RE_Fat_VAX_D,                       -- System.Fat_VAX_D_Float
@@ -822,7 +941,6 @@ package Rtsfind is
      RE_Add_Offset_To_Address,           -- System.Finalization_Masters
      RE_Attach,                          -- System.Finalization_Masters
      RE_Base_Pool,                       -- System.Finalization_Masters
-     RE_Detach,                          -- System.Finalization_Masters
      RE_Finalization_Master,             -- System.Finalization_Masters
      RE_Finalization_Master_Ptr,         -- System.Finalization_Masters
      RE_Set_Base_Pool,                   -- System.Finalization_Masters
@@ -832,14 +950,30 @@ package Rtsfind is
      RE_Root_Controlled,                 -- System.Finalization_Root
      RE_Root_Controlled_Ptr,             -- System.Finalization_Root
 
-     RE_Fore,                            -- System.Fore
+     RE_Fore_Decimal32,                  -- System.Fore_Decimal_32
+
+     RE_Fore_Decimal64,                  -- System.Fore_Decimal_64
+
+     RE_Fore_Decimal128,                 -- System.Fore_Decimal_128
+
+     RE_Fore_Fixed32,                    -- System.Fore_Fixed_32
+
+     RE_Fore_Fixed64,                    -- System.Fore_Fixed_64
+
+     RE_Fore_Fixed128,                   -- System.Fore_Fixed_128
+
+     RE_Fore_Real,                       -- System.Fore_Real
 
      RE_Image_Boolean,                   -- System.Img_Bool
 
      RE_Image_Character,                 -- System.Img_Char
      RE_Image_Character_05,              -- System.Img_Char
 
-     RE_Image_Decimal,                   -- System.Img_Dec
+     RE_Image_Decimal32,                 -- System.Img_Decimal_32
+
+     RE_Image_Decimal64,                 -- System.Img_Decimal_64
+
+     RE_Image_Decimal128,                -- System.Img_Decimal_128
 
      RE_Image_Enumeration_8,             -- System.Img_Enum_New
      RE_Image_Enumeration_16,            -- System.Img_Enum_New
@@ -847,11 +981,17 @@ package Rtsfind is
 
      RE_Image_Integer,                   -- System.Img_Int
 
-     RE_Image_Long_Long_Decimal,         -- System.Img_LLD
-
      RE_Image_Long_Long_Integer,         -- System.Img_LLI
 
+     RE_Image_Long_Long_Long_Integer,    -- System.Img_LLLI
+
      RE_Image_Long_Long_Unsigned,        -- System.Img_LLU
+
+     RE_Image_Long_Long_Long_Unsigned,   -- System.Img_LLLU
+
+     RE_Image_Fixed32,                   -- System.Img_Fixed_32
+     RE_Image_Fixed64,                   -- System.Img_Fixed_64
+     RE_Image_Fixed128,                  -- System.Img_Fixed_128
 
      RE_Image_Ordinary_Fixed_Point,      -- System.Img_Real
      RE_Image_Floating_Point,            -- System.Img_Real
@@ -1162,6 +1302,320 @@ package Rtsfind is
      RE_Get_63,                          -- System.Pack_63
      RE_Set_63,                          -- System.Pack_63
 
+     RE_Bits_65,                         -- System.Pack_65
+     RE_Get_65,                          -- System.Pack_65
+     RE_Set_65,                          -- System.Pack_65
+
+     RE_Bits_66,                         -- System.Pack_66
+     RE_Get_66,                          -- System.Pack_66
+     RE_GetU_66,                         -- System.Pack_66
+     RE_Set_66,                          -- System.Pack_66
+     RE_SetU_66,                         -- System.Pack_66
+
+     RE_Bits_67,                         -- System.Pack_67
+     RE_Get_67,                          -- System.Pack_67
+     RE_Set_67,                          -- System.Pack_67
+
+     RE_Bits_68,                         -- System.Pack_68
+     RE_Get_68,                          -- System.Pack_68
+     RE_GetU_68,                         -- System.Pack_68
+     RE_Set_68,                          -- System.Pack_68
+     RE_SetU_68,                         -- System.Pack_68
+
+     RE_Bits_69,                         -- System.Pack_69
+     RE_Get_69,                          -- System.Pack_69
+     RE_Set_69,                          -- System.Pack_69
+
+     RE_Bits_70,                         -- System.Pack_70
+     RE_Get_70,                          -- System.Pack_70
+     RE_GetU_70,                         -- System.Pack_70
+     RE_Set_70,                          -- System.Pack_70
+     RE_SetU_70,                         -- System.Pack_70
+
+     RE_Bits_71,                         -- System.Pack_71
+     RE_Get_71,                          -- System.Pack_71
+     RE_Set_71,                          -- System.Pack_71
+
+     RE_Bits_72,                         -- System.Pack_72
+     RE_Get_72,                          -- System.Pack_72
+     RE_GetU_72,                         -- System.Pack_72
+     RE_Set_72,                          -- System.Pack_72
+     RE_SetU_72,                         -- System.Pack_72
+
+     RE_Bits_73,                         -- System.Pack_73
+     RE_Get_73,                          -- System.Pack_73
+     RE_Set_73,                          -- System.Pack_73
+
+     RE_Bits_74,                         -- System.Pack_74
+     RE_Get_74,                          -- System.Pack_74
+     RE_GetU_74,                         -- System.Pack_74
+     RE_Set_74,                          -- System.Pack_74
+     RE_SetU_74,                         -- System.Pack_74
+
+     RE_Bits_75,                         -- System.Pack_75
+     RE_Get_75,                          -- System.Pack_75
+     RE_Set_75,                          -- System.Pack_75
+
+     RE_Bits_76,                         -- System.Pack_76
+     RE_Get_76,                          -- System.Pack_76
+     RE_GetU_76,                         -- System.Pack_76
+     RE_Set_76,                          -- System.Pack_76
+     RE_SetU_76,                         -- System.Pack_76
+
+     RE_Bits_77,                         -- System.Pack_77
+     RE_Get_77,                          -- System.Pack_77
+     RE_Set_77,                          -- System.Pack_77
+
+     RE_Bits_78,                         -- System.Pack_78
+     RE_Get_78,                          -- System.Pack_78
+     RE_GetU_78,                         -- System.Pack_78
+     RE_Set_78,                          -- System.Pack_78
+     RE_SetU_78,                         -- System.Pack_78
+
+     RE_Bits_79,                         -- System.Pack_79
+     RE_Get_79,                          -- System.Pack_79
+     RE_Set_79,                          -- System.Pack_79
+
+     RE_Bits_80,                         -- System.Pack_80
+     RE_Get_80,                          -- System.Pack_80
+     RE_GetU_80,                         -- System.Pack_80
+     RE_Set_80,                          -- System.Pack_80
+     RE_SetU_80,                         -- System.Pack_80
+
+     RE_Bits_81,                         -- System.Pack_81
+     RE_Get_81,                          -- System.Pack_81
+     RE_Set_81,                          -- System.Pack_81
+
+     RE_Bits_82,                         -- System.Pack_82
+     RE_Get_82,                          -- System.Pack_82
+     RE_GetU_82,                         -- System.Pack_82
+     RE_Set_82,                          -- System.Pack_82
+     RE_SetU_82,                         -- System.Pack_82
+
+     RE_Bits_83,                         -- System.Pack_83
+     RE_Get_83,                          -- System.Pack_83
+     RE_Set_83,                          -- System.Pack_83
+
+     RE_Bits_84,                         -- System.Pack_84
+     RE_Get_84,                          -- System.Pack_84
+     RE_GetU_84,                         -- System.Pack_84
+     RE_Set_84,                          -- System.Pack_84
+     RE_SetU_84,                         -- System.Pack_84
+
+     RE_Bits_85,                         -- System.Pack_85
+     RE_Get_85,                          -- System.Pack_85
+     RE_Set_85,                          -- System.Pack_85
+
+     RE_Bits_86,                         -- System.Pack_86
+     RE_Get_86,                          -- System.Pack_86
+     RE_GetU_86,                         -- System.Pack_86
+     RE_Set_86,                          -- System.Pack_86
+     RE_SetU_86,                         -- System.Pack_86
+
+     RE_Bits_87,                         -- System.Pack_87
+     RE_Get_87,                          -- System.Pack_87
+     RE_Set_87,                          -- System.Pack_87
+
+     RE_Bits_88,                         -- System.Pack_88
+     RE_Get_88,                          -- System.Pack_88
+     RE_GetU_88,                         -- System.Pack_88
+     RE_Set_88,                          -- System.Pack_88
+     RE_SetU_88,                         -- System.Pack_88
+
+     RE_Bits_89,                         -- System.Pack_89
+     RE_Get_89,                          -- System.Pack_89
+     RE_Set_89,                          -- System.Pack_89
+
+     RE_Bits_90,                         -- System.Pack_90
+     RE_Get_90,                          -- System.Pack_90
+     RE_GetU_90,                         -- System.Pack_90
+     RE_Set_90,                          -- System.Pack_90
+     RE_SetU_90,                         -- System.Pack_90
+
+     RE_Bits_91,                         -- System.Pack_91
+     RE_Get_91,                          -- System.Pack_91
+     RE_Set_91,                          -- System.Pack_91
+
+     RE_Bits_92,                         -- System.Pack_92
+     RE_Get_92,                          -- System.Pack_92
+     RE_GetU_92,                         -- System.Pack_92
+     RE_Set_92,                          -- System.Pack_92
+     RE_SetU_92,                         -- System.Pack_92
+
+     RE_Bits_93,                         -- System.Pack_93
+     RE_Get_93,                          -- System.Pack_93
+     RE_Set_93,                          -- System.Pack_93
+
+     RE_Bits_94,                         -- System.Pack_94
+     RE_Get_94,                          -- System.Pack_94
+     RE_GetU_94,                         -- System.Pack_94
+     RE_Set_94,                          -- System.Pack_94
+     RE_SetU_94,                         -- System.Pack_94
+
+     RE_Bits_95,                         -- System.Pack_95
+     RE_Get_95,                          -- System.Pack_95
+     RE_Set_95,                          -- System.Pack_95
+
+     RE_Bits_96,                         -- System.Pack_96
+     RE_Get_96,                          -- System.Pack_96
+     RE_GetU_96,                         -- System.Pack_96
+     RE_Set_96,                          -- System.Pack_96
+     RE_SetU_96,                         -- System.Pack_96
+
+     RE_Bits_97,                         -- System.Pack_97
+     RE_Get_97,                          -- System.Pack_97
+     RE_Set_97,                          -- System.Pack_97
+
+     RE_Bits_98,                         -- System.Pack_98
+     RE_Get_98,                          -- System.Pack_98
+     RE_GetU_98,                         -- System.Pack_98
+     RE_Set_98,                          -- System.Pack_98
+     RE_SetU_98,                         -- System.Pack_98
+
+     RE_Bits_99,                         -- System.Pack_99
+     RE_Get_99,                          -- System.Pack_99
+     RE_Set_99,                          -- System.Pack_99
+
+     RE_Bits_100,                        -- System.Pack_100
+     RE_Get_100,                         -- System.Pack_100
+     RE_GetU_100,                        -- System.Pack_100
+     RE_Set_100,                         -- System.Pack_100
+     RE_SetU_100,                        -- System.Pack_100
+
+     RE_Bits_101,                        -- System.Pack_101
+     RE_Get_101,                         -- System.Pack_101
+     RE_Set_101,                         -- System.Pack_101
+
+     RE_Bits_102,                        -- System.Pack_102
+     RE_Get_102,                         -- System.Pack_102
+     RE_GetU_102,                        -- System.Pack_102
+     RE_Set_102,                         -- System.Pack_102
+     RE_SetU_102,                        -- System.Pack_102
+
+     RE_Bits_103,                        -- System.Pack_103
+     RE_Get_103,                         -- System.Pack_103
+     RE_Set_103,                         -- System.Pack_103
+
+     RE_Bits_104,                        -- System.Pack_104
+     RE_Get_104,                         -- System.Pack_104
+     RE_GetU_104,                        -- System.Pack_104
+     RE_Set_104,                         -- System.Pack_104
+     RE_SetU_104,                        -- System.Pack_104
+
+     RE_Bits_105,                        -- System.Pack_105
+     RE_Get_105,                         -- System.Pack_105
+     RE_Set_105,                         -- System.Pack_105
+
+     RE_Bits_106,                        -- System.Pack_106
+     RE_Get_106,                         -- System.Pack_106
+     RE_GetU_106,                        -- System.Pack_106
+     RE_Set_106,                         -- System.Pack_106
+     RE_SetU_106,                        -- System.Pack_106
+
+     RE_Bits_107,                        -- System.Pack_107
+     RE_Get_107,                         -- System.Pack_107
+     RE_Set_107,                         -- System.Pack_107
+
+     RE_Bits_108,                        -- System.Pack_108
+     RE_Get_108,                         -- System.Pack_108
+     RE_GetU_108,                        -- System.Pack_108
+     RE_Set_108,                         -- System.Pack_108
+     RE_SetU_108,                        -- System.Pack_108
+
+     RE_Bits_109,                        -- System.Pack_109
+     RE_Get_109,                         -- System.Pack_109
+     RE_Set_109,                         -- System.Pack_109
+
+     RE_Bits_110,                        -- System.Pack_110
+     RE_Get_110,                         -- System.Pack_110
+     RE_GetU_110,                        -- System.Pack_110
+     RE_Set_110,                         -- System.Pack_110
+     RE_SetU_110,                        -- System.Pack_110
+
+     RE_Bits_111,                        -- System.Pack_111
+     RE_Get_111,                         -- System.Pack_111
+     RE_Set_111,                         -- System.Pack_111
+
+     RE_Bits_112,                        -- System.Pack_112
+     RE_Get_112,                         -- System.Pack_112
+     RE_GetU_112,                        -- System.Pack_112
+     RE_Set_112,                         -- System.Pack_112
+     RE_SetU_112,                        -- System.Pack_112
+
+     RE_Bits_113,                        -- System.Pack_113
+     RE_Get_113,                         -- System.Pack_113
+     RE_Set_113,                         -- System.Pack_113
+
+     RE_Bits_114,                        -- System.Pack_114
+     RE_Get_114,                         -- System.Pack_114
+     RE_GetU_114,                        -- System.Pack_114
+     RE_Set_114,                         -- System.Pack_114
+     RE_SetU_114,                        -- System.Pack_114
+
+     RE_Bits_115,                        -- System.Pack_115
+     RE_Get_115,                         -- System.Pack_115
+     RE_Set_115,                         -- System.Pack_115
+
+     RE_Bits_116,                        -- System.Pack_116
+     RE_Get_116,                         -- System.Pack_116
+     RE_GetU_116,                        -- System.Pack_116
+     RE_Set_116,                         -- System.Pack_116
+     RE_SetU_116,                        -- System.Pack_116
+
+     RE_Bits_117,                        -- System.Pack_117
+     RE_Get_117,                         -- System.Pack_117
+     RE_Set_117,                         -- System.Pack_117
+
+     RE_Bits_118,                        -- System.Pack_118
+     RE_Get_118,                         -- System.Pack_118
+     RE_GetU_118,                        -- System.Pack_118
+     RE_Set_118,                         -- System.Pack_118
+     RE_SetU_118,                        -- System.Pack_118
+
+     RE_Bits_119,                        -- System.Pack_119
+     RE_Get_119,                         -- System.Pack_119
+     RE_Set_119,                         -- System.Pack_119
+
+     RE_Bits_120,                        -- System.Pack_120
+     RE_Get_120,                         -- System.Pack_120
+     RE_GetU_120,                        -- System.Pack_120
+     RE_Set_120,                         -- System.Pack_120
+     RE_SetU_120,                        -- System.Pack_120
+
+     RE_Bits_121,                        -- System.Pack_121
+     RE_Get_121,                         -- System.Pack_121
+     RE_Set_121,                         -- System.Pack_121
+
+     RE_Bits_122,                        -- System.Pack_122
+     RE_Get_122,                         -- System.Pack_122
+     RE_GetU_122,                        -- System.Pack_122
+     RE_Set_122,                         -- System.Pack_122
+     RE_SetU_122,                        -- System.Pack_122
+
+     RE_Bits_123,                        -- System.Pack_123
+     RE_Get_123,                         -- System.Pack_123
+     RE_Set_123,                         -- System.Pack_123
+
+     RE_Bits_124,                        -- System.Pack_124
+     RE_Get_124,                         -- System.Pack_124
+     RE_GetU_124,                        -- System.Pack_124
+     RE_Set_124,                         -- System.Pack_124
+     RE_SetU_124,                        -- System.Pack_124
+
+     RE_Bits_125,                        -- System.Pack_125
+     RE_Get_125,                         -- System.Pack_125
+     RE_Set_125,                         -- System.Pack_125
+
+     RE_Bits_126,                        -- System.Pack_126
+     RE_Get_126,                         -- System.Pack_126
+     RE_GetU_126,                        -- System.Pack_126
+     RE_Set_126,                         -- System.Pack_126
+     RE_SetU_126,                        -- System.Pack_126
+
+     RE_Bits_127,                        -- System.Pack_127
+     RE_Get_127,                         -- System.Pack_127
+     RE_Set_127,                         -- System.Pack_127
+
      RE_Adjust_Storage_Size,             -- System.Parameters
      RE_Default_Secondary_Stack_Size,    -- System.Parameters
      RE_Default_Stack_Size,              -- System.Parameters
@@ -1197,8 +1651,10 @@ package Rtsfind is
 
      RE_Put_Image_Integer,               -- System.Put_Images
      RE_Put_Image_Long_Long_Integer,     -- System.Put_Images
+     RE_Put_Image_Long_Long_Long_Integer, -- System.Put_Images
      RE_Put_Image_Unsigned,              -- System.Put_Images
      RE_Put_Image_Long_Long_Unsigned,    -- System.Put_Images
+     RE_Put_Image_Long_Long_Long_Unsigned, -- System.Put_Images
      RE_Put_Image_Thin_Pointer,          -- System.Put_Images
      RE_Put_Image_Fat_Pointer,           -- System.Put_Images
      RE_Put_Image_Access_Subp,           -- System.Put_Images
@@ -1349,14 +1805,12 @@ package Rtsfind is
      RE_IS_Is2,                          -- System.Scalar_Values
      RE_IS_Is4,                          -- System.Scalar_Values
      RE_IS_Is8,                          -- System.Scalar_Values
+     RE_IS_Is16,                         -- System.Scalar_Values
      RE_IS_Iu1,                          -- System.Scalar_Values
      RE_IS_Iu2,                          -- System.Scalar_Values
      RE_IS_Iu4,                          -- System.Scalar_Values
      RE_IS_Iu8,                          -- System.Scalar_Values
-     RE_IS_Iz1,                          -- System.Scalar_Values
-     RE_IS_Iz2,                          -- System.Scalar_Values
-     RE_IS_Iz4,                          -- System.Scalar_Values
-     RE_IS_Iz8,                          -- System.Scalar_Values
+     RE_IS_Iu16,                         -- System.Scalar_Values
      RE_IS_Isf,                          -- System.Scalar_Values
      RE_IS_Ifl,                          -- System.Scalar_Values
      RE_IS_Ilf,                          -- System.Scalar_Values
@@ -1406,6 +1860,8 @@ package Rtsfind is
      RE_I_LI,                            -- System.Stream_Attributes
      RE_I_LLF,                           -- System.Stream_Attributes
      RE_I_LLI,                           -- System.Stream_Attributes
+     RE_I_LLLI,                          -- System.Stream_Attributes
+     RE_I_LLLU,                          -- System.Stream_Attributes
      RE_I_LLU,                           -- System.Stream_Attributes
      RE_I_LU,                            -- System.Stream_Attributes
      RE_I_SF,                            -- System.Stream_Attributes
@@ -1429,6 +1885,8 @@ package Rtsfind is
      RE_W_LI,                            -- System.Stream_Attributes
      RE_W_LLF,                           -- System.Stream_Attributes
      RE_W_LLI,                           -- System.Stream_Attributes
+     RE_W_LLLI,                          -- System.Stream_Attributes
+     RE_W_LLLU,                          -- System.Stream_Attributes
      RE_W_LLU,                           -- System.Stream_Attributes
      RE_W_LU,                            -- System.Stream_Attributes
      RE_W_SF,                            -- System.Stream_Attributes
@@ -1547,8 +2005,8 @@ package Rtsfind is
      RE_Bits_2,                          -- System.Unsigned_Types
      RE_Bits_4,                          -- System.Unsigned_Types
      RE_Float_Unsigned,                  -- System.Unsigned_Types
-     RE_Long_Unsigned,                   -- System.Unsigned_Types
      RE_Long_Long_Unsigned,              -- System.Unsigned_Types
+     RE_Long_Long_Long_Unsigned,         -- System.Unsigned_Types
      RE_Packed_Byte,                     -- System.Unsigned_Types
      RE_Packed_Bytes1,                   -- System.Unsigned_Types
      RE_Packed_Bytes2,                   -- System.Unsigned_Types
@@ -1556,29 +2014,43 @@ package Rtsfind is
      RE_Rev_Packed_Bytes1,               -- System.Unsigned_Types
      RE_Rev_Packed_Bytes2,               -- System.Unsigned_Types
      RE_Rev_Packed_Bytes4,               -- System.Unsigned_Types
-     RE_Short_Unsigned,                  -- System.Unsigned_Types
-     RE_Short_Short_Unsigned,            -- System.Unsigned_Types
      RE_Unsigned,                        -- System.Unsigned_Types
 
      RE_Value_Boolean,                   -- System.Val_Bool
 
      RE_Value_Character,                 -- System.Val_Char
 
-     RE_Value_Decimal,                   -- System.Val_Dec
+     RE_Value_Decimal32,                 -- System_Val_Decimal_32
+
+     RE_Value_Decimal64,                 -- System_Val_Decimal_64
+
+     RE_Value_Decimal128,                -- System_Val_Decimal_128
 
      RE_Value_Enumeration_8,             -- System.Val_Enum
      RE_Value_Enumeration_16,            -- System.Val_Enum
      RE_Value_Enumeration_32,            -- System.Val_Enum
 
+     RE_Value_Fixed32,                   -- System_Val_Fixed_32
+
+     RE_Value_Fixed64,                   -- System_Val_Fixed_64
+
+     RE_Value_Fixed128,                  -- System_Val_Fixed_128
+
+     RE_Value_Float,                     -- System_Val_Flt
+
      RE_Value_Integer,                   -- System.Val_Int
 
-     RE_Value_Long_Long_Decimal,         -- System.Val_LLD
+     RE_Value_Long_Float,                -- System_Val_LFlt
+
+     RE_Value_Long_Long_Float,           -- System_Val_LLF
 
      RE_Value_Long_Long_Integer,         -- System.Val_LLI
 
+     RE_Value_Long_Long_Long_Integer,    -- System.Val_LLLI
+
      RE_Value_Long_Long_Unsigned,        -- System.Val_LLU
 
-     RE_Value_Real,                      -- System.Val_Real
+     RE_Value_Long_Long_Long_Unsigned,   -- System.Val_LLLU
 
      RE_Value_Unsigned,                  -- System.Val_Uns
 
@@ -1618,9 +2090,17 @@ package Rtsfind is
      RE_Width_Enumeration_16,            -- System.Wid_Enum
      RE_Width_Enumeration_32,            -- System.Wid_Enum
 
+     RE_Width_Integer,                   -- System.Wid_Int
+
      RE_Width_Long_Long_Integer,         -- System.Wid_LLI
 
+     RE_Width_Long_Long_Long_Integer,    -- System.Wid_LLLI
+
      RE_Width_Long_Long_Unsigned,        -- System.Wid_LLU
+
+     RE_Width_Long_Long_Long_Unsigned,   -- System.Wid_LLLU
+
+     RE_Width_Unsigned,                  -- System.Wid_Uns
 
      RE_Width_Wide_Character,            -- System.Wid_WChar
      RE_Width_Wide_Wide_Character,       -- System.Wid_WChar
@@ -1916,16 +2396,31 @@ package Rtsfind is
 
      RE_Stream_T                         => CUDA_Driver_Types,
 
+     RE_Fatbin_Wrapper                   => CUDA_Internal,
+     RE_Launch_Kernel                    => CUDA_Internal,
+     RE_Pop_Call_Configuration           => CUDA_Internal,
+     RE_Push_Call_Configuration          => CUDA_Internal,
+     RE_Register_Fat_Binary              => CUDA_Internal,
+     RE_Register_Fat_Binary_End          => CUDA_Internal,
+     RE_Register_Function                => CUDA_Internal,
+
      RE_Dim3                             => CUDA_Vector_Types,
 
      RE_Integer_8                        => Interfaces,
      RE_Integer_16                       => Interfaces,
      RE_Integer_32                       => Interfaces,
      RE_Integer_64                       => Interfaces,
+     RE_Integer_128                      => Interfaces,
      RE_Unsigned_8                       => Interfaces,
      RE_Unsigned_16                      => Interfaces,
      RE_Unsigned_32                      => Interfaces,
      RE_Unsigned_64                      => Interfaces,
+     RE_Unsigned_128                     => Interfaces,
+
+     RO_IC_Unsigned                      => Interfaces_C,
+
+     RE_Chars_Ptr                        => Interfaces_C_Strings,
+     RE_New_Char_Array                   => Interfaces_C_Strings,
 
      RE_Address                          => System,
      RE_Any_Priority                     => System,
@@ -1942,11 +2437,17 @@ package Rtsfind is
 
      RE_Address_Image                    => System_Address_Image,
 
-     RE_Add_With_Ovflo_Check             => System_Arith_64,
-     RE_Double_Divide                    => System_Arith_64,
-     RE_Multiply_With_Ovflo_Check        => System_Arith_64,
-     RE_Scaled_Divide                    => System_Arith_64,
-     RE_Subtract_With_Ovflo_Check        => System_Arith_64,
+     RE_Add_With_Ovflo_Check64           => System_Arith_64,
+     RE_Double_Divide64                  => System_Arith_64,
+     RE_Multiply_With_Ovflo_Check64      => System_Arith_64,
+     RE_Scaled_Divide64                  => System_Arith_64,
+     RE_Subtract_With_Ovflo_Check64      => System_Arith_64,
+
+     RE_Add_With_Ovflo_Check128          => System_Arith_128,
+     RE_Double_Divide128                 => System_Arith_128,
+     RE_Multiply_With_Ovflo_Check128     => System_Arith_128,
+     RE_Subtract_With_Ovflo_Check128     => System_Arith_128,
+     RE_Scaled_Divide128                 => System_Arith_128,
 
      RE_Create_AST_Handler               => System_AST_Handling,
 
@@ -2024,6 +2525,7 @@ package Rtsfind is
      RE_Bswap_16                         => System_Byte_Swapping,
      RE_Bswap_32                         => System_Byte_Swapping,
      RE_Bswap_64                         => System_Byte_Swapping,
+     RE_Bswap_128                        => System_Byte_Swapping,
 
      RE_Compare_Array_S8                 => System_Compare_Array_Signed_8,
      RE_Compare_Array_S8_Unaligned       => System_Compare_Array_Signed_8,
@@ -2034,6 +2536,8 @@ package Rtsfind is
 
      RE_Compare_Array_S64                => System_Compare_Array_Signed_64,
 
+     RE_Compare_Array_S128               => System_Compare_Array_Signed_128,
+
      RE_Compare_Array_U8                 => System_Compare_Array_Unsigned_8,
      RE_Compare_Array_U8_Unaligned       => System_Compare_Array_Unsigned_8,
 
@@ -2042,6 +2546,8 @@ package Rtsfind is
      RE_Compare_Array_U32                => System_Compare_Array_Unsigned_32,
 
      RE_Compare_Array_U64                => System_Compare_Array_Unsigned_64,
+
+     RE_Compare_Array_U128               => System_Compare_Array_Unsigned_128,
 
      RE_Str_Concat_2                     => System_Concat_2,
      RE_Str_Concat_3                     => System_Concat_3,
@@ -2081,11 +2587,17 @@ package Rtsfind is
 
      RE_Exn_Long_Long_Integer            => System_Exn_LLI,
 
+     RE_Exn_Long_Long_Long_Integer       => System_Exn_LLLI,
+
      RE_Exp_Integer                      => System_Exp_Int,
 
      RE_Exp_Long_Long_Integer            => System_Exp_LLI,
 
+     RE_Exp_Long_Long_Long_Integer       => System_Exp_LLLI,
+
      RE_Exp_Long_Long_Unsigned           => System_Exp_LLU,
+
+     RE_Exp_Long_Long_Long_Unsigned      => System_Exp_LLLU,
 
      RE_Exp_Modular                      => System_Exp_Mod,
 
@@ -2093,17 +2605,9 @@ package Rtsfind is
 
      RE_Attr_Float                       => System_Fat_Flt,
 
-     RE_Attr_IEEE_Long                   => System_Fat_IEEE_Long_Float,
-     RE_Fat_IEEE_Long                    => System_Fat_IEEE_Long_Float,
-
-     RE_Attr_IEEE_Short                  => System_Fat_IEEE_Short_Float,
-     RE_Fat_IEEE_Short                   => System_Fat_IEEE_Short_Float,
-
      RE_Attr_Long_Float                  => System_Fat_LFlt,
 
      RE_Attr_Long_Long_Float             => System_Fat_LLF,
-
-     RE_Attr_Short_Float                 => System_Fat_SFlt,
 
      RE_Attr_VAX_D_Float                 => System_Fat_VAX_D_Float,
      RE_Fat_VAX_D                        => System_Fat_VAX_D_Float,
@@ -2117,7 +2621,6 @@ package Rtsfind is
      RE_Add_Offset_To_Address            => System_Finalization_Masters,
      RE_Attach                           => System_Finalization_Masters,
      RE_Base_Pool                        => System_Finalization_Masters,
-     RE_Detach                           => System_Finalization_Masters,
      RE_Finalization_Master              => System_Finalization_Masters,
      RE_Finalization_Master_Ptr          => System_Finalization_Masters,
      RE_Set_Base_Pool                    => System_Finalization_Masters,
@@ -2127,14 +2630,30 @@ package Rtsfind is
      RE_Root_Controlled                  => System_Finalization_Root,
      RE_Root_Controlled_Ptr              => System_Finalization_Root,
 
-     RE_Fore                             => System_Fore,
+     RE_Fore_Decimal32                   => System_Fore_Decimal_32,
+
+     RE_Fore_Decimal64                   => System_Fore_Decimal_64,
+
+     RE_Fore_Decimal128                  => System_Fore_Decimal_128,
+
+     RE_Fore_Fixed32                     => System_Fore_Fixed_32,
+
+     RE_Fore_Fixed64                     => System_Fore_Fixed_64,
+
+     RE_Fore_Fixed128                    => System_Fore_Fixed_128,
+
+     RE_Fore_Real                        => System_Fore_Real,
 
      RE_Image_Boolean                    => System_Img_Bool,
 
      RE_Image_Character                  => System_Img_Char,
      RE_Image_Character_05               => System_Img_Char,
 
-     RE_Image_Decimal                    => System_Img_Dec,
+     RE_Image_Decimal32                  => System_Img_Decimal_32,
+
+     RE_Image_Decimal64                  => System_Img_Decimal_64,
+
+     RE_Image_Decimal128                 => System_Img_Decimal_128,
 
      RE_Image_Enumeration_8              => System_Img_Enum_New,
      RE_Image_Enumeration_16             => System_Img_Enum_New,
@@ -2142,11 +2661,17 @@ package Rtsfind is
 
      RE_Image_Integer                    => System_Img_Int,
 
-     RE_Image_Long_Long_Decimal          => System_Img_LLD,
-
      RE_Image_Long_Long_Integer          => System_Img_LLI,
 
+     RE_Image_Long_Long_Long_Integer     => System_Img_LLLI,
+
      RE_Image_Long_Long_Unsigned         => System_Img_LLU,
+
+     RE_Image_Long_Long_Long_Unsigned    => System_Img_LLLU,
+
+     RE_Image_Fixed32                    => System_Img_Fixed_32,
+     RE_Image_Fixed64                    => System_Img_Fixed_64,
+     RE_Image_Fixed128                   => System_Img_Fixed_128,
 
      RE_Image_Ordinary_Fixed_Point       => System_Img_Real,
      RE_Image_Floating_Point             => System_Img_Real,
@@ -2457,6 +2982,320 @@ package Rtsfind is
      RE_Get_63                           => System_Pack_63,
      RE_Set_63                           => System_Pack_63,
 
+     RE_Bits_65                          => System_Pack_65,
+     RE_Get_65                           => System_Pack_65,
+     RE_Set_65                           => System_Pack_65,
+
+     RE_Bits_66                          => System_Pack_66,
+     RE_Get_66                           => System_Pack_66,
+     RE_GetU_66                          => System_Pack_66,
+     RE_Set_66                           => System_Pack_66,
+     RE_SetU_66                          => System_Pack_66,
+
+     RE_Bits_67                          => System_Pack_67,
+     RE_Get_67                           => System_Pack_67,
+     RE_Set_67                           => System_Pack_67,
+
+     RE_Bits_68                          => System_Pack_68,
+     RE_Get_68                           => System_Pack_68,
+     RE_GetU_68                          => System_Pack_68,
+     RE_Set_68                           => System_Pack_68,
+     RE_SetU_68                          => System_Pack_68,
+
+     RE_Bits_69                          => System_Pack_69,
+     RE_Get_69                           => System_Pack_69,
+     RE_Set_69                           => System_Pack_69,
+
+     RE_Bits_70                          => System_Pack_70,
+     RE_Get_70                           => System_Pack_70,
+     RE_GetU_70                          => System_Pack_70,
+     RE_Set_70                           => System_Pack_70,
+     RE_SetU_70                          => System_Pack_70,
+
+     RE_Bits_71                          => System_Pack_71,
+     RE_Get_71                           => System_Pack_71,
+     RE_Set_71                           => System_Pack_71,
+
+     RE_Bits_72                          => System_Pack_72,
+     RE_Get_72                           => System_Pack_72,
+     RE_GetU_72                          => System_Pack_72,
+     RE_Set_72                           => System_Pack_72,
+     RE_SetU_72                          => System_Pack_72,
+
+     RE_Bits_73                          => System_Pack_73,
+     RE_Get_73                           => System_Pack_73,
+     RE_Set_73                           => System_Pack_73,
+
+     RE_Bits_74                          => System_Pack_74,
+     RE_Get_74                           => System_Pack_74,
+     RE_GetU_74                          => System_Pack_74,
+     RE_Set_74                           => System_Pack_74,
+     RE_SetU_74                          => System_Pack_74,
+
+     RE_Bits_75                          => System_Pack_75,
+     RE_Get_75                           => System_Pack_75,
+     RE_Set_75                           => System_Pack_75,
+
+     RE_Bits_76                          => System_Pack_76,
+     RE_Get_76                           => System_Pack_76,
+     RE_GetU_76                          => System_Pack_76,
+     RE_Set_76                           => System_Pack_76,
+     RE_SetU_76                          => System_Pack_76,
+
+     RE_Bits_77                          => System_Pack_77,
+     RE_Get_77                           => System_Pack_77,
+     RE_Set_77                           => System_Pack_77,
+
+     RE_Bits_78                          => System_Pack_78,
+     RE_Get_78                           => System_Pack_78,
+     RE_GetU_78                          => System_Pack_78,
+     RE_Set_78                           => System_Pack_78,
+     RE_SetU_78                          => System_Pack_78,
+
+     RE_Bits_79                          => System_Pack_79,
+     RE_Get_79                           => System_Pack_79,
+     RE_Set_79                           => System_Pack_79,
+
+     RE_Bits_80                          => System_Pack_80,
+     RE_Get_80                           => System_Pack_80,
+     RE_GetU_80                          => System_Pack_80,
+     RE_Set_80                           => System_Pack_80,
+     RE_SetU_80                          => System_Pack_80,
+
+     RE_Bits_81                          => System_Pack_81,
+     RE_Get_81                           => System_Pack_81,
+     RE_Set_81                           => System_Pack_81,
+
+     RE_Bits_82                          => System_Pack_82,
+     RE_Get_82                           => System_Pack_82,
+     RE_GetU_82                          => System_Pack_82,
+     RE_Set_82                           => System_Pack_82,
+     RE_SetU_82                          => System_Pack_82,
+
+     RE_Bits_83                          => System_Pack_83,
+     RE_Get_83                           => System_Pack_83,
+     RE_Set_83                           => System_Pack_83,
+
+     RE_Bits_84                          => System_Pack_84,
+     RE_Get_84                           => System_Pack_84,
+     RE_GetU_84                          => System_Pack_84,
+     RE_Set_84                           => System_Pack_84,
+     RE_SetU_84                          => System_Pack_84,
+
+     RE_Bits_85                          => System_Pack_85,
+     RE_Get_85                           => System_Pack_85,
+     RE_Set_85                           => System_Pack_85,
+
+     RE_Bits_86                          => System_Pack_86,
+     RE_Get_86                           => System_Pack_86,
+     RE_GetU_86                          => System_Pack_86,
+     RE_Set_86                           => System_Pack_86,
+     RE_SetU_86                          => System_Pack_86,
+
+     RE_Bits_87                          => System_Pack_87,
+     RE_Get_87                           => System_Pack_87,
+     RE_Set_87                           => System_Pack_87,
+
+     RE_Bits_88                          => System_Pack_88,
+     RE_Get_88                           => System_Pack_88,
+     RE_GetU_88                          => System_Pack_88,
+     RE_Set_88                           => System_Pack_88,
+     RE_SetU_88                          => System_Pack_88,
+
+     RE_Bits_89                          => System_Pack_89,
+     RE_Get_89                           => System_Pack_89,
+     RE_Set_89                           => System_Pack_89,
+
+     RE_Bits_90                          => System_Pack_90,
+     RE_Get_90                           => System_Pack_90,
+     RE_GetU_90                          => System_Pack_90,
+     RE_Set_90                           => System_Pack_90,
+     RE_SetU_90                          => System_Pack_90,
+
+     RE_Bits_91                          => System_Pack_91,
+     RE_Get_91                           => System_Pack_91,
+     RE_Set_91                           => System_Pack_91,
+
+     RE_Bits_92                          => System_Pack_92,
+     RE_Get_92                           => System_Pack_92,
+     RE_GetU_92                          => System_Pack_92,
+     RE_Set_92                           => System_Pack_92,
+     RE_SetU_92                          => System_Pack_92,
+
+     RE_Bits_93                          => System_Pack_93,
+     RE_Get_93                           => System_Pack_93,
+     RE_Set_93                           => System_Pack_93,
+
+     RE_Bits_94                          => System_Pack_94,
+     RE_Get_94                           => System_Pack_94,
+     RE_GetU_94                          => System_Pack_94,
+     RE_Set_94                           => System_Pack_94,
+     RE_SetU_94                          => System_Pack_94,
+
+     RE_Bits_95                          => System_Pack_95,
+     RE_Get_95                           => System_Pack_95,
+     RE_Set_95                           => System_Pack_95,
+
+     RE_Bits_96                          => System_Pack_96,
+     RE_Get_96                           => System_Pack_96,
+     RE_GetU_96                          => System_Pack_96,
+     RE_Set_96                           => System_Pack_96,
+     RE_SetU_96                          => System_Pack_96,
+
+     RE_Bits_97                          => System_Pack_97,
+     RE_Get_97                           => System_Pack_97,
+     RE_Set_97                           => System_Pack_97,
+
+     RE_Bits_98                          => System_Pack_98,
+     RE_Get_98                           => System_Pack_98,
+     RE_GetU_98                          => System_Pack_98,
+     RE_Set_98                           => System_Pack_98,
+     RE_SetU_98                          => System_Pack_98,
+
+     RE_Bits_99                          => System_Pack_99,
+     RE_Get_99                           => System_Pack_99,
+     RE_Set_99                           => System_Pack_99,
+
+     RE_Bits_100                         => System_Pack_100,
+     RE_Get_100                          => System_Pack_100,
+     RE_GetU_100                         => System_Pack_100,
+     RE_Set_100                          => System_Pack_100,
+     RE_SetU_100                         => System_Pack_100,
+
+     RE_Bits_101                         => System_Pack_101,
+     RE_Get_101                          => System_Pack_101,
+     RE_Set_101                          => System_Pack_101,
+
+     RE_Bits_102                         => System_Pack_102,
+     RE_Get_102                          => System_Pack_102,
+     RE_GetU_102                         => System_Pack_102,
+     RE_Set_102                          => System_Pack_102,
+     RE_SetU_102                         => System_Pack_102,
+
+     RE_Bits_103                         => System_Pack_103,
+     RE_Get_103                          => System_Pack_103,
+     RE_Set_103                          => System_Pack_103,
+
+     RE_Bits_104                         => System_Pack_104,
+     RE_Get_104                          => System_Pack_104,
+     RE_GetU_104                         => System_Pack_104,
+     RE_Set_104                          => System_Pack_104,
+     RE_SetU_104                         => System_Pack_104,
+
+     RE_Bits_105                         => System_Pack_105,
+     RE_Get_105                          => System_Pack_105,
+     RE_Set_105                          => System_Pack_105,
+
+     RE_Bits_106                         => System_Pack_106,
+     RE_Get_106                          => System_Pack_106,
+     RE_GetU_106                         => System_Pack_106,
+     RE_Set_106                          => System_Pack_106,
+     RE_SetU_106                         => System_Pack_106,
+
+     RE_Bits_107                         => System_Pack_107,
+     RE_Get_107                          => System_Pack_107,
+     RE_Set_107                          => System_Pack_107,
+
+     RE_Bits_108                         => System_Pack_108,
+     RE_Get_108                          => System_Pack_108,
+     RE_GetU_108                         => System_Pack_108,
+     RE_Set_108                          => System_Pack_108,
+     RE_SetU_108                         => System_Pack_108,
+
+     RE_Bits_109                         => System_Pack_109,
+     RE_Get_109                          => System_Pack_109,
+     RE_Set_109                          => System_Pack_109,
+
+     RE_Bits_110                         => System_Pack_110,
+     RE_Get_110                          => System_Pack_110,
+     RE_GetU_110                         => System_Pack_110,
+     RE_Set_110                          => System_Pack_110,
+     RE_SetU_110                         => System_Pack_110,
+
+     RE_Bits_111                         => System_Pack_111,
+     RE_Get_111                          => System_Pack_111,
+     RE_Set_111                          => System_Pack_111,
+
+     RE_Bits_112                         => System_Pack_112,
+     RE_Get_112                          => System_Pack_112,
+     RE_GetU_112                         => System_Pack_112,
+     RE_Set_112                          => System_Pack_112,
+     RE_SetU_112                         => System_Pack_112,
+
+     RE_Bits_113                         => System_Pack_113,
+     RE_Get_113                          => System_Pack_113,
+     RE_Set_113                          => System_Pack_113,
+
+     RE_Bits_114                         => System_Pack_114,
+     RE_Get_114                          => System_Pack_114,
+     RE_GetU_114                         => System_Pack_114,
+     RE_Set_114                          => System_Pack_114,
+     RE_SetU_114                         => System_Pack_114,
+
+     RE_Bits_115                         => System_Pack_115,
+     RE_Get_115                          => System_Pack_115,
+     RE_Set_115                          => System_Pack_115,
+
+     RE_Bits_116                         => System_Pack_116,
+     RE_Get_116                          => System_Pack_116,
+     RE_GetU_116                         => System_Pack_116,
+     RE_Set_116                          => System_Pack_116,
+     RE_SetU_116                         => System_Pack_116,
+
+     RE_Bits_117                         => System_Pack_117,
+     RE_Get_117                          => System_Pack_117,
+     RE_Set_117                          => System_Pack_117,
+
+     RE_Bits_118                         => System_Pack_118,
+     RE_Get_118                          => System_Pack_118,
+     RE_GetU_118                         => System_Pack_118,
+     RE_Set_118                          => System_Pack_118,
+     RE_SetU_118                         => System_Pack_118,
+
+     RE_Bits_119                         => System_Pack_119,
+     RE_Get_119                          => System_Pack_119,
+     RE_Set_119                          => System_Pack_119,
+
+     RE_Bits_120                         => System_Pack_120,
+     RE_Get_120                          => System_Pack_120,
+     RE_GetU_120                         => System_Pack_120,
+     RE_Set_120                          => System_Pack_120,
+     RE_SetU_120                         => System_Pack_120,
+
+     RE_Bits_121                         => System_Pack_121,
+     RE_Get_121                          => System_Pack_121,
+     RE_Set_121                          => System_Pack_121,
+
+     RE_Bits_122                         => System_Pack_122,
+     RE_Get_122                          => System_Pack_122,
+     RE_GetU_122                         => System_Pack_122,
+     RE_Set_122                          => System_Pack_122,
+     RE_SetU_122                         => System_Pack_122,
+
+     RE_Bits_123                         => System_Pack_123,
+     RE_Get_123                          => System_Pack_123,
+     RE_Set_123                          => System_Pack_123,
+
+     RE_Bits_124                         => System_Pack_124,
+     RE_Get_124                          => System_Pack_124,
+     RE_GetU_124                         => System_Pack_124,
+     RE_Set_124                          => System_Pack_124,
+     RE_SetU_124                         => System_Pack_124,
+
+     RE_Bits_125                         => System_Pack_125,
+     RE_Get_125                          => System_Pack_125,
+     RE_Set_125                          => System_Pack_125,
+
+     RE_Bits_126                         => System_Pack_126,
+     RE_Get_126                          => System_Pack_126,
+     RE_GetU_126                         => System_Pack_126,
+     RE_Set_126                          => System_Pack_126,
+     RE_SetU_126                         => System_Pack_126,
+
+     RE_Bits_127                         => System_Pack_127,
+     RE_Get_127                          => System_Pack_127,
+     RE_Set_127                          => System_Pack_127,
+
      RE_Adjust_Storage_Size              => System_Parameters,
      RE_Default_Secondary_Stack_Size     => System_Parameters,
      RE_Default_Stack_Size               => System_Parameters,
@@ -2612,8 +3451,10 @@ package Rtsfind is
 
      RE_Put_Image_Integer                => System_Put_Images,
      RE_Put_Image_Long_Long_Integer      => System_Put_Images,
+     RE_Put_Image_Long_Long_Long_Integer => System_Put_Images,
      RE_Put_Image_Unsigned               => System_Put_Images,
      RE_Put_Image_Long_Long_Unsigned     => System_Put_Images,
+     RE_Put_Image_Long_Long_Long_Unsigned => System_Put_Images,
      RE_Put_Image_Thin_Pointer           => System_Put_Images,
      RE_Put_Image_Fat_Pointer            => System_Put_Images,
      RE_Put_Image_Access_Subp            => System_Put_Images,
@@ -2644,14 +3485,12 @@ package Rtsfind is
      RE_IS_Is2                           => System_Scalar_Values,
      RE_IS_Is4                           => System_Scalar_Values,
      RE_IS_Is8                           => System_Scalar_Values,
+     RE_IS_Is16                          => System_Scalar_Values,
      RE_IS_Iu1                           => System_Scalar_Values,
      RE_IS_Iu2                           => System_Scalar_Values,
      RE_IS_Iu4                           => System_Scalar_Values,
      RE_IS_Iu8                           => System_Scalar_Values,
-     RE_IS_Iz1                           => System_Scalar_Values,
-     RE_IS_Iz2                           => System_Scalar_Values,
-     RE_IS_Iz4                           => System_Scalar_Values,
-     RE_IS_Iz8                           => System_Scalar_Values,
+     RE_IS_Iu16                          => System_Scalar_Values,
      RE_IS_Isf                           => System_Scalar_Values,
      RE_IS_Ifl                           => System_Scalar_Values,
      RE_IS_Ilf                           => System_Scalar_Values,
@@ -2701,6 +3540,8 @@ package Rtsfind is
      RE_I_LI                             => System_Stream_Attributes,
      RE_I_LLF                            => System_Stream_Attributes,
      RE_I_LLI                            => System_Stream_Attributes,
+     RE_I_LLLI                           => System_Stream_Attributes,
+     RE_I_LLLU                           => System_Stream_Attributes,
      RE_I_LLU                            => System_Stream_Attributes,
      RE_I_LU                             => System_Stream_Attributes,
      RE_I_SF                             => System_Stream_Attributes,
@@ -2724,6 +3565,8 @@ package Rtsfind is
      RE_W_LI                             => System_Stream_Attributes,
      RE_W_LLF                            => System_Stream_Attributes,
      RE_W_LLI                            => System_Stream_Attributes,
+     RE_W_LLLI                           => System_Stream_Attributes,
+     RE_W_LLLU                           => System_Stream_Attributes,
      RE_W_LLU                            => System_Stream_Attributes,
      RE_W_LU                             => System_Stream_Attributes,
      RE_W_SF                             => System_Stream_Attributes,
@@ -2842,8 +3685,8 @@ package Rtsfind is
      RE_Bits_2                           => System_Unsigned_Types,
      RE_Bits_4                           => System_Unsigned_Types,
      RE_Float_Unsigned                   => System_Unsigned_Types,
-     RE_Long_Unsigned                    => System_Unsigned_Types,
      RE_Long_Long_Unsigned               => System_Unsigned_Types,
+     RE_Long_Long_Long_Unsigned          => System_Unsigned_Types,
      RE_Packed_Byte                      => System_Unsigned_Types,
      RE_Packed_Bytes1                    => System_Unsigned_Types,
      RE_Packed_Bytes2                    => System_Unsigned_Types,
@@ -2851,29 +3694,43 @@ package Rtsfind is
      RE_Rev_Packed_Bytes1                => System_Unsigned_Types,
      RE_Rev_Packed_Bytes2                => System_Unsigned_Types,
      RE_Rev_Packed_Bytes4                => System_Unsigned_Types,
-     RE_Short_Unsigned                   => System_Unsigned_Types,
-     RE_Short_Short_Unsigned             => System_Unsigned_Types,
      RE_Unsigned                         => System_Unsigned_Types,
 
      RE_Value_Boolean                    => System_Val_Bool,
 
      RE_Value_Character                  => System_Val_Char,
 
-     RE_Value_Decimal                    => System_Val_Dec,
+     RE_Value_Decimal32                  => System_Val_Decimal_32,
+
+     RE_Value_Decimal64                  => System_Val_Decimal_64,
+
+     RE_Value_Decimal128                 => System_Val_Decimal_128,
 
      RE_Value_Enumeration_8              => System_Val_Enum,
      RE_Value_Enumeration_16             => System_Val_Enum,
      RE_Value_Enumeration_32             => System_Val_Enum,
 
+     RE_Value_Fixed32                    => System_Val_Fixed_32,
+
+     RE_Value_Fixed64                    => System_Val_Fixed_64,
+
+     RE_Value_Fixed128                   => System_Val_Fixed_128,
+
+     RE_Value_Float                      => System_Val_Flt,
+
      RE_Value_Integer                    => System_Val_Int,
 
-     RE_Value_Long_Long_Decimal          => System_Val_LLD,
+     RE_Value_Long_Float                 => System_Val_LFlt,
+
+     RE_Value_Long_Long_Float            => System_Val_LLF,
 
      RE_Value_Long_Long_Integer          => System_Val_LLI,
 
+     RE_Value_Long_Long_Long_Integer     => System_Val_LLLI,
+
      RE_Value_Long_Long_Unsigned         => System_Val_LLU,
 
-     RE_Value_Real                       => System_Val_Real,
+     RE_Value_Long_Long_Long_Unsigned    => System_Val_LLLU,
 
      RE_Value_Unsigned                   => System_Val_Uns,
 
@@ -2914,9 +3771,17 @@ package Rtsfind is
      RE_Width_Enumeration_16             => System_Wid_Enum,
      RE_Width_Enumeration_32             => System_Wid_Enum,
 
+     RE_Width_Integer                    => System_Wid_Int,
+
      RE_Width_Long_Long_Integer          => System_Wid_LLI,
 
+     RE_Width_Long_Long_Long_Integer     => System_Wid_LLLI,
+
      RE_Width_Long_Long_Unsigned         => System_Wid_LLU,
+
+     RE_Width_Long_Long_Long_Unsigned    => System_Wid_LLLU,
+
+     RE_Width_Unsigned                   => System_Wid_Uns,
 
      RE_Width_Wide_Character             => System_Wid_WChar,
      RE_Width_Wide_Wide_Character        => System_Wid_WChar,

@@ -1,6 +1,6 @@
 // Control various target specific ABI tweaks.  ARM version.
 
-// Copyright (C) 2004-2020 Free Software Foundation, Inc.
+// Copyright (C) 2004-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -48,7 +48,7 @@ namespace __cxxabiv1
   typedef int __guard;
 
 #define _GLIBCXX_GUARD_TEST_AND_ACQUIRE(x) \
-  _GLIBCXX_GUARD_TEST(__atomic_load_n(x, __ATOMIC_ACQUIRE))
+  ((__atomic_load_n(x, __ATOMIC_ACQUIRE) & 1) != 0)
 #define _GLIBCXX_GUARD_SET_AND_RELEASE(x) \
   __atomic_store_n(x, 1, __ATOMIC_RELEASE)
 

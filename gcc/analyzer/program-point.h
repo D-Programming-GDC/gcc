@@ -1,5 +1,5 @@
 /* Classes for representing locations within the program.
-   Copyright (C) 2019-2020 Free Software Foundation, Inc.
+   Copyright (C) 2019-2021 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -138,6 +138,9 @@ public:
 				     const function_point &point_b);
   static int cmp_within_supernode (const function_point &point_a,
 				   const function_point &point_b);
+  static int cmp (const function_point &point_a,
+		  const function_point &point_b);
+  static int cmp_ptr (const void *p1, const void *p2);
 
   /* For before_stmt, go to next stmt.  */
   void next_stmt ();

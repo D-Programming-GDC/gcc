@@ -306,8 +306,6 @@ package body Sem_Ch6 is
       --  If the expression is a completion, Prev is the entity whose
       --  declaration is completed. Def_Id is needed to analyze the spec.
 
-   --  Start of processing for Analyze_Expression_Function
-
    begin
       --  This is one of the occasions on which we transform the tree during
       --  semantic analysis. If this is a completion, transform the expression
@@ -611,6 +609,12 @@ package body Sem_Ch6 is
                   Set_Expression
                     (Original_Node (Subprogram_Spec (Def_Id)),
                      New_Copy_Tree (Expr));
+
+                  --  Mark static expression functions as inlined, to ensure
+                  --  that even calls with nonstatic actuals will be inlined.
+
+                  Set_Has_Pragma_Inline (Def_Id);
+                  Set_Is_Inlined (Def_Id);
                end if;
             end if;
          end;
@@ -668,9 +672,9 @@ package body Sem_Ch6 is
       end if;
    end Analyze_Expression_Function;
 
-   ----------------------------------------
-   -- Analyze_Extended_Return_Statement  --
-   ----------------------------------------
+   ---------------------------------------
+   -- Analyze_Extended_Return_Statement --
+   ---------------------------------------
 
    procedure Analyze_Extended_Return_Statement (N : Node_Id) is
    begin
@@ -780,20 +784,55 @@ package body Sem_Ch6 is
       ------------------------------------------
 
       procedure Check_Return_Construct_Accessibility (Return_Stmt : Node_Id) is
-         Assoc         : Node_Id;
-         Agg           : Node_Id := Empty;
-         Discr         : Entity_Id;
-         Expr          : Node_Id;
-         Obj           : Node_Id;
-         Process_Exprs : Boolean := False;
-         Return_Con    : Node_Id;
+
+         function First_Selector (Assoc : Node_Id) return Node_Id;
+         --  Obtain the first selector or choice from a given association
+
+         --------------------
+         -- First_Selector --
+         --------------------
+
+         function First_Selector (Assoc : Node_Id) return Node_Id is
+         begin
+            if Nkind (Assoc) = N_Component_Association then
+               return First (Choices (Assoc));
+
+            elsif Nkind (Assoc) = N_Discriminant_Association then
+               return (First (Selector_Names (Assoc)));
+
+            else
+               raise Program_Error;
+            end if;
+         end First_Selector;
+
+         --  Local declarations
+
+         Assoc : Node_Id := Empty;
+         --  Assoc should perhaps be renamed and declared as a
+         --  Node_Or_Entity_Id since it encompasses not only component and
+         --  discriminant associations, but also discriminant components within
+         --  a type declaration or subtype indication ???
+
+         Assoc_Expr    : Node_Id;
+         Assoc_Present : Boolean := False;
+
+         Unseen_Disc_Count : Nat := 0;
+         Seen_Discs        : Elist_Id;
+         Disc              : Entity_Id;
+         First_Disc        : Entity_Id;
+
+         Obj_Decl   : Node_Id;
+         Return_Con : Node_Id;
+         Unqual     : Node_Id;
+
+      --  Start of processing for Check_Return_Construct_Accessibility
 
       begin
          --  Only perform checks on record types with access discriminants and
          --  non-internally generated functions.
 
          if not Is_Record_Type (R_Type)
-           or else not Has_Discriminants (R_Type)
+           or else not Has_Anonymous_Access_Discriminant (R_Type)
            or else not Comes_From_Source (Return_Stmt)
          then
             return;
@@ -833,165 +872,370 @@ package body Sem_Ch6 is
 
             Return_Con := Original_Node (Return_Con);
          else
-            Return_Con := Return_Stmt;
+            Return_Con := Expression (Return_Stmt);
          end if;
 
-         --  We may need to check an aggregate or a subtype indication
-         --  depending on how the discriminants were specified and whether
-         --  we are looking at an extended return statement.
+         --  Obtain the accessibility levels of the expressions associated
+         --  with all anonymous access discriminants, then generate a
+         --  dynamic check or static error when relevant.
 
-         if Nkind (Return_Con) = N_Object_Declaration
-           and then Nkind (Object_Definition (Return_Con))
-                      = N_Subtype_Indication
+         Unqual := Unqualify (Original_Node (Return_Con));
+
+         --  Get the corresponding declaration based on the return object's
+         --  identifier.
+
+         if Nkind (Unqual) = N_Identifier
+           and then Nkind (Parent (Entity (Unqual)))
+                      in N_Object_Declaration
+                       | N_Object_Renaming_Declaration
          then
-            Assoc := Original_Node
-                       (First
-                         (Constraints
-                           (Constraint (Object_Definition (Return_Con)))));
+            Obj_Decl := Original_Node (Parent (Entity (Unqual)));
+
+         --  We were passed the object declaration directly, so use it
+
+         elsif Nkind (Unqual) in N_Object_Declaration
+                               | N_Object_Renaming_Declaration
+         then
+            Obj_Decl := Unqual;
+
+         --  Otherwise, we are looking at something else
+
          else
-            --  Qualified expressions may be nested
+            Obj_Decl := Empty;
 
-            Agg := Original_Node (Expression (Return_Con));
-            while Nkind (Agg) = N_Qualified_Expression loop
-               Agg := Original_Node (Expression (Agg));
-            end loop;
-
-            --  If we are looking at an aggregate instead of a function call we
-            --  can continue checking accessibility for the supplied
-            --  discriminant associations.
-
-            if Nkind (Agg) = N_Aggregate then
-               if Present (Expressions (Agg)) then
-                  Assoc         := First (Expressions (Agg));
-                  Process_Exprs := True;
-               else
-                  Assoc := First (Component_Associations (Agg));
-               end if;
-
-            --  Otherwise the expression is not of interest ???
-
-            else
-               return;
-            end if;
          end if;
 
-         --  Move through the discriminants checking the accessibility level
-         --  of each co-extension's associated expression.
+         --  Hop up object renamings when present
 
-         Discr := First_Discriminant (R_Type);
-         while Present (Discr) loop
-            if Ekind (Etype (Discr)) = E_Anonymous_Access_Type then
+         if Present (Obj_Decl)
+           and then Nkind (Obj_Decl) = N_Object_Renaming_Declaration
+         then
+            while Nkind (Obj_Decl) = N_Object_Renaming_Declaration loop
 
-               if Nkind (Assoc) = N_Attribute_Reference then
-                  Expr := Assoc;
-               elsif Nkind (Assoc) in
-                       N_Component_Association | N_Discriminant_Association
-               then
-                  Expr := Expression (Assoc);
-               else
-                  Expr := Empty;
-               end if;
+               if Nkind (Name (Obj_Decl)) not in N_Entity then
+                  --  We may be looking at the expansion of iterators or
+                  --  some other internally generated construct, so it is safe
+                  --  to ignore checks ???
 
-               --  This anonymous access discriminant has an associated
-               --  expression which needs checking.
-
-               if Present (Expr)
-                 and then Nkind (Expr) = N_Attribute_Reference
-                 and then Attribute_Name (Expr) /= Name_Unrestricted_Access
-               then
-                  --  Obtain the object to perform static checks on by moving
-                  --  up the prefixes in the expression taking into account
-                  --  named access types and renamed objects within the
-                  --  expression.
-
-                  --  Note, this loop duplicates some of the logic in
-                  --  Object_Access_Level since we have to check special rules
-                  --  based on the context we are in (a return aggregate)
-                  --  relating to formals of the current function.
-
-                  Obj := Original_Node (Prefix (Expr));
-                  loop
-                     while Nkind (Obj) in N_Explicit_Dereference
-                                        | N_Indexed_Component
-                                        | N_Selected_Component
-                     loop
-                        --  When we encounter a named access type then we can
-                        --  ignore accessibility checks on the dereference.
-
-                        if Ekind (Etype (Original_Node (Prefix (Obj))))
-                             in E_Access_Type ..
-                                E_Access_Protected_Subprogram_Type
-                        then
-                           if Nkind (Obj) = N_Selected_Component then
-                              Obj := Selector_Name (Obj);
-                           else
-                              Obj := Original_Node (Prefix (Obj));
-                           end if;
-                           exit;
-                        end if;
-
-                        Obj := Original_Node (Prefix (Obj));
-                     end loop;
-
-                     if Nkind (Obj) = N_Selected_Component then
-                        Obj := Selector_Name (Obj);
-                     end if;
-
-                     --  Check for renamings
-
-                     pragma Assert (Is_Entity_Name (Obj));
-
-                     if Present (Renamed_Object (Entity (Obj))) then
-                        Obj := Renamed_Object (Entity (Obj));
-                     else
-                        exit;
-                     end if;
-                  end loop;
-
-                  --  Do not check aliased formals statically
-
-                  if Is_Formal (Entity (Obj))
-                    and then (Is_Aliased (Entity (Obj))
-                               or else Ekind (Etype (Entity (Obj))) =
-                                         E_Anonymous_Access_Type)
-                  then
-                     null;
-
-                  --  Otherwise, handle the expression normally, avoiding the
-                  --  special logic above, and call Object_Access_Level with
-                  --  the original expression.
-
-                  elsif Object_Access_Level (Expr) >
-                          Scope_Depth (Scope (Scope_Id))
-                  then
-                     Error_Msg_N
-                       ("access discriminant in return aggregate would "
-                        & "be a dangling reference", Obj);
+                  if not Comes_From_Source (Obj_Decl) then
+                     return;
                   end if;
-               end if;
-            end if;
 
-            Next_Discriminant (Discr);
+                  Obj_Decl := Original_Node
+                                (Declaration_Node
+                                  (Ultimate_Prefix (Name (Obj_Decl))));
 
-            if not Is_List_Member (Assoc) then
-               Assoc := Empty;
-            else
-               Nlists.Next (Assoc);
-            end if;
+               --  Move up to the next declaration based on the object's name
 
-            --  After aggregate expressions, examine component associations if
-            --  present.
-
-            if No (Assoc) then
-               if Present (Agg)
-                 and then Process_Exprs
-                 and then Present (Component_Associations (Agg))
-               then
-                  Assoc         := First (Component_Associations (Agg));
-                  Process_Exprs := False;
                else
+                  Obj_Decl := Original_Node
+                                (Declaration_Node (Name (Obj_Decl)));
+               end if;
+            end loop;
+         end if;
+
+         --  Obtain the discriminant values from the return aggregate
+
+         --  Do we cover extension aggregates correctly ???
+
+         if Nkind (Unqual) = N_Aggregate then
+            if Present (Expressions (Unqual)) then
+               Assoc := First (Expressions (Unqual));
+            else
+               Assoc := First (Component_Associations (Unqual));
+            end if;
+
+         --  There is an object declaration for the return object
+
+         elsif Present (Obj_Decl) then
+            --  When a subtype indication is present in an object declaration
+            --  it must contain the object's discriminants.
+
+            if Nkind (Object_Definition (Obj_Decl)) = N_Subtype_Indication then
+               Assoc := First
+                          (Constraints
+                            (Constraint
+                              (Object_Definition (Obj_Decl))));
+
+            --  The object declaration contains an aggregate
+
+            elsif Present (Expression (Obj_Decl)) then
+
+               if Nkind (Unqualify (Expression (Obj_Decl))) = N_Aggregate then
+                  --  Grab the first associated discriminant expresion
+
+                  if Present
+                       (Expressions (Unqualify (Expression (Obj_Decl))))
+                  then
+                     Assoc := First
+                                (Expressions
+                                  (Unqualify (Expression (Obj_Decl))));
+                  else
+                     Assoc := First
+                                (Component_Associations
+                                  (Unqualify (Expression (Obj_Decl))));
+                  end if;
+
+               --  Otherwise, this is something else
+
+               else
+                  return;
+               end if;
+
+            --  There are no supplied discriminants in the object declaration,
+            --  so get them from the type definition since they must be default
+            --  initialized.
+
+            --  Do we handle constrained subtypes correctly ???
+
+            elsif Nkind (Unqual) = N_Object_Declaration then
+               Assoc := First_Discriminant
+                          (Etype (Object_Definition (Obj_Decl)));
+
+            else
+               Assoc := First_Discriminant (Etype (Unqual));
+            end if;
+
+         --  When we are not looking at an aggregate or an identifier, return
+         --  since any other construct (like a function call) is not
+         --  applicable since checks will be performed on the side of the
+         --  callee.
+
+         else
+            return;
+         end if;
+
+         --  Obtain the discriminants so we know the actual type in case the
+         --  value of their associated expression gets implicitly converted.
+
+         if No (Obj_Decl) then
+            pragma Assert (Nkind (Unqual) = N_Aggregate);
+
+            Disc := First_Discriminant (Etype (Unqual));
+
+         else
+            Disc := First_Discriminant
+                      (Etype (Defining_Identifier (Obj_Decl)));
+         end if;
+
+         --  Preserve the first discriminant for checking named associations
+
+         First_Disc := Disc;
+
+         --  Count the number of discriminants for processing an aggregate
+         --  which includes an others.
+
+         Disc := First_Disc;
+         while Present (Disc) loop
+            Unseen_Disc_Count := Unseen_Disc_Count + 1;
+
+            Next_Discriminant (Disc);
+         end loop;
+
+         Seen_Discs := New_Elmt_List;
+
+         --  Loop through each of the discriminants and check each expression
+         --  associated with an anonymous access discriminant.
+
+         --  When named associations occur in the return aggregate then
+         --  discriminants can be in any order, so we need to ensure we do
+         --  not continue to loop when all discriminants have been seen.
+
+         Disc := First_Disc;
+         while Present (Assoc)
+           and then (Present (Disc) or else Assoc_Present)
+           and then Unseen_Disc_Count > 0
+         loop
+            --  Handle named associations by searching through the names of
+            --  the relevant discriminant components.
+
+            if Nkind (Assoc)
+                 in N_Component_Association | N_Discriminant_Association
+            then
+               Assoc_Expr    := Expression (Assoc);
+               Assoc_Present := True;
+
+               --  We currently don't handle box initialized discriminants,
+               --  however, since default initialized anonymous access
+               --  discriminants are a corner case, this is ok for now ???
+
+               if Nkind (Assoc) = N_Component_Association
+                 and then Box_Present (Assoc)
+               then
+                  Assoc_Present := False;
+
+                  if Nkind (First_Selector (Assoc)) = N_Others_Choice then
+                     Unseen_Disc_Count := 0;
+                  end if;
+
+               --  When others is present we must identify a discriminant we
+               --  haven't already seen so as to get the appropriate type for
+               --  the static accessibility check.
+
+               --  This works because all components within an others clause
+               --  must have the same type.
+
+               elsif Nkind (First_Selector (Assoc)) = N_Others_Choice then
+
+                  Disc := First_Disc;
+                  Outer : while Present (Disc) loop
+                     declare
+                        Current_Seen_Disc : Elmt_Id;
+                     begin
+                        --  Move through the list of identified discriminants
+
+                        Current_Seen_Disc := First_Elmt (Seen_Discs);
+                        while Present (Current_Seen_Disc) loop
+                           --  Exit the loop when we found a match
+
+                           exit when
+                             Chars (Node (Current_Seen_Disc)) = Chars (Disc);
+
+                           Next_Elmt (Current_Seen_Disc);
+                        end loop;
+
+                        --  When we have exited the above loop without finding
+                        --  a match then we know that Disc has not been seen.
+
+                        exit Outer when No (Current_Seen_Disc);
+                     end;
+
+                     Next_Discriminant (Disc);
+                  end loop Outer;
+
+                  --  If we got to an others clause with a non-zero
+                  --  discriminant count there must be a discriminant left to
+                  --  check.
+
+                  pragma Assert (Present (Disc));
+
+                  --  Set the unseen discriminant count to zero because we know
+                  --  an others clause sets all remaining components of an
+                  --  aggregate.
+
+                  Unseen_Disc_Count := 0;
+
+               --  Move through each of the selectors in the named association
+               --  and obtain a discriminant for accessibility checking if one
+               --  is referenced in the list. Also track which discriminants
+               --  are referenced for the purpose of handling an others clause.
+
+               else
+                  declare
+                     Assoc_Choice : Node_Id;
+                     Curr_Disc    : Node_Id;
+                  begin
+
+                     Disc      := Empty;
+                     Curr_Disc := First_Disc;
+                     while Present (Curr_Disc) loop
+                        --  Check each of the choices in the associations for a
+                        --  match to the name of the current discriminant.
+
+                        Assoc_Choice := First_Selector (Assoc);
+                        while Present (Assoc_Choice) loop
+                           --  When the name matches we track that we have seen
+                           --  the discriminant, but instead of exiting the
+                           --  loop we continue iterating to make sure all the
+                           --  discriminants within the named association get
+                           --  tracked.
+
+                           if Chars (Assoc_Choice) = Chars (Curr_Disc) then
+                              Append_Elmt (Curr_Disc, Seen_Discs);
+
+                              Disc              := Curr_Disc;
+                              Unseen_Disc_Count := Unseen_Disc_Count - 1;
+                           end if;
+
+                           Next (Assoc_Choice);
+                        end loop;
+
+                        Next_Discriminant (Curr_Disc);
+                     end loop;
+                  end;
+               end if;
+
+            --  Unwrap the associated expression if we are looking at a default
+            --  initialized type declaration. In this case Assoc is not really
+            --  an association, but a component declaration. Should Assoc be
+            --  renamed in some way to be more clear ???
+
+            --  This occurs when the return object does not initialize
+            --  discriminant and instead relies on the type declaration for
+            --  their supplied values.
+
+            elsif Nkind (Assoc) in N_Entity
+              and then Ekind (Assoc) = E_Discriminant
+            then
+               Append_Elmt (Disc, Seen_Discs);
+
+               Assoc_Expr        := Discriminant_Default_Value (Assoc);
+               Unseen_Disc_Count := Unseen_Disc_Count - 1;
+
+            --  Otherwise, there is nothing to do because Assoc is an
+            --  expression within the return aggregate itself.
+
+            else
+               Append_Elmt (Disc, Seen_Discs);
+
+               Assoc_Expr        := Assoc;
+               Unseen_Disc_Count := Unseen_Disc_Count - 1;
+            end if;
+
+            --  Check the accessibility level of the expression when the
+            --  discriminant is of an anonymous access type.
+
+            if Present (Assoc_Expr)
+              and then Present (Disc)
+              and then Ekind (Etype (Disc)) = E_Anonymous_Access_Type
+            then
+               --  Perform a static check first, if possible
+
+               if Static_Accessibility_Level
+                    (Expr              => Assoc_Expr,
+                     Level             => Zero_On_Dynamic_Level,
+                     In_Return_Context => True)
+                      > Scope_Depth (Scope (Scope_Id))
+               then
+                  Error_Msg_N
+                    ("access discriminant in return object would be a dangling"
+                     & " reference", Return_Stmt);
+
                   exit;
                end if;
+
+               --  Otherwise, generate a dynamic check based on the extra
+               --  accessibility of the result.
+
+               if Present (Extra_Accessibility_Of_Result (Scope_Id)) then
+                  Insert_Before_And_Analyze (Return_Stmt,
+                    Make_Raise_Program_Error (Loc,
+                      Condition =>
+                        Make_Op_Gt (Loc,
+                          Left_Opnd  => Accessibility_Level
+                                          (Expr              => Assoc_Expr,
+                                           Level             => Dynamic_Level,
+                                           In_Return_Context => True),
+                          Right_Opnd => Extra_Accessibility_Of_Result
+                                          (Scope_Id)),
+                      Reason    => PE_Accessibility_Check_Failed));
+               end if;
+            end if;
+
+            --  Iterate over the discriminants, except when we have encountered
+            --  a named association since the discriminant order becomes
+            --  irrelevant in that case.
+
+            if not Assoc_Present then
+               Next_Discriminant (Disc);
+            end if;
+
+            --  Iterate over associations
+
+            if not Is_List_Member (Assoc) then
+               exit;
+            else
+               Nlists.Next (Assoc);
             end if;
          end loop;
       end Check_Return_Construct_Accessibility;
@@ -1293,12 +1537,12 @@ package body Sem_Ch6 is
                   --  Can it really happen (extended return???)
 
                   Error_Msg_N
-                    ("aliased only allowed for limited return objects "
+                    ("ALIASED only allowed for limited return objects "
                      & "in Ada 2012??", N);
 
                elsif not Is_Limited_View (R_Type) then
                   Error_Msg_N
-                    ("aliased only allowed for limited return objects", N);
+                    ("ALIASED only allowed for limited return objects", N);
                end if;
             end if;
 
@@ -1432,8 +1676,8 @@ package body Sem_Ch6 is
 
          if (Ada_Version < Ada_2005 or else Debug_Flag_Dot_L)
            and then Is_Limited_View (Etype (Scope_Id))
-           and then Object_Access_Level (Expr) >
-                      Subprogram_Access_Level (Scope_Id)
+           and then Static_Accessibility_Level (Expr, Zero_On_Dynamic_Level)
+                      > Subprogram_Access_Level (Scope_Id)
          then
             --  Suppress the message in a generic, where the rewriting
             --  is irrelevant.
@@ -1865,12 +2109,18 @@ package body Sem_Ch6 is
    --  is just a string, as in (conjunction = "or"). In these cases the parser
    --  generates this node, and the semantics does the disambiguation. Other
    --  such case are actuals in an instantiation, the generic unit in an
-   --  instantiation, and pragma arguments.
+   --  instantiation, pragma arguments, and aspect specifications.
 
    procedure Analyze_Operator_Symbol (N : Node_Id) is
       Par : constant Node_Id := Parent (N);
 
+      Maybe_Aspect_Spec : Node_Id := Par;
    begin
+      if Nkind (Maybe_Aspect_Spec) /= N_Aspect_Specification then
+         --  deal with N_Aggregate nodes
+         Maybe_Aspect_Spec := Parent (Maybe_Aspect_Spec);
+      end if;
+
       if        (Nkind (Par) = N_Function_Call and then N = Name (Par))
         or else  Nkind (Par) = N_Function_Instantiation
         or else (Nkind (Par) = N_Indexed_Component and then N = Prefix (Par))
@@ -1879,6 +2129,10 @@ package body Sem_Ch6 is
         or else  Nkind (Par) = N_Subprogram_Renaming_Declaration
         or else (Nkind (Par) = N_Attribute_Reference
                   and then Attribute_Name (Par) /= Name_Value)
+        or else (Nkind (Maybe_Aspect_Spec) = N_Aspect_Specification
+                  and then Get_Aspect_Id (Maybe_Aspect_Spec)
+                            --  include other aspects here ???
+                            in Aspect_Stable_Properties | Aspect_Aggregate)
       then
          Find_Direct_Name (N);
 
@@ -2176,6 +2430,26 @@ package body Sem_Ch6 is
 
       else
          Error_Msg_N ("invalid procedure or entry call", N);
+
+         --  Specialize the error message in the case where both a primitive
+         --  operation and a record component are visible at the same time.
+
+         if Nkind (P) = N_Selected_Component
+           and then Is_Entity_Name (Selector_Name (P))
+         then
+            declare
+               Sel : constant Entity_Id := Entity (Selector_Name (P));
+            begin
+               if Ekind (Sel) = E_Component
+                 and then Present (Homonym (Sel))
+                 and then Ekind (Homonym (Sel)) = E_Procedure
+               then
+                  Error_Msg_NE ("\component & conflicts with"
+                    & " homonym procedure (RM 4.1.3 (9.2/3))",
+                    Selector_Name (P), Sel);
+               end if;
+            end;
+         end if;
       end if;
 
    <<Leave>>
@@ -2216,13 +2490,11 @@ package body Sem_Ch6 is
          Result : Entity_Id := Empty;
 
       begin
-         --  Loop outward through the Scope_Stack, skipping blocks, loops,
-         --  and postconditions.
+         --  Loop outward through the Scope_Stack, skipping blocks, and loops
 
          for J in reverse 0 .. Scope_Stack.Last loop
             Result := Scope_Stack.Table (J).Entity;
-            exit when Ekind (Result) not in E_Block | E_Loop
-              and then Chars (Result) /= Name_uPostconditions;
+            exit when Ekind (Result) not in E_Block | E_Loop;
          end loop;
 
          pragma Assert (Present (Result));
@@ -2574,6 +2846,9 @@ package body Sem_Ch6 is
       Loc       : constant Source_Ptr := Sloc (N);
       Prev_Id   : constant Entity_Id  := Current_Entity_In_Scope (Body_Id);
 
+      Body_Nod         : Node_Id := Empty;
+      Minimum_Acc_Objs : List_Id := No_List;
+
       Conformant : Boolean;
       Desig_View : Entity_Id := Empty;
       Exch_Views : Elist_Id  := No_Elist;
@@ -2657,6 +2932,13 @@ package body Sem_Ch6 is
       --  incomplete types coming from a limited context and replace their
       --  limited views with the non-limited ones. Return the list of changes
       --  to be used to undo the transformation.
+
+      procedure Generate_Minimum_Accessibility
+        (Extra_Access : Entity_Id;
+         Related_Form : Entity_Id := Empty);
+      --  Generate a minimum accessibility object for a given extra
+      --  accessibility formal (Extra_Access) and its related formal if it
+      --  exists.
 
       function Is_Private_Concurrent_Primitive
         (Subp_Id : Entity_Id) return Boolean;
@@ -2957,10 +3239,10 @@ package body Sem_Ch6 is
          --  Required to ensure that Expand_Call rewrites calls to this
          --  function by calls to the built procedure.
 
-         if Modify_Tree_For_C
+         if Transform_Function_Array
            and then Nkind (Body_Spec) = N_Function_Specification
            and then
-              Rewritten_For_C (Defining_Entity (Specification (Subp_Decl)))
+             Rewritten_For_C (Defining_Entity (Specification (Subp_Decl)))
          then
             Set_Rewritten_For_C (Defining_Entity (Body_Spec));
             Set_Corresponding_Procedure (Defining_Entity (Body_Spec),
@@ -3435,6 +3717,66 @@ package body Sem_Ch6 is
          return Result;
       end Exchange_Limited_Views;
 
+      ------------------------------------
+      -- Generate_Minimum_Accessibility --
+      ------------------------------------
+
+      procedure Generate_Minimum_Accessibility
+        (Extra_Access : Entity_Id;
+         Related_Form : Entity_Id := Empty)
+      is
+         Loc      : constant Source_Ptr := Sloc (Body_Nod);
+         Form     : Entity_Id;
+         Obj_Node : Node_Id;
+      begin
+         --  When no related formal exists then we are dealing with an
+         --  extra accessibility formal for a function result.
+
+         if No (Related_Form) then
+            Form := Extra_Access;
+         else
+            Form := Related_Form;
+         end if;
+
+         --  Create the minimum accessibility object
+
+         Obj_Node :=
+            Make_Object_Declaration (Loc,
+             Defining_Identifier =>
+               Make_Temporary
+                 (Loc, 'A', Extra_Access),
+             Object_Definition   => New_Occurrence_Of
+                                      (Standard_Natural, Loc),
+             Expression          =>
+               Make_Attribute_Reference (Loc,
+                 Prefix         => New_Occurrence_Of
+                                     (Standard_Natural, Loc),
+                 Attribute_Name => Name_Min,
+                 Expressions    => New_List (
+                   Make_Integer_Literal (Loc,
+                     Scope_Depth (Body_Id)),
+                   New_Occurrence_Of
+                     (Extra_Access, Loc))));
+
+         --  Add the new local object to the Minimum_Acc_Obj to
+         --  be later prepended to the subprogram's list of
+         --  declarations after we are sure all expansion is
+         --  done.
+
+         if Present (Minimum_Acc_Objs) then
+            Prepend (Obj_Node, Minimum_Acc_Objs);
+         else
+            Minimum_Acc_Objs := New_List (Obj_Node);
+         end if;
+
+         --  Register the object and analyze it
+
+         Set_Minimum_Accessibility
+           (Form, Defining_Identifier (Obj_Node));
+
+         Analyze (Obj_Node);
+      end Generate_Minimum_Accessibility;
+
       -------------------------------------
       -- Is_Private_Concurrent_Primitive --
       -------------------------------------
@@ -3766,9 +4108,6 @@ package body Sem_Ch6 is
 
       --  Local variables
 
-      Body_Nod         : Node_Id := Empty;
-      Minimum_Acc_Objs : List_Id := No_List;
-
       Saved_GM   : constant Ghost_Mode_Type := Ghost_Mode;
       Saved_IGR  : constant Node_Id         := Ignored_Ghost_Region;
       Saved_EA   : constant Boolean         := Expander_Active;
@@ -3950,11 +4289,11 @@ package body Sem_Ch6 is
                   Build_Subprogram_Declaration;
 
                --  If this is a function that returns a constrained array, and
-               --  we are generating C code, create subprogram declaration
-               --  to simplify subsequent C generation.
+               --  Transform_Function_Array is set, create subprogram
+               --  declaration to simplify e.g. subsequent C generation.
 
                elsif No (Spec_Id)
-                 and then Modify_Tree_For_C
+                 and then Transform_Function_Array
                  and then Nkind (Body_Spec) = N_Function_Specification
                  and then Is_Array_Type (Etype (Body_Id))
                  and then Is_Constrained (Etype (Body_Id))
@@ -4048,33 +4387,58 @@ package body Sem_Ch6 is
          Spec_Id := Build_Internal_Protected_Declaration (N);
       end if;
 
-      --  If we are generating C and this is a function returning a constrained
-      --  array type for which we must create a procedure with an extra out
-      --  parameter, build and analyze the body now. The procedure declaration
-      --  has already been created. We reuse the source body of the function,
-      --  because in an instance it may contain global references that cannot
-      --  be reanalyzed. The source function itself is not used any further,
-      --  so we mark it as having a completion. If the subprogram is a stub the
-      --  transformation is done later, when the proper body is analyzed.
+      --  If Transform_Function_Array is set and this is a function returning a
+      --  constrained array type for which we must create a procedure with an
+      --  extra out parameter, build and analyze the body now. The procedure
+      --  declaration has already been created. We reuse the source body of the
+      --  function, because in an instance it may contain global references
+      --  that cannot be reanalyzed. The source function itself is not used any
+      --  further, so we mark it as having a completion. If the subprogram is a
+      --  stub the transformation is done later, when the proper body is
+      --  analyzed.
 
       if Expander_Active
-        and then Modify_Tree_For_C
-        and then Present (Spec_Id)
-        and then Ekind (Spec_Id) = E_Function
+        and then Transform_Function_Array
         and then Nkind (N) /= N_Subprogram_Body_Stub
-        and then Rewritten_For_C (Spec_Id)
       then
-         Set_Has_Completion (Spec_Id);
+         declare
+            S         : constant Entity_Id :=
+                          (if Present (Spec_Id)
+                           then Spec_Id
+                           else Defining_Unit_Name (Specification (N)));
+            Proc_Body : Node_Id;
 
-         Rewrite (N, Build_Procedure_Body_Form (Spec_Id, N));
-         Analyze (N);
+         begin
+            if Ekind (S) = E_Function and then Rewritten_For_C (S) then
+               Set_Has_Completion (S);
+               Proc_Body := Build_Procedure_Body_Form (S, N);
 
-         --  The entity for the created procedure must remain invisible, so it
-         --  does not participate in resolution of subsequent references to the
-         --  function.
+               if Present (Spec_Id) then
+                  Rewrite (N, Proc_Body);
+                  Analyze (N);
 
-         Set_Is_Immediately_Visible (Corresponding_Spec (N), False);
-         goto Leave;
+                  --  The entity for the created procedure must remain
+                  --  invisible, so it does not participate in resolution of
+                  --  subsequent references to the function.
+
+                  Set_Is_Immediately_Visible (Corresponding_Spec (N), False);
+
+               --  If we do not have a separate spec for N, build one and
+               --  insert the new body right after.
+
+               else
+                  Rewrite (N,
+                    Make_Subprogram_Declaration (Loc,
+                      Specification => Relocate_Node (Specification (N))));
+                  Analyze (N);
+                  Insert_After_And_Analyze (N, Proc_Body);
+                  Set_Is_Immediately_Visible
+                    (Corresponding_Spec (Proc_Body), False);
+               end if;
+
+               goto Leave;
+            end if;
+         end;
       end if;
 
       --  If a separate spec is present, then deal with freezing issues
@@ -4646,7 +5010,7 @@ package body Sem_Ch6 is
 
       --  This method is used to supplement our "small integer model" for
       --  accessibility-check generation (for more information see
-      --  Dynamic_Accessibility_Level).
+      --  Accessibility_Level).
 
       --  Because we allow accessibility values greater than our expected value
       --  passing along the same extra accessibility formal as an actual
@@ -4695,50 +5059,33 @@ package body Sem_Ch6 is
                   then
                      --  Generate the minimum accessibility level object
 
-                     --    A60b : natural := natural'min(1, paramL);
+                     --    A60b : constant natural := natural'min(1, paramL);
 
-                     declare
-                        Loc      : constant Source_Ptr := Sloc (Body_Nod);
-                        Obj_Node : constant Node_Id :=
-                           Make_Object_Declaration (Loc,
-                            Defining_Identifier =>
-                              Make_Temporary
-                                (Loc, 'A', Extra_Accessibility (Form)),
-                            Object_Definition   => New_Occurrence_Of
-                                                     (Standard_Natural, Loc),
-                            Expression          =>
-                              Make_Attribute_Reference (Loc,
-                                Prefix         => New_Occurrence_Of
-                                                    (Standard_Natural, Loc),
-                                Attribute_Name => Name_Min,
-                                Expressions    => New_List (
-                                  Make_Integer_Literal (Loc,
-                                    Object_Access_Level (Form)),
-                                  New_Occurrence_Of
-                                    (Extra_Accessibility (Form), Loc))));
-                     begin
-                        --  Add the new local object to the Minimum_Acc_Obj to
-                        --  be later prepended to the subprogram's list of
-                        --  declarations after we are sure all expansion is
-                        --  done.
-
-                        if Present (Minimum_Acc_Objs) then
-                           Prepend (Obj_Node, Minimum_Acc_Objs);
-                        else
-                           Minimum_Acc_Objs := New_List (Obj_Node);
-                        end if;
-
-                        --  Register the object and analyze it
-
-                        Set_Minimum_Accessibility
-                          (Form, Defining_Identifier (Obj_Node));
-
-                        Analyze (Obj_Node);
-                     end;
+                     Generate_Minimum_Accessibility
+                       (Extra_Accessibility (Form), Form);
                   end if;
 
                   Next_Formal (Form);
                end loop;
+
+               --  Generate the minimum accessibility level object for the
+               --  function's Extra_Accessibility_Of_Result.
+
+               --    A31b : constant natural := natural'min (2, funcL);
+
+               if Ekind (Body_Id) = E_Function
+                 and then Present (Extra_Accessibility_Of_Result (Body_Id))
+               then
+                  Generate_Minimum_Accessibility
+                    (Extra_Accessibility_Of_Result (Body_Id));
+
+                  --  Replace the Extra_Accessibility_Of_Result with the new
+                  --  minimum accessibility object.
+
+                  Set_Extra_Accessibility_Of_Result
+                    (Body_Id, Minimum_Accessibility
+                                (Extra_Accessibility_Of_Result (Body_Id)));
+               end if;
             end if;
          end;
       end if;
@@ -9120,10 +9467,27 @@ package body Sem_Ch6 is
               ("equality operator appears too late (Ada 2012)?y?", Eq_Op);
          end if;
 
-      --  No error detected
+      --  Finally check for AI12-0352: declaration of a user-defined primitive
+      --  equality operation for a record type T is illegal if it occurs after
+      --  a type has been derived from T.
 
       else
-         return;
+         Obj_Decl := Next (Parent (Typ));
+
+         while Present (Obj_Decl) and then Obj_Decl /= Decl loop
+            if Nkind (Obj_Decl) = N_Full_Type_Declaration
+              and then Etype (Defining_Identifier (Obj_Decl)) = Typ
+            then
+               Error_Msg_N
+                 ("equality operator cannot appear after derivation", Eq_Op);
+               Error_Msg_NE
+                 ("an equality operator for& cannot be declared after "
+                  & "this point??",
+                  Obj_Decl, Typ);
+            end if;
+
+            Next (Obj_Decl);
+         end loop;
       end if;
    end Check_Untagged_Equality;
 
@@ -9604,7 +9968,7 @@ package body Sem_Ch6 is
                Error_Msg_Sloc :=
                  Text_Ptr'Max (Sloc (Entity (E1)), Sloc (Entity (E2)));
                Error_Msg_NE
-                 ("Meaning of& differs because of declaration#", E1, E2);
+                 ("meaning of& differs because of declaration#", E1, E2);
             end if;
 
             return Result;
@@ -12259,6 +12623,27 @@ package body Sem_Ch6 is
                Error_Msg_N
                  ("formal parameter of mode `IN` cannot be volatile", Formal);
             end if;
+         end if;
+
+         --  Deal with aspects on formal parameters. Only Unreferenced is
+         --  supported for the time being.
+
+         if Has_Aspects (Param_Spec) then
+            declare
+               Aspect : Node_Id := First (Aspect_Specifications (Param_Spec));
+            begin
+               while Present (Aspect) loop
+                  if Chars (Identifier (Aspect)) = Name_Unreferenced then
+                     Set_Has_Pragma_Unreferenced (Formal);
+                  else
+                     Error_Msg_NE
+                       ("unsupported aspect& on parameter",
+                        Aspect, Identifier (Aspect));
+                  end if;
+
+                  Next (Aspect);
+               end loop;
+            end;
          end if;
 
       <<Continue>>

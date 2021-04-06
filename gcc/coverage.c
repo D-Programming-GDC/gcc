@@ -1,5 +1,5 @@
 /* Read and write coverage files, and associated functionality.
-   Copyright (C) 1990-2020 Free Software Foundation, Inc.
+   Copyright (C) 1990-2021 Free Software Foundation, Inc.
    Contributed by James E. Wilson, UC Berkeley/Cygnus Support;
    based on some ideas from Dain Samples of UC Berkeley.
    Further mangling by Bob Manson, Cygnus Support.
@@ -1097,6 +1097,25 @@ build_gcov_exit_decl (void)
   cgraph_build_static_cdtor ('D', dtor, priority);
 }
 
+/* Generate the pointer to the gcov_info_var in a dedicated section.  */
+
+static void
+build_gcov_info_var_registration (tree gcov_info_type)
+{
+  tree var = build_decl (BUILTINS_LOCATION,
+			 VAR_DECL, NULL_TREE,
+			 build_pointer_type (gcov_info_type));
+  TREE_STATIC (var) = 1;
+  TREE_READONLY (var) = 1;
+  char name_buf[32];
+  ASM_GENERATE_INTERNAL_LABEL (name_buf, "LPBX", 2);
+  DECL_NAME (var) = get_identifier (name_buf);
+  get_section (profile_info_section, SECTION_UNNAMED, NULL);
+  set_decl_section_name (var, profile_info_section);
+  DECL_INITIAL (var) = build_fold_addr_expr (gcov_info_var);
+  varpool_node::finalize_decl (var);
+}
+
 /* Create the gcov_info types and object.  Generate the constructor
    function to call __gcov_init.  Does not generate the initializer
    for the object.  Returns TRUE if coverage data is being emitted.  */
@@ -1151,8 +1170,13 @@ coverage_obj_init (void)
   ASM_GENERATE_INTERNAL_LABEL (name_buf, "LPBX", 0);
   DECL_NAME (gcov_info_var) = get_identifier (name_buf);
 
-  build_init_ctor (gcov_info_type);
-  build_gcov_exit_decl ();
+  if (profile_info_section)
+    build_gcov_info_var_registration (gcov_info_type);
+  else
+    {
+      build_init_ctor (gcov_info_type);
+      build_gcov_exit_decl ();
+    }
 
   return true;
 }
@@ -1206,6 +1230,8 @@ coverage_obj_finish (vec<constructor_elt, va_gc> *ctor)
 void
 coverage_init (const char *filename)
 {
+  const char *original_filename = filename;
+  int original_len = strlen (original_filename);
 #if HAVE_DOS_BASED_FILE_SYSTEM
   const char *separator = "\\";
 #else
@@ -1277,9 +1303,9 @@ coverage_init (const char *filename)
 	bbg_file_name = xstrdup (profile_note_location);
       else
 	{
-	  bbg_file_name = XNEWVEC (char, len + strlen (GCOV_NOTE_SUFFIX) + 1);
-	  memcpy (bbg_file_name, filename, len);
-	  strcpy (bbg_file_name + len, GCOV_NOTE_SUFFIX);
+	  bbg_file_name = XNEWVEC (char, original_len + strlen (GCOV_NOTE_SUFFIX) + 1);
+	  memcpy (bbg_file_name, original_filename, original_len);
+	  strcpy (bbg_file_name + original_len, GCOV_NOTE_SUFFIX);
 	}
 
       if (!gcov_open (bbg_file_name, -1))

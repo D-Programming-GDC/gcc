@@ -1,5 +1,5 @@
 /* d-codegen.cc --  Code generation and routines for manipulation of GCC trees.
-   Copyright (C) 2006-2020 Free Software Foundation, Inc.
+   Copyright (C) 2006-2021 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -1343,7 +1343,10 @@ build_assign (tree_code code, tree lhs, tree rhs)
 	 since that would cause the LHS to be constructed twice.
 	 So we force the TARGET_EXPR to be expanded without a target.  */
       if (code != INIT_EXPR)
-	rhs = compound_expr (rhs, TARGET_EXPR_SLOT (rhs));
+	{
+	  init = compound_expr (init, rhs);
+	  rhs = TARGET_EXPR_SLOT (rhs);
+	}
       else
 	{
 	  d_mark_addressable (lhs);

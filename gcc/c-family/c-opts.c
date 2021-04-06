@@ -1,5 +1,5 @@
 /* C/ObjC/C++ command line option handling.
-   Copyright (C) 2002-2020 Free Software Foundation, Inc.
+   Copyright (C) 2002-2021 Free Software Foundation, Inc.
    Contributed by Neil Booth.
 
 This file is part of GCC.
@@ -113,6 +113,7 @@ static void set_std_cxx11 (int);
 static void set_std_cxx14 (int);
 static void set_std_cxx17 (int);
 static void set_std_cxx20 (int);
+static void set_std_cxx23 (int);
 static void set_std_c89 (int, int);
 static void set_std_c99 (int);
 static void set_std_c11 (int);
@@ -234,6 +235,7 @@ c_common_init_options (unsigned int decoded_options_count,
   cpp_opts = cpp_get_options (parse_in);
   cpp_opts->dollars_in_ident = DOLLARS_IN_IDENTIFIERS;
   cpp_opts->objc = c_dialect_objc ();
+  cpp_opts->deps.modules = true;
 
   /* Reset to avoid warnings on internal definitions.  We set it just
      before passing on command-line options to cpplib.  */
@@ -365,6 +367,18 @@ c_common_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
     case OPT_MP:
       deps_seen = true;
       cpp_opts->deps.phony_targets = true;
+      break;
+
+    case OPT_Mmodules:
+      /* Do not set deps_seen, so the user can unconditionally turn
+	 this on or off.  */
+      cpp_opts->deps.modules = true;
+      break;
+
+    case OPT_Mno_modules:
+      /* Do not set deps_seen, so the user can unconditionally turn
+	 this on or off.  */
+      cpp_opts->deps.modules = false;
       break;
 
     case OPT_MQ:
@@ -636,6 +650,12 @@ c_common_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 	set_std_cxx20 (code == OPT_std_c__20 /* ISO */);
       break;
 
+    case OPT_std_c__23:
+    case OPT_std_gnu__23:
+      if (!preprocessing_asm_p)
+	set_std_cxx23 (code == OPT_std_c__23 /* ISO */);
+      break;
+
     case OPT_std_c90:
     case OPT_std_iso9899_199409:
       if (!preprocessing_asm_p)
@@ -752,8 +772,6 @@ default_handle_c_option (size_t code ATTRIBUTE_UNUSED,
 bool
 c_common_post_options (const char **pfilename)
 {
-  struct cpp_callbacks *cb;
-
   /* Canonicalize the input and output filenames.  */
   if (in_fnames == NULL)
     {
@@ -925,6 +943,16 @@ c_common_post_options (const char **pfilename)
   SET_OPTION_IF_UNSET (&global_options, &global_options_set, warn_volatile,
 		       cxx_dialect >= cxx20 && warn_deprecated);
 
+  /* -Wdeprecated-enum-enum-conversion is enabled by default in C++20.  */
+  SET_OPTION_IF_UNSET (&global_options, &global_options_set,
+		       warn_deprecated_enum_enum_conv,
+		       cxx_dialect >= cxx20 && warn_deprecated);
+
+  /* -Wdeprecated-enum-float-conversion is enabled by default in C++20.  */
+  SET_OPTION_IF_UNSET (&global_options, &global_options_set,
+		       warn_deprecated_enum_float_conv,
+		       cxx_dialect >= cxx20 && warn_deprecated);
+
   /* Declone C++ 'structors if -Os.  */
   if (flag_declone_ctor_dtor == -1)
     flag_declone_ctor_dtor = optimize_size;
@@ -937,7 +965,7 @@ c_common_post_options (const char **pfilename)
 
   /* Change flag_abi_version to be the actual current ABI level, for the
      benefit of c_cpp_builtins, and to make comparison simpler.  */
-  const int latest_abi_version = 14;
+  const int latest_abi_version = 15;
   /* Generate compatibility aliases for ABI v11 (7.1) by default.  */
   const int abi_compat_default = 11;
 
@@ -998,7 +1026,7 @@ c_common_post_options (const char **pfilename)
 	warn_narrowing = 1;
 
       /* Unless -f{,no-}ext-numeric-literals has been used explicitly,
-	 for -std=c++{11,14,17,2a} default to -fno-ext-numeric-literals.  */
+	 for -std=c++{11,14,17,20,23} default to -fno-ext-numeric-literals.  */
       if (flag_iso && !global_options_set.x_flag_ext_numeric_literals)
 	cpp_opts->ext_numeric_literals = 0;
     }
@@ -1095,9 +1123,11 @@ c_common_post_options (const char **pfilename)
       input_location = UNKNOWN_LOCATION;
     }
 
-  cb = cpp_get_callbacks (parse_in);
+  struct cpp_callbacks *cb = cpp_get_callbacks (parse_in);
   cb->file_change = cb_file_change;
   cb->dir_change = cb_dir_change;
+  if (lang_hooks.preprocess_options)
+    lang_hooks.preprocess_options (parse_in);
   cpp_post_options (parse_in);
   init_global_opts_from_cpp (&global_options, cpp_get_options (parse_in));
 
@@ -1540,7 +1570,13 @@ push_command_line_include (void)
       cpp_opts->warn_unused_macros = cpp_warn_unused_macros;
       /* Restore the line map back to the main file.  */
       if (!cpp_opts->preprocessed)
-	cpp_change_file (parse_in, LC_RENAME, this_input_filename);
+	{
+	  cpp_change_file (parse_in, LC_RENAME, this_input_filename);
+	  if (lang_hooks.preprocess_main_file)
+	    /* We're starting the main file.  Inform the FE of that.  */
+	    lang_hooks.preprocess_main_file
+	      (parse_in, line_table, LINEMAPS_LAST_ORDINARY_MAP (line_table));
+	}
 
       /* Set this here so the client can change the option if it wishes,
 	 and after stacking the main file so we don't trace the main file.  */
@@ -1550,13 +1586,18 @@ push_command_line_include (void)
 
 /* File change callback.  Has to handle -include files.  */
 static void
-cb_file_change (cpp_reader * ARG_UNUSED (pfile),
-		const line_map_ordinary *new_map)
+cb_file_change (cpp_reader *reader, const line_map_ordinary *new_map)
 {
   if (flag_preprocess_only)
     pp_file_change (new_map);
   else
     fe_file_change (new_map);
+
+  if (new_map && cpp_opts->preprocessed
+      && lang_hooks.preprocess_main_file && MAIN_FILE_P (new_map)
+      && ORDINARY_MAP_STARTING_LINE_NUMBER (new_map))
+    /* We're starting the main file.  Inform the FE of that.  */
+    lang_hooks.preprocess_main_file (reader, line_table, new_map);
 
   if (new_map 
       && (new_map->reason == LC_ENTER || new_map->reason == LC_RENAME))
@@ -1729,7 +1770,7 @@ set_std_cxx20 (int iso)
   flag_no_gnu_keywords = iso;
   flag_no_nonansi_builtin = iso;
   flag_iso = iso;
-  /* C++17 includes the C11 standard library.  */
+  /* C++20 includes the C11 standard library.  */
   flag_isoc94 = 1;
   flag_isoc99 = 1;
   flag_isoc11 = 1;
@@ -1737,6 +1778,24 @@ set_std_cxx20 (int iso)
   flag_coroutines = true;
   cxx_dialect = cxx20;
   lang_hooks.name = "GNU C++20";
+}
+
+/* Set the C++ 2023 standard (without GNU extensions if ISO).  */
+static void
+set_std_cxx23 (int iso)
+{
+  cpp_set_lang (parse_in, iso ? CLK_CXX23: CLK_GNUCXX23);
+  flag_no_gnu_keywords = iso;
+  flag_no_nonansi_builtin = iso;
+  flag_iso = iso;
+  /* C++23 includes the C11 standard library.  */
+  flag_isoc94 = 1;
+  flag_isoc99 = 1;
+  flag_isoc11 = 1;
+  /* C++23 includes coroutines.  */
+  flag_coroutines = true;
+  cxx_dialect = cxx23;
+  lang_hooks.name = "GNU C++23";
 }
 
 /* Args to -d specify what to dump.  Silently ignore

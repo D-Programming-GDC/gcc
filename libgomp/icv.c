@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2021 Free Software Foundation, Inc.
    Contributed by Richard Henderson <rth@redhat.com>.
 
    This file is part of the GNU Offloading and Multi Processing Library
@@ -51,19 +51,26 @@ omp_get_dynamic (void)
   return icv->dyn_var;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 void
 omp_set_nested (int val)
 {
   struct gomp_task_icv *icv = gomp_icv (true);
-  icv->nest_var = val;
+  if (val)
+    icv->max_active_levels_var = gomp_supported_active_levels;
+  else if (icv->max_active_levels_var > 1)
+    icv->max_active_levels_var = 1;
 }
 
 int
 omp_get_nested (void)
 {
   struct gomp_task_icv *icv = gomp_icv (false);
-  return icv->nest_var;
+  return (icv->max_active_levels_var > 1
+	  && icv->max_active_levels_var > omp_get_active_level ());
 }
+#pragma GCC diagnostic pop
 
 void
 omp_set_schedule (omp_sched_t kind, int chunk_size)
@@ -116,13 +123,27 @@ void
 omp_set_max_active_levels (int max_levels)
 {
   if (max_levels >= 0)
-    gomp_max_active_levels_var = max_levels;
+    {
+      struct gomp_task_icv *icv = gomp_icv (true);
+
+      if (max_levels <= gomp_supported_active_levels)
+	icv->max_active_levels_var = max_levels;
+      else
+	icv->max_active_levels_var = gomp_supported_active_levels;
+    }
 }
 
 int
 omp_get_max_active_levels (void)
 {
-  return gomp_max_active_levels_var;
+  struct gomp_task_icv *icv = gomp_icv (false);
+  return icv->max_active_levels_var;
+}
+
+int
+omp_get_supported_active_levels (void)
+{
+  return gomp_supported_active_levels;
 }
 
 int
@@ -142,12 +163,6 @@ omp_get_proc_bind (void)
 {
   struct gomp_task_icv *icv = gomp_icv (false);
   return icv->bind_var;
-}
-
-int
-omp_get_initial_device (void)
-{
-  return GOMP_DEVICE_HOST_FALLBACK;
 }
 
 int
@@ -217,19 +232,22 @@ omp_get_default_allocator (void)
 }
 
 ialias (omp_set_dynamic)
-ialias (omp_set_nested)
-ialias (omp_set_num_threads)
 ialias (omp_get_dynamic)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+ialias (omp_set_nested)
 ialias (omp_get_nested)
+#pragma GCC diagnostic pop
+ialias (omp_set_num_threads)
 ialias (omp_set_schedule)
 ialias (omp_get_schedule)
 ialias (omp_get_max_threads)
 ialias (omp_get_thread_limit)
 ialias (omp_set_max_active_levels)
 ialias (omp_get_max_active_levels)
+ialias (omp_get_supported_active_levels)
 ialias (omp_get_cancellation)
 ialias (omp_get_proc_bind)
-ialias (omp_get_initial_device)
 ialias (omp_get_max_task_priority)
 ialias (omp_get_num_places)
 ialias (omp_get_place_num)

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// +build !js
 // +build !plan9
 // +build !windows
-// +build !js
 
 package runtime
 
@@ -17,7 +17,7 @@ func read(fd int32, p unsafe.Pointer, n int32) int32
 
 func closefd(fd int32) int32
 
-//extern exit
+//extern-sysinfo exit
 func exit(code int32)
 func usleep(usec uint32)
 

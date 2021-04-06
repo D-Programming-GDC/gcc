@@ -1,6 +1,6 @@
 /* Form lists of pseudo register references for autoinc optimization
    for GNU compiler.  This is part of flow optimization.
-   Copyright (C) 1999-2020 Free Software Foundation, Inc.
+   Copyright (C) 1999-2021 Free Software Foundation, Inc.
    Originally contributed by Michael P. Hayes
              (m.hayes@elec.canterbury.ac.nz, mhayes@redhat.com)
    Major rewrite contributed by Danny Berlin (dberlin@dberlin.org)
@@ -929,6 +929,7 @@ public:
   /* The results of the dataflow problem.  */
   bitmap_head in;    /* At the top of the block.  */
   bitmap_head out;   /* At the bottom of the block.  */
+  bool con_visited;  /* Visited by con_fun_{0,n}.  */
 };
 
 
@@ -1085,6 +1086,7 @@ extern void df_update_entry_exit_and_calls (void);
 extern bool df_hard_reg_used_p (unsigned int);
 extern unsigned int df_hard_reg_used_count (unsigned int);
 extern bool df_regs_ever_live_p (unsigned int);
+extern bool df_epilogue_uses_p (unsigned int);
 extern void df_set_regs_ever_live (unsigned int, bool);
 extern void df_compute_regs_ever_live (bool);
 extern void df_scan_verify (void);

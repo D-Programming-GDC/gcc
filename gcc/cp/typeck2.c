@@ -1,6 +1,6 @@
 /* Report error messages, build initializers, and perform
    some front-end optimizations for C++ compiler.
-   Copyright (C) 1987-2020 Free Software Foundation, Inc.
+   Copyright (C) 1987-2021 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -123,123 +123,6 @@ cxx_readonly_error (location_t loc, tree arg, enum lvalue_use errstring)
     readonly_error (loc, arg, errstring);
 }
 
-/* Structure that holds information about declarations whose type was
-   incomplete and we could not check whether it was abstract or not.  */
-
-struct GTY((chain_next ("%h.next"), for_user)) pending_abstract_type {
-  /* Declaration which we are checking for abstractness. It is either
-     a DECL node, or an IDENTIFIER_NODE if we do not have a full
-     declaration available.  */
-  tree decl;
-
-  /* Type which will be checked for abstractness.  */
-  tree type;
-
-  /* Kind of use in an unnamed declarator.  */
-  enum abstract_class_use use;
-
-  /* Position of the declaration. This is only needed for IDENTIFIER_NODEs,
-     because DECLs already carry locus information.  */
-  location_t locus;
-
-  /* Link to the next element in list.  */
-  struct pending_abstract_type* next;
-};
-
-struct abstract_type_hasher : ggc_ptr_hash<pending_abstract_type>
-{
-  typedef tree compare_type;
-  static hashval_t hash (pending_abstract_type *);
-  static bool equal (pending_abstract_type *, tree);
-};
-
-/* Compute the hash value of the node VAL. This function is used by the
-   hash table abstract_pending_vars.  */
-
-hashval_t
-abstract_type_hasher::hash (pending_abstract_type *pat)
-{
-  return (hashval_t) TYPE_UID (pat->type);
-}
-
-
-/* Compare node VAL1 with the type VAL2. This function is used by the
-   hash table abstract_pending_vars.  */
-
-bool
-abstract_type_hasher::equal (pending_abstract_type *pat1, tree type2)
-{
-  return (pat1->type == type2);
-}
-
-/* Hash table that maintains pending_abstract_type nodes, for which we still
-   need to check for type abstractness.  The key of the table is the type
-   of the declaration.  */
-static GTY (()) hash_table<abstract_type_hasher> *abstract_pending_vars = NULL;
-
-static int abstract_virtuals_error_sfinae (tree, tree, abstract_class_use, tsubst_flags_t);
-
-/* This function is called after TYPE is completed, and will check if there
-   are pending declarations for which we still need to verify the abstractness
-   of TYPE, and emit a diagnostic (through abstract_virtuals_error) if TYPE
-   turned out to be incomplete.  */
-
-void
-complete_type_check_abstract (tree type)
-{
-  struct pending_abstract_type *pat;
-  location_t cur_loc = input_location;
-
-  gcc_assert (COMPLETE_TYPE_P (type));
-
-  if (!abstract_pending_vars)
-    return;
-
-  /* Retrieve the list of pending declarations for this type.  */
-  pending_abstract_type **slot
-    = abstract_pending_vars->find_slot_with_hash (type, TYPE_UID (type),
-						  NO_INSERT);
-  if (!slot)
-    return;
-  pat = *slot;
-  gcc_assert (pat);
-
-  /* If the type is not abstract, do not do anything.  */
-  if (CLASSTYPE_PURE_VIRTUALS (type))
-    {
-      struct pending_abstract_type *prev = 0, *next;
-
-      /* Reverse the list to emit the errors in top-down order.  */
-      for (; pat; pat = next)
-	{
-	  next = pat->next;
-	  pat->next = prev;
-	  prev = pat;
-	}
-      pat = prev;
-
-      /* Go through the list, and call abstract_virtuals_error for each
-	element: it will issue a diagnostic if the type is abstract.  */
-      while (pat)
-	{
-	  gcc_assert (type == pat->type);
-
-	  /* Tweak input_location so that the diagnostic appears at the correct
-	    location. Notice that this is only needed if the decl is an
-	    IDENTIFIER_NODE.  */
-	  input_location = pat->locus;
-	  abstract_virtuals_error_sfinae (pat->decl, pat->type, pat->use,
-					  tf_warning_or_error);
-	  pat = pat->next;
-	}
-    }
-
-  abstract_pending_vars->clear_slot (slot);
-
-  input_location = cur_loc;
-}
-
-
 /* If TYPE has abstract virtual functions, issue an error about trying
    to create an object of that type.  DECL is the object declared, or
    NULL_TREE if the declaration is unavailable, in which case USE specifies
@@ -251,6 +134,13 @@ abstract_virtuals_error_sfinae (tree decl, tree type, abstract_class_use use,
 				tsubst_flags_t complain)
 {
   vec<tree, va_gc> *pure;
+
+  if (TREE_CODE (type) == ARRAY_TYPE)
+    {
+      decl = NULL_TREE;
+      use = ACU_ARRAY;
+      type = strip_array_types (type);
+    }
 
   /* This function applies only to classes. Any other entity can never
      be abstract.  */
@@ -265,38 +155,6 @@ abstract_virtuals_error_sfinae (tree decl, tree type, abstract_class_use use,
   if (!(complain & (tf_error|tf_decltype)))
     complete_type (type);
 #endif
-
-  /* If the type is incomplete, we register it within a hash table,
-     so that we can check again once it is completed. This makes sense
-     only for objects for which we have a declaration or at least a
-     name.  */
-  if (!COMPLETE_TYPE_P (type) && (complain & tf_error))
-    {
-      struct pending_abstract_type *pat;
-
-      gcc_assert (!decl || DECL_P (decl) || identifier_p (decl));
-
-      if (!abstract_pending_vars)
-	abstract_pending_vars
-	  = hash_table<abstract_type_hasher>::create_ggc (31);
-
-      pending_abstract_type **slot
-       	= abstract_pending_vars->find_slot_with_hash (type, TYPE_UID (type),
-						      INSERT);
-
-      pat = ggc_alloc<pending_abstract_type> ();
-      pat->type = type;
-      pat->decl = decl;
-      pat->use = use;
-      pat->locus = ((decl && DECL_P (decl))
-		    ? DECL_SOURCE_LOCATION (decl)
-		    : input_location);
-
-      pat->next = *slot;
-      *slot = pat;
-
-      return 0;
-    }
 
   if (!TYPE_SIZE (type))
     /* TYPE is being defined, and during that time
@@ -711,17 +569,30 @@ split_nonconstant_init_1 (tree dest, tree init, bool nested)
 		    sub = build3 (COMPONENT_REF, inner_type, dest, field_index,
 				  NULL_TREE);
 
+		  /* We may need to add a copy constructor call if
+		     the field has [[no_unique_address]].  */
 		  if (unsafe_return_slot_p (sub))
 		    {
-		      /* We may need to add a copy constructor call if
-			 the field has [[no_unique_address]].  */
+		      /* But not if the initializer is an implicit ctor call
+			 we just built in digest_init.  */
+		      if (TREE_CODE (value) == TARGET_EXPR
+			  && TARGET_EXPR_LIST_INIT_P (value)
+			  && make_safe_copy_elision (sub, value))
+			goto build_init;
+
+		      tree name = (DECL_FIELD_IS_BASE (field_index)
+				   ? base_ctor_identifier
+				   : complete_ctor_identifier);
 		      releasing_vec args = make_tree_vector_single (value);
 		      code = build_special_member_call
-			(sub, complete_ctor_identifier, &args, inner_type,
+			(sub, name, &args, inner_type,
 			 LOOKUP_NORMAL, tf_warning_or_error);
 		    }
 		  else
-		    code = build2 (INIT_EXPR, inner_type, sub, value);
+		    {
+		    build_init:
+		      code = build2 (INIT_EXPR, inner_type, sub, value);
+		    }
 		  code = build_stmt (input_location, EXPR_STMT, code);
 		  code = maybe_cleanup_point_expr_void (code);
 		  add_stmt (code);
@@ -886,11 +757,13 @@ store_init_value (tree decl, tree init, vec<tree, va_gc>** cleanups, int flags)
     {
       bool const_init;
       tree oldval = value;
-      value = fold_non_dependent_expr (value, tf_warning_or_error, true, decl);
       if (DECL_DECLARED_CONSTEXPR_P (decl)
 	  || (DECL_IN_AGGR_P (decl)
 	      && DECL_INITIALIZED_IN_CLASS_P (decl)))
 	{
+	  value = fold_non_dependent_expr (value, tf_warning_or_error,
+					   /*manifestly_const_eval=*/true,
+					   decl);
 	  /* Diagnose a non-constant initializer for constexpr variable or
 	     non-inline in-class-initialized static data member.  */
 	  if (!require_constant_expression (value))
@@ -904,7 +777,8 @@ store_init_value (tree decl, tree init, vec<tree, va_gc>** cleanups, int flags)
 	    value = cxx_constant_init (value, decl);
 	}
       else
-	value = maybe_constant_init (value, decl, true);
+	value = fold_non_dependent_init (value, tf_warning_or_error,
+					 /*manifestly_const_eval=*/true, decl);
       if (TREE_CODE (value) == CONSTRUCTOR && cp_has_mutable_p (type))
 	/* Poison this CONSTRUCTOR so it can't be copied to another
 	   constexpr variable.  */
@@ -948,13 +822,14 @@ store_init_value (tree decl, tree init, vec<tree, va_gc>** cleanups, int flags)
      the bits that are constant, and then return an expression that
      will perform the dynamic initialization.  */
   if (value != error_mark_node
+      && !processing_template_decl
       && (TREE_SIDE_EFFECTS (value)
 	  || vla_type_p (type)
 	  || ! reduced_constant_expression_p (value)))
     return split_nonconstant_init (decl, value);
 
   /* DECL may change value; purge caches.  */
-  clear_cv_and_fold_caches (TREE_STATIC (decl));
+  clear_cv_and_fold_caches ();
 
   /* If the value is a constant, just put it in DECL_INITIAL.  If DECL
      is an automatic variable, the middle end will turn this into a
@@ -1128,6 +1003,29 @@ ordinary_char_type_p (tree type)
 	  || type == unsigned_char_type_node);
 }
 
+/* True iff the string literal INIT has a type suitable for initializing array
+   TYPE.  */
+
+bool
+array_string_literal_compatible_p (tree type, tree init)
+{
+  tree to_char_type = TYPE_MAIN_VARIANT (TREE_TYPE (type));
+  tree from_char_type = TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (init)));
+
+  if (to_char_type == from_char_type)
+    return true;
+  /* The array element type does not match the initializing string
+     literal element type; this is only allowed when both types are
+     ordinary character type.  There are no string literals of
+     signed or unsigned char type in the language, but we can get
+     them internally from converting braced-init-lists to
+     STRING_CST.  */
+  if (ordinary_char_type_p (to_char_type)
+      && ordinary_char_type_p (from_char_type))
+    return true;
+  return false;
+}
+
 /* Process the initializer INIT for a variable of type TYPE, emitting
    diagnostics for invalid initializers and converting the initializer as
    appropriate.
@@ -1195,30 +1093,13 @@ digest_init_r (tree type, tree init, int nested, int flags,
       if (char_type_p (typ1)
 	  && TREE_CODE (stripped_init) == STRING_CST)
 	{
-	  tree char_type = TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (init)));
-	  bool incompat_string_cst = false;
-
-	  if (typ1 != char_type)
-	    {
-	      /* The array element type does not match the initializing string
-	         literal element type; this is only allowed when both types are
-	         ordinary character type.  There are no string literals of
-	         signed or unsigned char type in the language, but we can get
-	         them internally from converting braced-init-lists to
-	         STRING_CST.  */
-	      if (ordinary_char_type_p (typ1)
-		  && ordinary_char_type_p (char_type))
-		/* OK */;
-	      else
-		incompat_string_cst = true;
-	    }
-
-	  if (incompat_string_cst)
+	  if (!array_string_literal_compatible_p (type, init))
 	    {
 	      if (complain & tf_error)
 		error_at (loc, "cannot initialize array of %qT from "
-		          "a string literal with type array of %qT",
-		          typ1, char_type);
+			  "a string literal with type array of %qT",
+			  typ1,
+			  TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (init))));
 	      return error_mark_node;
 	    }
 
@@ -1288,6 +1169,7 @@ digest_init_r (tree type, tree init, int nested, int flags,
 	      || VECTOR_TYPE_P (type)
 	      || code == RECORD_TYPE
 	      || code == UNION_TYPE
+	      || code == OPAQUE_TYPE
 	      || code == COMPLEX_TYPE);
 
   /* "If T is a class type and the initializer list has a single
@@ -1603,7 +1485,6 @@ process_init_constructor_record (tree type, tree init, int nested, int flags,
   for (field = TYPE_FIELDS (type); field; field = DECL_CHAIN (field))
     {
       tree next;
-      tree type;
 
       if (TREE_CODE (field) != FIELD_DECL
 	  || (DECL_ARTIFICIAL (field)
@@ -1614,10 +1495,10 @@ process_init_constructor_record (tree type, tree init, int nested, int flags,
 	continue;
 
       /* If this is a bitfield, first convert to the declared type.  */
-      type = TREE_TYPE (field);
+      tree fldtype = TREE_TYPE (field);
       if (DECL_BIT_FIELD_TYPE (field))
-	type = DECL_BIT_FIELD_TYPE (field);
-      if (type == error_mark_node)
+	fldtype = DECL_BIT_FIELD_TYPE (field);
+      if (fldtype == error_mark_node)
 	return PICFLAG_ERRONEOUS;
 
       next = NULL_TREE;
@@ -1633,8 +1514,8 @@ process_init_constructor_record (tree type, tree init, int nested, int flags,
 			  || identifier_p (ce->index));
 	      if (ce->index == field || ce->index == DECL_NAME (field))
 		next = ce->value;
-	      else if (ANON_AGGR_TYPE_P (type)
-		       && search_anon_aggr (type,
+	      else if (ANON_AGGR_TYPE_P (fldtype)
+		       && search_anon_aggr (fldtype,
 					    TREE_CODE (ce->index) == FIELD_DECL
 					    ? DECL_NAME (ce->index)
 					    : ce->index))
@@ -1662,7 +1543,7 @@ process_init_constructor_record (tree type, tree init, int nested, int flags,
 	  if (ce)
 	    {
 	      gcc_assert (ce->value);
-	      next = massage_init_elt (type, next, nested, flags, complain);
+	      next = massage_init_elt (fldtype, next, nested, flags, complain);
 	      ++idx;
 	    }
 	}
@@ -1688,25 +1569,24 @@ process_init_constructor_record (tree type, tree init, int nested, int flags,
 	      && find_placeholders (next))
 	    CONSTRUCTOR_PLACEHOLDER_BOUNDARY (init) = 1;
 	}
-      else if (type_build_ctor_call (TREE_TYPE (field)))
+      else if (type_build_ctor_call (fldtype))
 	{
 	  /* If this type needs constructors run for
 	     default-initialization, we can't rely on the back end to do it
 	     for us, so build up TARGET_EXPRs.  If the type in question is
 	     a class, just build one up; if it's an array, recurse.  */
 	  next = build_constructor (init_list_type_node, NULL);
-	  next = massage_init_elt (TREE_TYPE (field), next, nested, flags,
-				   complain);
+	  next = massage_init_elt (fldtype, next, nested, flags, complain);
 
 	  /* Warn when some struct elements are implicitly initialized.  */
 	  if ((complain & tf_warning)
+	      && !cp_unevaluated_operand
 	      && !EMPTY_CONSTRUCTOR_P (init))
 	    warning (OPT_Wmissing_field_initializers,
 		     "missing initializer for member %qD", field);
 	}
       else
 	{
-	  const_tree fldtype = TREE_TYPE (field);
 	  if (TYPE_REF_P (fldtype))
 	    {
 	      if (complain & tf_error)
@@ -1730,14 +1610,19 @@ process_init_constructor_record (tree type, tree init, int nested, int flags,
 	  /* Warn when some struct elements are implicitly initialized
 	     to zero.  */
 	  if ((complain & tf_warning)
+	      && !cp_unevaluated_operand
 	      && !EMPTY_CONSTRUCTOR_P (init))
 	    warning (OPT_Wmissing_field_initializers,
 		     "missing initializer for member %qD", field);
 
-	  if (!zero_init_p (fldtype)
-	      || skipped < 0)
-	    next = build_zero_init (TREE_TYPE (field), /*nelts=*/NULL_TREE,
-				    /*static_storage_p=*/false);
+	  if (!zero_init_p (fldtype) || skipped < 0)
+	    {
+	      if (TYPE_REF_P (fldtype))
+		next = build_zero_cst (fldtype);
+	      else
+		next = build_zero_init (fldtype, /*nelts=*/NULL_TREE,
+					/*static_storage_p=*/false);
+	    }
 	  else
 	    {
 	      /* The default zero-initialization is fine for us; don't
@@ -1747,7 +1632,7 @@ process_init_constructor_record (tree type, tree init, int nested, int flags,
 	    }
 	}
 
-      if (DECL_SIZE (field) && integer_zerop (DECL_SIZE (field))
+      if (is_empty_field (field)
 	  && !TREE_SIDE_EFFECTS (next))
 	/* Don't add trivial initialization of an empty base/field to the
 	   constructor, as they might not be ordered the way the back-end
@@ -1755,7 +1640,7 @@ process_init_constructor_record (tree type, tree init, int nested, int flags,
 	continue;
 
       /* If this is a bitfield, now convert to the lowered type.  */
-      if (type != TREE_TYPE (field))
+      if (fldtype != TREE_TYPE (field))
 	next = cp_convert_and_check (TREE_TYPE (field), next, complain);
       picflags |= picflag_from_initializer (next);
       CONSTRUCTOR_APPEND_ELT (v, field, next);
@@ -2594,6 +2479,3 @@ require_complete_eh_spec_types (tree fntype, tree decl)
 	}
     }
 }
-
-
-#include "gt-cp-typeck2.h"

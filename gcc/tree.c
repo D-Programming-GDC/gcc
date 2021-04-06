@@ -1,5 +1,5 @@
 /* Language-independent node constructors for parse phase of GNU compiler.
-   Copyright (C) 1987-2020 Free Software Foundation, Inc.
+   Copyright (C) 1987-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -291,19 +291,21 @@ unsigned const char omp_clause_num_ops[] =
   1, /* OMP_CLAUSE_COPYPRIVATE  */
   3, /* OMP_CLAUSE_LINEAR  */
   2, /* OMP_CLAUSE_ALIGNED  */
+  2, /* OMP_CLAUSE_ALLOCATE  */
   1, /* OMP_CLAUSE_DEPEND  */
   1, /* OMP_CLAUSE_NONTEMPORAL  */
   1, /* OMP_CLAUSE_UNIFORM  */
   1, /* OMP_CLAUSE_TO_DECLARE  */
   1, /* OMP_CLAUSE_LINK  */
-  2, /* OMP_CLAUSE_FROM  */
-  2, /* OMP_CLAUSE_TO  */
-  2, /* OMP_CLAUSE_MAP  */
+  1, /* OMP_CLAUSE_DETACH  */
   1, /* OMP_CLAUSE_USE_DEVICE_PTR  */
   1, /* OMP_CLAUSE_USE_DEVICE_ADDR  */
   1, /* OMP_CLAUSE_IS_DEVICE_PTR  */
   1, /* OMP_CLAUSE_INCLUSIVE  */
   1, /* OMP_CLAUSE_EXCLUSIVE  */
+  2, /* OMP_CLAUSE_FROM  */
+  2, /* OMP_CLAUSE_TO  */
+  2, /* OMP_CLAUSE_MAP  */
   2, /* OMP_CLAUSE__CACHE_  */
   2, /* OMP_CLAUSE_GANG  */
   1, /* OMP_CLAUSE_ASYNC  */
@@ -375,19 +377,21 @@ const char * const omp_clause_code_name[] =
   "copyprivate",
   "linear",
   "aligned",
+  "allocate",
   "depend",
   "nontemporal",
   "uniform",
   "to",
   "link",
-  "from",
-  "to",
-  "map",
+  "detach",
   "use_device_ptr",
   "use_device_addr",
   "is_device_ptr",
   "inclusive",
   "exclusive",
+  "from",
+  "to",
+  "map",
   "_cache_",
   "gang",
   "async",
@@ -771,6 +775,33 @@ set_decl_section_name (tree node, const char *value)
   snode->set_section (value);
 }
 
+/* Set section name of NODE to match the section name of OTHER.
+
+   set_decl_section_name (decl, other) is equivalent to
+   set_decl_section_name (decl, DECL_SECTION_NAME (other)), but possibly more
+   efficient.  */
+void
+set_decl_section_name (tree decl, const_tree other)
+{
+  struct symtab_node *other_node = symtab_node::get (other);
+  if (other_node)
+    {
+      struct symtab_node *decl_node;
+      if (VAR_P (decl))
+    decl_node = varpool_node::get_create (decl);
+      else
+    decl_node = cgraph_node::get_create (decl);
+      decl_node->set_section (*other_node);
+    }
+  else
+    {
+      struct symtab_node *decl_node = symtab_node::get (decl);
+      if (!decl_node)
+    return;
+      decl_node->set_section (NULL);
+    }
+}
+
 /* Return TLS model of a variable NODE.  */
 enum tls_model
 decl_tls_model (const_tree node)
@@ -835,6 +866,7 @@ tree_code_size (enum tree_code code)
 	case BOOLEAN_TYPE:
 	case INTEGER_TYPE:
 	case REAL_TYPE:
+	case OPAQUE_TYPE:
 	case POINTER_TYPE:
 	case REFERENCE_TYPE:
 	case NULLPTR_TYPE:
@@ -1212,7 +1244,7 @@ copy_node (tree node MEM_STAT_DECL)
 	  SET_DECL_VALUE_EXPR (t, DECL_VALUE_EXPR (node));
 	  DECL_HAS_VALUE_EXPR_P (t) = 1;
 	}
-      /* DECL_DEBUG_EXPR is copied explicitely by callers.  */
+      /* DECL_DEBUG_EXPR is copied explicitly by callers.  */
       if (VAR_P (node))
 	{
 	  DECL_HAS_DEBUG_EXPR_P (t) = 0;
@@ -1725,8 +1757,15 @@ wide_int_to_tree (tree type, const poly_wide_int_ref &value)
   return build_poly_int_cst (type, value);
 }
 
-void
-cache_integer_cst (tree t)
+/* Insert INTEGER_CST T into a cache of integer constants.  And return
+   the cached constant (which may or may not be T).  If MIGHT_DUPLICATE
+   is false, and T falls into the type's 'smaller values' range, there
+   cannot be an existing entry.  Otherwise, if MIGHT_DUPLICATE is true,
+   or the value is large, should an existing entry exist, it is
+   returned (rather than inserting T).  */
+
+tree
+cache_integer_cst (tree t, bool might_duplicate ATTRIBUTE_UNUSED)
 {
   tree type = TREE_TYPE (t);
   int ix = -1;
@@ -1735,20 +1774,25 @@ cache_integer_cst (tree t)
 
   gcc_assert (!TREE_OVERFLOW (t));
 
+  /* The caching indices here must match those in
+     wide_int_to_type_1.  */
   switch (TREE_CODE (type))
     {
     case NULLPTR_TYPE:
-      gcc_assert (integer_zerop (t));
+      gcc_checking_assert (integer_zerop (t));
       /* Fallthru.  */
 
     case POINTER_TYPE:
     case REFERENCE_TYPE:
-      /* Cache NULL pointer.  */
-      if (integer_zerop (t))
-	{
-	  limit = 1;
+      {
+	if (integer_zerop (t))
 	  ix = 0;
-	}
+	else if (integer_onep (t))
+	  ix = 2;
+
+	if (ix >= 0)
+	  limit = 3;
+      }
       break;
 
     case BOOLEAN_TYPE:
@@ -1815,21 +1859,32 @@ cache_integer_cst (tree t)
 	  TYPE_CACHED_VALUES (type) = make_tree_vec (limit);
 	}
 
-      gcc_assert (TREE_VEC_ELT (TYPE_CACHED_VALUES (type), ix) == NULL_TREE);
-      TREE_VEC_ELT (TYPE_CACHED_VALUES (type), ix) = t;
+      if (tree r = TREE_VEC_ELT (TYPE_CACHED_VALUES (type), ix))
+	{
+	  gcc_checking_assert (might_duplicate);
+	  t = r;
+	}
+      else
+	TREE_VEC_ELT (TYPE_CACHED_VALUES (type), ix) = t;
     }
   else
     {
       /* Use the cache of larger shared ints.  */
       tree *slot = int_cst_hash_table->find_slot (t, INSERT);
-      /* If there is already an entry for the number verify it's the
-         same.  */
-      if (*slot)
-	gcc_assert (wi::to_wide (tree (*slot)) == wi::to_wide (t));
+      if (tree r = *slot)
+	{
+	  /* If there is already an entry for the number verify it's the
+	     same value.  */
+	  gcc_checking_assert (wi::to_wide (tree (r)) == wi::to_wide (t));
+	  /* And return the cached value.  */
+	  t = r;
+	}
       else
 	/* Otherwise insert this one into the hash table.  */
 	*slot = t;
     }
+
+  return t;
 }
 
 
@@ -2132,7 +2187,7 @@ build_constructor_from_vec (tree type, const vec<tree, va_gc> *vals)
 {
   vec<constructor_elt, va_gc> *v = NULL;
 
-  for (tree t : *vals)
+  for (tree t : vals)
     CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, t);
 
   return build_constructor (type, v);
@@ -2246,6 +2301,22 @@ build_real_from_int_cst (tree type, const_tree i)
 
   TREE_OVERFLOW (v) |= overflow;
   return v;
+}
+
+/* Return a new REAL_CST node whose type is TYPE
+   and whose value is the integer value I which has sign SGN.  */
+
+tree
+build_real_from_wide (tree type, const wide_int_ref &i, signop sgn)
+{
+  REAL_VALUE_TYPE d;
+
+  /* Clear all bits of the real value type so that we can later do
+     bitwise comparisons to see if two values are the same.  */
+  memset (&d, 0, sizeof d);
+
+  real_from_integer (&d, TYPE_MODE (type), i, sgn);
+  return build_real (type, d);
 }
 
 /* Return a newly constructed STRING_CST node whose value is the LEN
@@ -3414,7 +3485,17 @@ array_type_nelts (const_tree type)
 
   /* TYPE_MAX_VALUE may not be set if the array has unknown length.  */
   if (!max)
-    return error_mark_node;
+    {
+      /* zero sized arrays are represented from C FE as complete types with
+	 NULL TYPE_MAX_VALUE and zero TYPE_SIZE, while C++ FE represents
+	 them as min 0, max -1.  */
+      if (COMPLETE_TYPE_P (type)
+	  && integer_zerop (TYPE_SIZE (type))
+	  && integer_zerop (min))
+	return build_int_cst (TREE_TYPE (min), -1);
+
+      return error_mark_node;
+    }
 
   return (integer_zerop (min)
 	  ? max
@@ -3893,6 +3974,7 @@ type_contains_placeholder_1 (const_tree type)
   switch (TREE_CODE (type))
     {
     case VOID_TYPE:
+    case OPAQUE_TYPE:
     case COMPLEX_TYPE:
     case ENUMERAL_TYPE:
     case BOOLEAN_TYPE:
@@ -5777,7 +5859,7 @@ free_lang_data_in_decl (tree decl, class free_lang_data_d *fld)
 	      DECL_INITIAL (decl) = error_mark_node;
 	    }
 	}
-      if (gimple_has_body_p (decl) || (node && node->thunk.thunk_p))
+      if (gimple_has_body_p (decl) || (node && node->thunk))
 	{
 	  tree t;
 
@@ -6491,7 +6573,8 @@ check_base_type (const_tree cand, const_tree base)
 			        TYPE_ATTRIBUTES (base)))
     return false;
   /* Check alignment.  */
-  if (TYPE_ALIGN (cand) == TYPE_ALIGN (base))
+  if (TYPE_ALIGN (cand) == TYPE_ALIGN (base)
+      && TYPE_USER_ALIGN (cand) == TYPE_USER_ALIGN (base))
     return true;
   /* Atomic types increase minimal alignment.  We must to do so as well
      or we get duplicated canonical types. See PR88686.  */
@@ -6526,6 +6609,9 @@ check_aligned_type (const_tree cand, const_tree base, unsigned int align)
 	  && TYPE_CONTEXT (cand) == TYPE_CONTEXT (base)
 	  /* Check alignment.  */
 	  && TYPE_ALIGN (cand) == align
+	  /* Check this is a user-aligned type as build_aligned_type
+	     would create.  */
+	  && TYPE_USER_ALIGN (cand)
 	  && attribute_list_equal (TYPE_ATTRIBUTES (cand),
 				   TYPE_ATTRIBUTES (base))
 	  && check_lang_type (cand, base));
@@ -7021,6 +7107,7 @@ type_cache_hasher::equal (type_hash *a, type_hash *b)
   switch (TREE_CODE (a->type))
     {
     case VOID_TYPE:
+    case OPAQUE_TYPE:
     case COMPLEX_TYPE:
     case POINTER_TYPE:
     case REFERENCE_TYPE:
@@ -10514,7 +10601,7 @@ set_call_expr_flags (tree decl, int flags)
   if (flags & ECF_RET1)
     DECL_ATTRIBUTES (decl)
       = tree_cons (get_identifier ("fn spec"),
-		   build_tree_list (NULL_TREE, build_string (1, "1")),
+		   build_tree_list (NULL_TREE, build_string (2, "1 ")),
 		   DECL_ATTRIBUTES (decl));
   if ((flags & ECF_TM_PURE) && flag_tm)
     apply_tm_attr (decl, get_identifier ("transaction_pure"));
@@ -10576,10 +10663,10 @@ build_common_builtin_nodes (void)
 
       if (!builtin_decl_explicit_p (BUILT_IN_MEMCPY))
 	local_define_builtin ("__builtin_memcpy", ftype, BUILT_IN_MEMCPY,
-			      "memcpy", ECF_NOTHROW | ECF_LEAF | ECF_RET1);
+			      "memcpy", ECF_NOTHROW | ECF_LEAF);
       if (!builtin_decl_explicit_p (BUILT_IN_MEMMOVE))
 	local_define_builtin ("__builtin_memmove", ftype, BUILT_IN_MEMMOVE,
-			      "memmove", ECF_NOTHROW | ECF_LEAF | ECF_RET1);
+			      "memmove", ECF_NOTHROW | ECF_LEAF);
     }
 
   if (!builtin_decl_explicit_p (BUILT_IN_MEMCMP))
@@ -10597,7 +10684,7 @@ build_common_builtin_nodes (void)
 					ptr_type_node, integer_type_node,
 					size_type_node, NULL_TREE);
       local_define_builtin ("__builtin_memset", ftype, BUILT_IN_MEMSET,
-			    "memset", ECF_NOTHROW | ECF_LEAF | ECF_RET1);
+			    "memset", ECF_NOTHROW | ECF_LEAF);
     }
 
   /* If we're checking the stack, `alloca' can throw.  */
@@ -10652,6 +10739,12 @@ build_common_builtin_nodes (void)
 
   ftype = build_function_type_list (void_type_node,
 				    ptr_type_node, ptr_type_node, NULL_TREE);
+  if (!builtin_decl_explicit_p (BUILT_IN_CLEAR_CACHE))
+    local_define_builtin ("__builtin___clear_cache", ftype,
+			  BUILT_IN_CLEAR_CACHE,
+			  "__clear_cache",
+			  ECF_NOTHROW);
+
   local_define_builtin ("__builtin_nonlocal_goto", ftype,
 			BUILT_IN_NONLOCAL_GOTO,
 			"__builtin_nonlocal_goto",
@@ -10926,8 +11019,15 @@ build_truth_vector_type_for_mode (poly_uint64 nunits, machine_mode mask_mode)
 {
   gcc_assert (mask_mode != BLKmode);
 
-  poly_uint64 vsize = GET_MODE_BITSIZE (mask_mode);
-  unsigned HOST_WIDE_INT esize = vector_element_size (vsize, nunits);
+  unsigned HOST_WIDE_INT esize;
+  if (VECTOR_MODE_P (mask_mode))
+    {
+      poly_uint64 vsize = GET_MODE_BITSIZE (mask_mode);
+      esize = vector_element_size (vsize, nunits);
+    }
+  else
+    esize = 1;
+
   tree bool_type = build_nonstandard_boolean_type (esize);
 
   return make_vector_type (bool_type, nunits, mask_mode);
@@ -10983,13 +11083,13 @@ build_opaque_vector_type (tree innertype, poly_int64 nunits)
 
 /* Return the value of element I of VECTOR_CST T as a wide_int.  */
 
-wide_int
+static poly_wide_int
 vector_cst_int_elt (const_tree t, unsigned int i)
 {
   /* First handle elements that are directly encoded.  */
   unsigned int encoded_nelts = vector_cst_encoded_nelts (t);
   if (i < encoded_nelts)
-    return wi::to_wide (VECTOR_CST_ENCODED_ELT (t, i));
+    return wi::to_poly_wide (VECTOR_CST_ENCODED_ELT (t, i));
 
   /* Identify the pattern that contains element I and work out the index of
      the last encoded element for that pattern.  */
@@ -11000,13 +11100,13 @@ vector_cst_int_elt (const_tree t, unsigned int i)
 
   /* If there are no steps, the final encoded value is the right one.  */
   if (!VECTOR_CST_STEPPED_P (t))
-    return wi::to_wide (VECTOR_CST_ENCODED_ELT (t, final_i));
+    return wi::to_poly_wide (VECTOR_CST_ENCODED_ELT (t, final_i));
 
   /* Otherwise work out the value from the last two encoded elements.  */
   tree v1 = VECTOR_CST_ENCODED_ELT (t, final_i - npatterns);
   tree v2 = VECTOR_CST_ENCODED_ELT (t, final_i);
-  wide_int diff = wi::to_wide (v2) - wi::to_wide (v1);
-  return wi::to_wide (v2) + (count - 2) * diff;
+  poly_wide_int diff = wi::to_poly_wide (v2) - wi::to_poly_wide (v1);
+  return wi::to_poly_wide (v2) + (count - 2) * diff;
 }
 
 /* Return the value of element I of VECTOR_CST T.  */
@@ -12033,7 +12133,6 @@ walk_tree_1 (tree *tp, walk_tree_fn func, void *data,
     case INTEGER_CST:
     case REAL_CST:
     case FIXED_CST:
-    case VECTOR_CST:
     case STRING_CST:
     case BLOCK:
     case PLACEHOLDER_EXPR:
@@ -12062,6 +12161,18 @@ walk_tree_1 (tree *tp, walk_tree_fn func, void *data,
 
 	/* Now walk the first one as a tail call.  */
 	WALK_SUBTREE_TAIL (TREE_VEC_ELT (*tp, 0));
+      }
+
+    case VECTOR_CST:
+      {
+	unsigned len = vector_cst_encoded_nelts (*tp);
+	if (len == 0)
+	  break;
+	/* Walk all elements but the first.  */
+	while (--len)
+	  WALK_SUBTREE (VECTOR_CST_ENCODED_ELT (*tp, len));
+	/* Now walk the first one as a tail call.  */
+	WALK_SUBTREE_TAIL (VECTOR_CST_ENCODED_ELT (*tp, 0));
       }
 
     case COMPLEX_CST:
@@ -12146,6 +12257,7 @@ walk_tree_1 (tree *tp, walk_tree_fn func, void *data,
 	case OMP_CLAUSE_HINT:
 	case OMP_CLAUSE_TO_DECLARE:
 	case OMP_CLAUSE_LINK:
+	case OMP_CLAUSE_DETACH:
 	case OMP_CLAUSE_USE_DEVICE_PTR:
 	case OMP_CLAUSE_USE_DEVICE_ADDR:
 	case OMP_CLAUSE_IS_DEVICE_PTR:
@@ -12206,6 +12318,7 @@ walk_tree_1 (tree *tp, walk_tree_fn func, void *data,
 	  WALK_SUBTREE_TAIL (OMP_CLAUSE_CHAIN (*tp));
 
 	case OMP_CLAUSE_ALIGNED:
+	case OMP_CLAUSE_ALLOCATE:
 	case OMP_CLAUSE_FROM:
 	case OMP_CLAUSE_TO:
 	case OMP_CLAUSE_MAP:
@@ -12515,8 +12628,43 @@ tree_nonartificial_location (tree exp)
     return EXPR_LOCATION (exp);
 }
 
+/* Return the location into which EXP has been inlined.  Analogous
+   to tree_nonartificial_location() above but not limited to artificial
+   functions declared inline.  If SYSTEM_HEADER is true, return
+   the macro expansion point of the location if it's in a system header */
 
-/* These are the hash table functions for the hash table of OPTIMIZATION_NODEq
+location_t
+tree_inlined_location (tree exp, bool system_header /* = true */)
+{
+  location_t loc = UNKNOWN_LOCATION;
+
+  tree block = TREE_BLOCK (exp);
+
+  while (block && TREE_CODE (block) == BLOCK
+	 && BLOCK_ABSTRACT_ORIGIN (block))
+    {
+      tree ao = BLOCK_ABSTRACT_ORIGIN (block);
+      if (TREE_CODE (ao) == FUNCTION_DECL)
+	loc = BLOCK_SOURCE_LOCATION (block);
+      else if (TREE_CODE (ao) != BLOCK)
+	break;
+
+      block = BLOCK_SUPERCONTEXT (block);
+    }
+
+  if (loc == UNKNOWN_LOCATION)
+    {
+      loc = EXPR_LOCATION (exp);
+      if (system_header)
+	/* Only consider macro expansion when the block traversal failed
+	   to find a location.  Otherwise it's not relevant.  */
+	return expansion_point_location_if_in_system_header (loc);
+    }
+
+  return loc;
+}
+
+/* These are the hash table functions for the hash table of OPTIMIZATION_NODE
    nodes.  */
 
 /* Return the hash code X, an OPTIMIZATION_NODE or TARGET_OPTION code.  */
@@ -13640,20 +13788,21 @@ get_initializer_for (tree init, tree decl)
 /* Determines the size of the member referenced by the COMPONENT_REF
    REF, using its initializer expression if necessary in order to
    determine the size of an initialized flexible array member.
-   If non-null, *INTERIOR_ZERO_LENGTH is set when REF refers to
-   an interior zero-length array.
+   If non-null, set *ARK when REF refers to an interior zero-length
+   array or a trailing one-element array.
    Returns the size as sizetype (which might be zero for an object
    with an uninitialized flexible array member) or null if the size
    cannot be determined.  */
 
 tree
-component_ref_size (tree ref, bool *interior_zero_length /* = NULL */)
+component_ref_size (tree ref, special_array_member *sam /* = NULL */)
 {
   gcc_assert (TREE_CODE (ref) == COMPONENT_REF);
 
-  bool int_0_len = false;
-  if (!interior_zero_length)
-    interior_zero_length = &int_0_len;
+  special_array_member sambuf;
+  if (!sam)
+    sam = &sambuf;
+  *sam = special_array_member::none;
 
   /* The object/argument referenced by the COMPONENT_REF and its type.  */
   tree arg = TREE_OPERAND (ref, 0);
@@ -13666,7 +13815,13 @@ component_ref_size (tree ref, bool *interior_zero_length /* = NULL */)
     {
       tree memtype = TREE_TYPE (member);
       if (TREE_CODE (memtype) != ARRAY_TYPE)
-	return memsize;
+	/* DECL_SIZE may be less than TYPE_SIZE in C++ when referring
+	   to the type of a class with a virtual base which doesn't
+	   reflect the size of the virtual's members (see pr97595).
+	   If that's the case fail for now and implement something
+	   more robust in the future.  */
+	return (tree_int_cst_equal (memsize, TYPE_SIZE_UNIT (memtype))
+		? memsize : NULL_TREE);
 
       bool trailing = array_at_struct_end_p (ref);
       bool zero_length = integer_zerop (memsize);
@@ -13675,9 +13830,16 @@ component_ref_size (tree ref, bool *interior_zero_length /* = NULL */)
 	   more than one element.  */
 	return memsize;
 
-      *interior_zero_length = zero_length && !trailing;
-      if (*interior_zero_length)
-	memsize = NULL_TREE;
+      if (zero_length)
+	{
+	  if (trailing)
+	    *sam = special_array_member::trail_0;
+	  else
+	    {
+	      *sam = special_array_member::int_0;
+	      memsize = NULL_TREE;
+	    }
+	}
 
       if (!zero_length)
 	if (tree dom = TYPE_DOMAIN (memtype))
@@ -13688,12 +13850,16 @@ component_ref_size (tree ref, bool *interior_zero_length /* = NULL */)
 		{
 		  offset_int minidx = wi::to_offset (min);
 		  offset_int maxidx = wi::to_offset (max);
-		  if (maxidx - minidx > 0)
+		  offset_int neltsm1 = maxidx - minidx;
+		  if (neltsm1 > 0)
 		    /* MEMBER is an array with more than one element.  */
 		    return memsize;
+
+		  if (neltsm1 == 0)
+		    *sam = special_array_member::trail_1;
 		}
 
-      /* For a refernce to a zero- or one-element array member of a union
+      /* For a reference to a zero- or one-element array member of a union
 	 use the size of the union instead of the size of the member.  */
       if (TREE_CODE (argtype) == UNION_TYPE)
 	memsize = TYPE_SIZE_UNIT (argtype);
@@ -13708,7 +13874,7 @@ component_ref_size (tree ref, bool *interior_zero_length /* = NULL */)
   tree base = get_addr_base_and_unit_offset (ref, &baseoff);
   if (!base || !VAR_P (base))
     {
-      if (!*interior_zero_length)
+      if (*sam != special_array_member::int_0)
 	return NULL_TREE;
 
       if (TREE_CODE (arg) != COMPONENT_REF)
@@ -13728,7 +13894,7 @@ component_ref_size (tree ref, bool *interior_zero_length /* = NULL */)
   /* Determine the base type of the referenced object.  If it's
      the same as ARGTYPE and MEMBER has a known size, return it.  */
   tree bt = basetype;
-  if (!*interior_zero_length)
+  if (*sam != special_array_member::int_0)
     while (TREE_CODE (bt) == ARRAY_TYPE)
       bt = TREE_TYPE (bt);
   bool typematch = useless_type_conversion_p (argtype, bt);
@@ -13768,7 +13934,7 @@ component_ref_size (tree ref, bool *interior_zero_length /* = NULL */)
 	  if (DECL_P (base)
 	      && DECL_EXTERNAL (base)
 	      && bt == basetype
-	      && !*interior_zero_length)
+	      && *sam != special_array_member::int_0)
 	    /* The size of a flexible array member of an extern struct
 	       with no initializer cannot be determined (it's defined
 	       in another translation unit and can have an initializer
@@ -13876,8 +14042,7 @@ vector_element_bits (const_tree type)
 {
   gcc_checking_assert (VECTOR_TYPE_P (type));
   if (VECTOR_BOOLEAN_TYPE_P (type))
-    return vector_element_size (tree_to_poly_uint64 (TYPE_SIZE (type)),
-				TYPE_VECTOR_SUBPARTS (type));
+    return TYPE_PRECISION (TREE_TYPE (type));
   return tree_to_uhwi (TYPE_SIZE (TREE_TYPE (type)));
 }
 
@@ -14971,6 +15136,10 @@ maybe_wrap_with_location (tree expr, location_t loc)
   if (EXCEPTIONAL_CLASS_P (expr))
     return expr;
 
+  /* Compiler-generated temporary variables don't need a wrapper.  */
+  if (DECL_P (expr) && DECL_ARTIFICIAL (expr) && DECL_IGNORED_P (expr))
+    return expr;
+
   /* If any auto_suppress_location_wrappers are active, don't create
      wrappers.  */
   if (suppress_location_wrappers > 0)
@@ -15062,22 +15231,22 @@ get_nonnull_args (const_tree fntype)
 /* Returns true if TYPE is a type where it and all of its subobjects
    (recursively) are of structure, union, or array type.  */
 
-static bool
-default_is_empty_type (tree type)
+bool
+is_empty_type (const_tree type)
 {
   if (RECORD_OR_UNION_TYPE_P (type))
     {
       for (tree field = TYPE_FIELDS (type); field; field = DECL_CHAIN (field))
 	if (TREE_CODE (field) == FIELD_DECL
 	    && !DECL_PADDING_P (field)
-	    && !default_is_empty_type (TREE_TYPE (field)))
+	    && !is_empty_type (TREE_TYPE (field)))
 	  return false;
       return true;
     }
   else if (TREE_CODE (type) == ARRAY_TYPE)
     return (integer_minus_onep (array_type_nelts (type))
 	    || TYPE_DOMAIN (type) == NULL_TREE
-	    || default_is_empty_type (TREE_TYPE (type)));
+	    || is_empty_type (TREE_TYPE (type)));
   return false;
 }
 
@@ -15096,7 +15265,7 @@ default_is_empty_record (const_tree type)
   if (TREE_ADDRESSABLE (type))
     return false;
 
-  return default_is_empty_type (TYPE_MAIN_VARIANT (type));
+  return is_empty_type (TYPE_MAIN_VARIANT (type));
 }
 
 /* Determine whether TYPE is a structure with a flexible array member,
@@ -15267,6 +15436,75 @@ verify_type_context (location_t loc, type_context_kind context,
   gcc_assert (TYPE_P (type));
   return (!targetm.verify_type_context
 	  || targetm.verify_type_context (loc, context, type, silent_p));
+}
+
+/* Return that NEW_ASM and DELETE_ASM name a valid pair of new and
+   delete operators.  */
+
+bool
+valid_new_delete_pair_p (tree new_asm, tree delete_asm)
+{
+  const char *new_name = IDENTIFIER_POINTER (new_asm);
+  const char *delete_name = IDENTIFIER_POINTER (delete_asm);
+  unsigned int new_len = IDENTIFIER_LENGTH (new_asm);
+  unsigned int delete_len = IDENTIFIER_LENGTH (delete_asm);
+
+  if (new_len < 5 || delete_len < 6)
+    return false;
+  if (new_name[0] == '_')
+    ++new_name, --new_len;
+  if (new_name[0] == '_')
+    ++new_name, --new_len;
+  if (delete_name[0] == '_')
+    ++delete_name, --delete_len;
+  if (delete_name[0] == '_')
+    ++delete_name, --delete_len;
+  if (new_len < 4 || delete_len < 5)
+    return false;
+  /* *_len is now just the length after initial underscores.  */
+  if (new_name[0] != 'Z' || new_name[1] != 'n')
+    return false;
+  if (delete_name[0] != 'Z' || delete_name[1] != 'd')
+    return false;
+  /* _Znw must match _Zdl, _Zna must match _Zda.  */
+  if ((new_name[2] != 'w' || delete_name[2] != 'l')
+      && (new_name[2] != 'a' || delete_name[2] != 'a'))
+    return false;
+  /* 'j', 'm' and 'y' correspond to size_t.  */
+  if (new_name[3] != 'j' && new_name[3] != 'm' && new_name[3] != 'y')
+    return false;
+  if (delete_name[3] != 'P' || delete_name[4] != 'v')
+    return false;
+  if (new_len == 4
+      || (new_len == 18 && !memcmp (new_name + 4, "RKSt9nothrow_t", 14)))
+    {
+      /* _ZnXY or _ZnXYRKSt9nothrow_t matches
+	 _ZdXPv, _ZdXPvY and _ZdXPvRKSt9nothrow_t.  */
+      if (delete_len == 5)
+	return true;
+      if (delete_len == 6 && delete_name[5] == new_name[3])
+	return true;
+      if (delete_len == 19 && !memcmp (delete_name + 5, "RKSt9nothrow_t", 14))
+	return true;
+    }
+  else if ((new_len == 19 && !memcmp (new_name + 4, "St11align_val_t", 15))
+	   || (new_len == 33
+	       && !memcmp (new_name + 4, "St11align_val_tRKSt9nothrow_t", 29)))
+    {
+      /* _ZnXYSt11align_val_t or _ZnXYSt11align_val_tRKSt9nothrow_t matches
+	 _ZdXPvSt11align_val_t or _ZdXPvYSt11align_val_t or  or
+	 _ZdXPvSt11align_val_tRKSt9nothrow_t.  */
+      if (delete_len == 20 && !memcmp (delete_name + 5, "St11align_val_t", 15))
+	return true;
+      if (delete_len == 21
+	  && delete_name[5] == new_name[3]
+	  && !memcmp (delete_name + 6, "St11align_val_t", 15))
+	return true;
+      if (delete_len == 34
+	  && !memcmp (delete_name + 5, "St11align_val_tRKSt9nothrow_t", 29))
+	return true;
+    }
+  return false;
 }
 
 #if CHECKING_P

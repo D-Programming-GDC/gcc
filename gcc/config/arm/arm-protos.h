@@ -1,5 +1,5 @@
 /* Prototypes for exported functions defined in arm.c and pe.c
-   Copyright (C) 1999-2020 Free Software Foundation, Inc.
+   Copyright (C) 1999-2021 Free Software Foundation, Inc.
    Contributed by Richard Earnshaw (rearnsha@arm.com)
    Minor hacks by Nick Clifton (nickc@cygnus.com)
 
@@ -74,7 +74,8 @@ extern bool arm_small_register_classes_for_mode_p (machine_mode);
 extern int const_ok_for_arm (HOST_WIDE_INT);
 extern int const_ok_for_op (HOST_WIDE_INT, enum rtx_code);
 extern int const_ok_for_dimode_op (HOST_WIDE_INT, enum rtx_code);
-extern void thumb1_gen_const_int (rtx, HOST_WIDE_INT);
+extern void thumb1_gen_const_int_rtl (rtx, HOST_WIDE_INT);
+extern void thumb1_gen_const_int_print (rtx, HOST_WIDE_INT);
 extern int arm_split_constant (RTX_CODE, machine_mode, rtx,
 			       HOST_WIDE_INT, rtx, rtx, int);
 extern int legitimate_pic_operand_p (rtx);
@@ -372,9 +373,11 @@ extern void arm_emit_coreregs_64bit_shift (enum rtx_code, rtx, rtx, rtx, rtx,
 extern bool arm_fusion_enabled_p (tune_params::fuse_ops);
 extern bool arm_valid_symbolic_address_p (rtx);
 extern bool arm_validize_comparison (rtx *, rtx *, rtx *);
+extern bool arm_expand_vector_compare (rtx, rtx_code, rtx, rtx, bool);
 #endif /* RTX_CODE */
 
 extern bool arm_gen_setmem (rtx *);
+extern void arm_expand_vcond (rtx *, machine_mode);
 extern void arm_expand_vec_perm (rtx target, rtx op0, rtx op1, rtx sel);
 
 extern bool arm_autoinc_modes_ok_p (machine_mode, enum arm_auto_incmodes);

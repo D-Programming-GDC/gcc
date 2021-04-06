@@ -30,7 +30,6 @@ with Einfo;    use Einfo;
 with Elists;   use Elists;
 with Eval_Fat; use Eval_Fat;
 with Exp_Ch11; use Exp_Ch11;
-with Exp_Ch2;  use Exp_Ch2;
 with Exp_Ch4;  use Exp_Ch4;
 with Exp_Pakd; use Exp_Pakd;
 with Exp_Util; use Exp_Util;
@@ -536,7 +535,7 @@ package body Checks is
       --  We do not need checks if we are not generating code (i.e. the
       --  expander is not active). This is not just an optimization, there
       --  are cases (e.g. with pragma Debug) where generating the checks
-      --  can cause real trouble).
+      --  can cause real trouble.
 
       if not Expander_Active then
          return;
@@ -590,7 +589,6 @@ package body Checks is
       then
          Param_Ent := Entity (N);
          while Present (Renamed_Object (Param_Ent)) loop
-
             --  Renamed_Object must return an Entity_Name here
             --  because of preceding "Present (E_E_A (...))" test.
 
@@ -602,32 +600,45 @@ package body Checks is
          return;
 
       --  Only apply the run-time check if the access parameter has an
-      --  associated extra access level parameter and when the level of the
-      --  type is less deep than the level of the access parameter, and
-      --  accessibility checks are not suppressed.
+      --  associated extra access level parameter and when accessibility checks
+      --  are enabled.
 
       elsif Present (Param_Ent)
-         and then Present (Extra_Accessibility (Param_Ent))
-         and then UI_Gt (Object_Access_Level (N),
-                         Deepest_Type_Access_Level (Typ))
+         and then Present (Get_Dynamic_Accessibility (Param_Ent))
          and then not Accessibility_Checks_Suppressed (Param_Ent)
          and then not Accessibility_Checks_Suppressed (Typ)
       then
+         --  Obtain the parameter's accessibility level
+
          Param_Level :=
-           New_Occurrence_Of (Extra_Accessibility (Param_Ent), Loc);
+           New_Occurrence_Of (Get_Dynamic_Accessibility (Param_Ent), Loc);
 
          --  Use the dynamic accessibility parameter for the function's result
          --  when one has been created instead of statically referring to the
          --  deepest type level so as to appropriatly handle the rules for
          --  RM 3.10.2 (10.1/3).
 
-         if Ekind (Scope (Param_Ent))
-              in E_Function | E_Operator | E_Subprogram_Type
-           and then Present (Extra_Accessibility_Of_Result (Scope (Param_Ent)))
+         if Ekind (Scope (Param_Ent)) = E_Function
+           and then In_Return_Value (N)
+           and then Ekind (Typ) = E_Anonymous_Access_Type
          then
-            Type_Level :=
-              New_Occurrence_Of
-                (Extra_Accessibility_Of_Result (Scope (Param_Ent)), Loc);
+            --  Associate the level of the result type to the extra result
+            --  accessibility parameter belonging to the current function.
+
+            if Present (Extra_Accessibility_Of_Result (Scope (Param_Ent))) then
+               Type_Level :=
+                 New_Occurrence_Of
+                   (Extra_Accessibility_Of_Result (Scope (Param_Ent)), Loc);
+
+            --  In Ada 2005 and earlier modes, a result extra accessibility
+            --  parameter is not generated and no dynamic check is performed.
+
+            else
+               return;
+            end if;
+
+         --  Otherwise get the type's accessibility level normally
+
          else
             Type_Level :=
               Make_Integer_Literal (Loc, Deepest_Type_Access_Level (Typ));
@@ -1013,8 +1024,7 @@ package body Checks is
       --  Now see if an overflow check is required
 
       declare
-         Siz   : constant Int := UI_To_Int (Esize (Rtyp));
-         Dsiz  : constant Int := Siz * 2;
+         Dsiz  : constant Uint := 2 * Esize (Rtyp);
          Opnod : Node_Id;
          Ctyp  : Entity_Id;
          Opnd  : Node_Id;
@@ -1050,33 +1060,47 @@ package body Checks is
          --  an integer type of sufficient length to hold the largest possible
          --  result.
 
-         --  If the size of check type exceeds the size of Long_Long_Integer,
+         --  If the size of the check type exceeds the maximum integer size,
          --  we use a different approach, expanding to:
 
-         --    typ (xxx_With_Ovflo_Check (Integer_64 (x), Integer (y)))
+         --    typ (xxx_With_Ovflo_Check (Integer_NN (x), Integer_NN (y)))
 
          --  where xxx is Add, Multiply or Subtract as appropriate
 
          --  Find check type if one exists
 
-         if Dsiz <= Standard_Integer_Size then
-            Ctyp := Standard_Integer;
-
-         elsif Dsiz <= Standard_Long_Long_Integer_Size then
-            Ctyp := Standard_Long_Long_Integer;
+         if Dsiz <= System_Max_Integer_Size then
+            Ctyp := Integer_Type_For (Dsiz, Uns => False);
 
          --  No check type exists, use runtime call
 
          else
-            if Nkind (N) = N_Op_Add then
-               Cent := RE_Add_With_Ovflo_Check;
-
-            elsif Nkind (N) = N_Op_Multiply then
-               Cent := RE_Multiply_With_Ovflo_Check;
-
+            if System_Max_Integer_Size = 64 then
+               Ctyp := RTE (RE_Integer_64);
             else
-               pragma Assert (Nkind (N) = N_Op_Subtract);
-               Cent := RE_Subtract_With_Ovflo_Check;
+               Ctyp := RTE (RE_Integer_128);
+            end if;
+
+            if Nkind (N) = N_Op_Add then
+               if System_Max_Integer_Size = 64 then
+                  Cent := RE_Add_With_Ovflo_Check64;
+               else
+                  Cent := RE_Add_With_Ovflo_Check128;
+               end if;
+
+            elsif Nkind (N) = N_Op_Subtract then
+               if System_Max_Integer_Size = 64 then
+                  Cent := RE_Subtract_With_Ovflo_Check64;
+               else
+                  Cent := RE_Subtract_With_Ovflo_Check128;
+               end if;
+
+            else pragma Assert (Nkind (N) = N_Op_Multiply);
+               if System_Max_Integer_Size = 64 then
+                  Cent := RE_Multiply_With_Ovflo_Check64;
+               else
+                  Cent := RE_Multiply_With_Ovflo_Check128;
+               end if;
             end if;
 
             Rewrite (N,
@@ -1084,8 +1108,8 @@ package body Checks is
                 Make_Function_Call (Loc,
                   Name => New_Occurrence_Of (RTE (Cent), Loc),
                   Parameter_Associations => New_List (
-                    OK_Convert_To (RTE (RE_Integer_64), Left_Opnd  (N)),
-                    OK_Convert_To (RTE (RE_Integer_64), Right_Opnd (N))))));
+                    OK_Convert_To (Ctyp, Left_Opnd  (N)),
+                    OK_Convert_To (Ctyp, Right_Opnd (N))))));
 
             Analyze_And_Resolve (N, Typ);
             return;
@@ -2140,6 +2164,15 @@ package body Checks is
          Lo_OK := (Lo >= UR_From_Uint (Ifirst));
       end if;
 
+      --  Saturate the lower bound to that of the expression's type, because
+      --  we do not want to create an out-of-range value but we still need to
+      --  do a comparison to catch NaNs.
+
+      if Lo < Expr_Value_R (Type_Low_Bound (Expr_Type)) then
+         Lo := Expr_Value_R (Type_Low_Bound (Expr_Type));
+         Lo_OK := True;
+      end if;
+
       if Lo_OK then
 
          --  Lo_Chk := (X >= Lo)
@@ -2172,6 +2205,15 @@ package body Checks is
       else
          Hi := Machine (Expr_Type, UR_From_Uint (Ilast), Round_Even, Expr);
          Hi_OK := (Hi <= UR_From_Uint (Ilast));
+      end if;
+
+      --  Saturate the higher bound to that of the expression's type, because
+      --  we do not want to create an out-of-range value but we still need to
+      --  do a comparison to catch NaNs.
+
+      if Hi > Expr_Value_R (Type_High_Bound (Expr_Type)) then
+         Hi := Expr_Value_R (Type_High_Bound (Expr_Type));
+         Hi_OK := True;
       end if;
 
       if Hi_OK then
@@ -2744,13 +2786,9 @@ package body Checks is
       Par : Node_Id;
       S   : Entity_Id;
 
+      Check_Disabled : constant Boolean := (not Predicate_Enabled (Typ))
+        or else not Predicate_Check_In_Scope (N);
    begin
-      if not Predicate_Enabled (Typ)
-        or else not Predicate_Check_In_Scope (N)
-      then
-         return;
-      end if;
-
       S := Current_Scope;
       while Present (S) and then not Is_Subprogram (S) loop
          S := Scope (S);
@@ -2759,7 +2797,9 @@ package body Checks is
       --  If the check appears within the predicate function itself, it means
       --  that the user specified a check whose formal is the predicated
       --  subtype itself, rather than some covering type. This is likely to be
-      --  a common error, and thus deserves a warning.
+      --  a common error, and thus deserves a warning. We want to emit this
+      --  warning even if predicate checking is disabled (in which case the
+      --  warning is still useful even if it is not strictly accurate).
 
       if Present (S) and then S = Predicate_Function (Typ) then
          Error_Msg_NE
@@ -2774,9 +2814,15 @@ package body Checks is
                Parent (N), Typ);
          end if;
 
-         Insert_Action (N,
-           Make_Raise_Storage_Error (Sloc (N),
-             Reason => SE_Infinite_Recursion));
+         if not Check_Disabled then
+            Insert_Action (N,
+              Make_Raise_Storage_Error (Sloc (N),
+                Reason => SE_Infinite_Recursion));
+            return;
+         end if;
+      end if;
+
+      if Check_Disabled then
          return;
       end if;
 
@@ -3212,23 +3258,16 @@ package body Checks is
       end if;
 
       --  Return if we know expression is definitely in the range of the target
-      --  type as determined by Determine_Range. Right now we only do this for
-      --  discrete types, and not fixed-point or floating-point types.
-
-      --  The additional less-precise tests below catch these cases
-
-      --  In GNATprove_Mode, also deal with the case of a conversion from
-      --  floating-point to integer. It is only possible because analysis
-      --  in GNATprove rules out the possibility of a NaN or infinite value.
+      --  type as determined by Determine_Range_To_Discrete. Right now we only
+      --  do this for discrete target types, i.e. neither for fixed-point nor
+      --  for floating-point types. But the additional less precise tests below
+      --  catch these cases.
 
       --  Note: skip this if we are given a source_typ, since the point of
       --  supplying a Source_Typ is to stop us looking at the expression.
       --  We could sharpen this test to be out parameters only ???
 
       if Is_Discrete_Type (Target_Typ)
-        and then (Is_Discrete_Type (Etype (Expr))
-                   or else (GNATprove_Mode
-                             and then Is_Floating_Point_Type (Etype (Expr))))
         and then not Is_Unconstrained_Subscr_Ref
         and then No (Source_Typ)
       then
@@ -3272,35 +3311,8 @@ package body Checks is
 
                   --  Otherwise determine range of value
 
-                  if Is_Discrete_Type (Etype (Expr)) then
-                     Determine_Range
-                       (Expr, OK, Lo, Hi, Assume_Valid => True);
-
-                  --  When converting a float to an integer type, determine the
-                  --  range in real first, and then convert the bounds using
-                  --  UR_To_Uint which correctly rounds away from zero when
-                  --  half way between two integers, as required by normal
-                  --  Ada 95 rounding semantics. It is only possible because
-                  --  analysis in GNATprove rules out the possibility of a NaN
-                  --  or infinite value.
-
-                  elsif GNATprove_Mode
-                    and then Is_Floating_Point_Type (Etype (Expr))
-                  then
-                     declare
-                        Hir : Ureal;
-                        Lor : Ureal;
-
-                     begin
-                        Determine_Range_R
-                          (Expr, OK, Lor, Hir, Assume_Valid => True);
-
-                        if OK then
-                           Lo := UR_To_Uint (Lor);
-                           Hi := UR_To_Uint (Hir);
-                        end if;
-                     end;
-                  end if;
+                  Determine_Range_To_Discrete
+                    (Expr, OK, Lo, Hi, Fixed_Int, Assume_Valid => True);
 
                   if OK then
 
@@ -3343,10 +3355,12 @@ package body Checks is
       --  Check if we can determine at compile time whether Expr is in the
       --  range of the target type. Note that if S_Typ is within the bounds
       --  of Target_Typ then this must be the case. This check is meaningful
-      --  only if this is not a conversion between integer and real types.
+      --  only if this is not a conversion between integer and real types,
+      --  unless for a fixed-point type if Fixed_Int is set.
 
       if not Is_Unconstrained_Subscr_Ref
-        and then Is_Discrete_Type (S_Typ) = Is_Discrete_Type (Target_Typ)
+        and then (Is_Discrete_Type (S_Typ) = Is_Discrete_Type (Target_Typ)
+                   or else (Fixed_Int and then Is_Discrete_Type (Target_Typ)))
         and then
           (In_Subrange_Of (S_Typ, Target_Typ, Fixed_Int)
 
@@ -3586,7 +3600,7 @@ package body Checks is
 
       elsif Is_Scalar_Type (Target_Type) then
          declare
-            Conv_OK  : constant Boolean := Conversion_OK (N);
+            Conv_OK : constant Boolean := Conversion_OK (N);
             --  If the Conversion_OK flag on the type conversion is set and no
             --  floating-point type is involved in the type conversion then
             --  fixed-point values must be read as integral values.
@@ -3642,14 +3656,10 @@ package body Checks is
                             (Entity (High_Bound (Scalar_Range (Enum_T))));
                      end if;
 
-                     if Last_E <= Last_I then
-                        null;
-
-                     else
+                     if Last_E > Last_I then
                         Activate_Overflow_Check (N);
                      end if;
                   end;
-
                else
                   Activate_Overflow_Check (N);
                end if;
@@ -3662,14 +3672,16 @@ package body Checks is
                  and then not GNATprove_Mode
                then
                   Apply_Float_Conversion_Check (Expr, Target_Type);
-
                else
-                  --  Conversions involving fixed-point types are expanded
-                  --  separately, and do not need a Range_Check flag, except
-                  --  in GNATprove_Mode, where the explicit constraint check
-                  --  will not be generated.
+                  --  Raw conversions involving fixed-point types are expanded
+                  --  separately and do not need a Range_Check flag yet, except
+                  --  in GNATprove_Mode where this expansion is not performed.
+                  --  This does not apply to conversion where fixed-point types
+                  --  are treated as integers, which are precisely generated by
+                  --  this expansion.
 
                   if GNATprove_Mode
+                    or else Conv_OK
                     or else (not Is_Fixed_Point_Type (Expr_Type)
                               and then not Is_Fixed_Point_Type (Target_Type))
                   then
@@ -3910,6 +3922,13 @@ package body Checks is
 
       function Aggregate_Discriminant_Val (Disc : Entity_Id) return Node_Id;
 
+      function Replace_Current_Instance
+        (N : Node_Id) return Traverse_Result;
+      --  Replace a reference to the current instance of the type with the
+      --  corresponding _init formal of the initialization procedure. Note:
+      --  this function relies on us currently being within the initialization
+      --  procedure.
+
       --------------------------------
       -- Aggregate_Discriminant_Val --
       --------------------------------
@@ -3936,6 +3955,26 @@ package body Checks is
 
          raise Program_Error;
       end Aggregate_Discriminant_Val;
+
+      ------------------------------
+      -- Replace_Current_Instance --
+      ------------------------------
+
+      function Replace_Current_Instance
+        (N : Node_Id) return Traverse_Result is
+      begin
+         if Is_Entity_Name (N)
+           and then Etype (N) = Entity (N)
+         then
+            Rewrite (N,
+              New_Occurrence_Of (First_Formal (Current_Subprogram), Loc));
+         end if;
+
+         return OK;
+      end Replace_Current_Instance;
+
+      procedure Search_And_Replace_Current_Instance is new
+        Traverse_Proc (Replace_Current_Instance);
 
    --  Start of processing for Build_Discriminant_Checks
 
@@ -3964,6 +4003,13 @@ package body Checks is
             Dval := New_Occurrence_Of (Discriminal (Entity (Dval)), Loc);
          else
             Dval := Duplicate_Subexpr_No_Checks (Dval);
+         end if;
+
+         --  Replace references to the current instance of the type with the
+         --  corresponding _init formal of the initialization procedure.
+
+         if Within_Init_Proc then
+            Search_And_Replace_Current_Instance (Dval);
          end if;
 
          --  If we have an Unchecked_Union node, we can infer the discriminants
@@ -4374,7 +4420,7 @@ package body Checks is
                   Apply_Compile_Time_Constraint_Error
                     (N      => Expr,
                      Msg    =>
-                       "(Ada 2005) null not allowed in null-excluding "
+                       "(Ada 2005) NULL not allowed in null-excluding "
                        & "components??",
                      Reason => CE_Null_Not_Allowed);
 
@@ -4382,7 +4428,7 @@ package body Checks is
                   Apply_Compile_Time_Constraint_Error
                     (N      => Expr,
                      Msg    =>
-                       "(Ada 2005) null not allowed in null-excluding "
+                       "(Ada 2005) NULL not allowed in null-excluding "
                        & "objects??",
                      Reason => CE_Null_Not_Allowed);
 
@@ -4390,7 +4436,7 @@ package body Checks is
                   Apply_Compile_Time_Constraint_Error
                     (N      => Expr,
                      Msg    =>
-                       "(Ada 2005) null not allowed in null-excluding "
+                       "(Ada 2005) NULL not allowed in null-excluding "
                        & "formals??",
                      Reason => CE_Null_Not_Allowed);
 
@@ -5313,38 +5359,11 @@ package body Checks is
             end case;
 
          when N_Type_Conversion =>
+            --  For a type conversion, we can try to refine the range using the
+            --  converted value.
 
-            --  For type conversion from one discrete type to another, we can
-            --  refine the range using the converted value.
-
-            if Is_Discrete_Type (Etype (Expression (N))) then
-               Determine_Range (Expression (N), OK1, Lor, Hir, Assume_Valid);
-
-            --  When converting a float to an integer type, determine the range
-            --  in real first, and then convert the bounds using UR_To_Uint
-            --  which correctly rounds away from zero when half way between two
-            --  integers, as required by normal Ada 95 rounding semantics. It
-            --  is only possible because analysis in GNATprove rules out the
-            --  possibility of a NaN or infinite value.
-
-            elsif GNATprove_Mode
-              and then Is_Floating_Point_Type (Etype (Expression (N)))
-            then
-               declare
-                  Lor_Real, Hir_Real : Ureal;
-               begin
-                  Determine_Range_R (Expression (N), OK1, Lor_Real, Hir_Real,
-                                     Assume_Valid);
-
-                  if OK1 then
-                     Lor := UR_To_Uint (Lor_Real);
-                     Hir := UR_To_Uint (Hir_Real);
-                  end if;
-               end;
-
-            else
-               OK1 := False;
-            end if;
+            Determine_Range_To_Discrete
+              (Expression (N), OK1, Lor, Hir, Conversion_OK (N), Assume_Valid);
 
          --  Nothing special to do for all other expression kinds
 
@@ -5863,6 +5882,96 @@ package body Checks is
             return;
          end if;
    end Determine_Range_R;
+
+   ---------------------------------
+   -- Determine_Range_To_Discrete --
+   ---------------------------------
+
+   procedure Determine_Range_To_Discrete
+     (N            : Node_Id;
+      OK           : out Boolean;
+      Lo           : out Uint;
+      Hi           : out Uint;
+      Fixed_Int    : Boolean := False;
+      Assume_Valid : Boolean := False)
+   is
+      Typ : constant Entity_Id := Etype (N);
+
+   begin
+      --  For a discrete type, simply defer to Determine_Range
+
+      if Is_Discrete_Type (Typ) then
+         Determine_Range (N, OK, Lo, Hi, Assume_Valid);
+
+      --  For a fixed point type treated as an integer, we can determine the
+      --  range using the Corresponding_Integer_Value of the bounds of the
+      --  type or base type. This is done by the calls to Expr_Value below.
+
+      elsif Is_Fixed_Point_Type (Typ) and then Fixed_Int then
+         declare
+            Btyp, Ftyp : Entity_Id;
+            Bound      : Node_Id;
+
+         begin
+            if Assume_Valid then
+               Ftyp := Typ;
+            else
+               Ftyp := Underlying_Type (Base_Type (Typ));
+            end if;
+
+            Btyp := Base_Type (Ftyp);
+
+            --  First the low bound
+
+            Bound := Type_Low_Bound (Ftyp);
+
+            if Compile_Time_Known_Value (Bound) then
+               Lo := Expr_Value (Bound);
+            else
+               Lo := Expr_Value (Type_Low_Bound (Btyp));
+            end if;
+
+            --  Then the high bound
+
+            Bound := Type_High_Bound (Ftyp);
+
+            if Compile_Time_Known_Value (Bound) then
+               Hi := Expr_Value (Bound);
+            else
+               Hi := Expr_Value (Type_High_Bound (Btyp));
+            end if;
+
+            OK := True;
+         end;
+
+      --  For a floating-point type, we can determine the range in real first,
+      --  and then convert the bounds using UR_To_Uint, which correctly rounds
+      --  away from zero when half way between two integers, as required by
+      --  normal Ada 95 rounding semantics. But this is only possible because
+      --  GNATprove's analysis rules out the possibility of a NaN or infinite.
+
+      elsif GNATprove_Mode and then Is_Floating_Point_Type (Typ) then
+         declare
+            Lo_Real, Hi_Real : Ureal;
+
+         begin
+            Determine_Range_R (N, OK, Lo_Real, Hi_Real, Assume_Valid);
+
+            if OK then
+               Lo := UR_To_Uint (Lo_Real);
+               Hi := UR_To_Uint (Hi_Real);
+            else
+               Lo := No_Uint;
+               Hi := No_Uint;
+            end if;
+         end;
+
+      else
+         Lo := No_Uint;
+         Hi := No_Uint;
+         OK := False;
+      end if;
+   end Determine_Range_To_Discrete;
 
    ------------------------------------
    -- Discriminant_Checks_Suppressed --
@@ -10510,10 +10619,10 @@ package body Checks is
    begin
       --  Checks will be applied only when generating code. In GNATprove mode,
       --  we do not apply the checks, but we still call Selected_Range_Checks
-      --  to possibly issue errors on SPARK code when a run-time error can be
-      --  detected at compile time.
+      --  outside of generics to possibly issue errors on SPARK code when a
+      --  run-time error can be detected at compile time.
 
-      if not Expander_Active and not GNATprove_Mode then
+      if Inside_A_Generic or (not GNATprove_Mode and not Expander_Active) then
          return Ret_Result;
       end if;
 
@@ -11086,8 +11195,7 @@ package body Checks is
 
    procedure Validity_Check_Range
      (N          : Node_Id;
-      Related_Id : Entity_Id := Empty)
-   is
+      Related_Id : Entity_Id := Empty) is
    begin
       if Validity_Checks_On and Validity_Check_Operands then
          if Nkind (N) = N_Range then
@@ -11103,18 +11211,5 @@ package body Checks is
          end if;
       end if;
    end Validity_Check_Range;
-
-   --------------------------------
-   -- Validity_Checks_Suppressed --
-   --------------------------------
-
-   function Validity_Checks_Suppressed (E : Entity_Id) return Boolean is
-   begin
-      if Present (E) and then Checks_May_Be_Suppressed (E) then
-         return Is_Check_Suppressed (E, Validity_Check);
-      else
-         return Scope_Suppress.Suppress (Validity_Check);
-      end if;
-   end Validity_Checks_Suppressed;
 
 end Checks;

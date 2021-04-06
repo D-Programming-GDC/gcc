@@ -1,5 +1,5 @@
 /* LTO symbol table.
-   Copyright (C) 2009-2020 Free Software Foundation, Inc.
+   Copyright (C) 2009-2021 Free Software Foundation, Inc.
    Contributed by CodeSourcery, Inc.
 
 This file is part of GCC.
@@ -694,8 +694,8 @@ lto_symtab_merge_decls_2 (symtab_node *first, bool diagnosed_p)
 	 location in that case.  It also happens for AVR if two built-ins
 	 use the same asm name because their libgcc assembler code is the
 	 same, see PR78562.  */
-      if (DECL_IS_BUILTIN (prevailing->decl)
-	  && DECL_IS_BUILTIN (decl))
+      if (DECL_IS_UNDECLARED_BUILTIN (prevailing->decl)
+	  && DECL_IS_UNDECLARED_BUILTIN (decl))
 	continue;
 
       int level = warn_type_compatibility_p (TREE_TYPE (prevailing->decl),
@@ -985,7 +985,7 @@ lto_symtab_merge_symbols (void)
       /* Do the actual merging.  
 	 At this point we invalidate hash translating decls into symtab nodes
 	 because after removing one of duplicate decls the hash is not correcly
-	 updated to the ohter dupliate.  */
+	 updated to the other duplicate.  */
       FOR_EACH_SYMBOL (node)
 	if (lto_symtab_symbol_p (node)
 	    && node->next_sharing_asm_name
@@ -1081,7 +1081,8 @@ lto_symtab_merge_symbols (void)
 }
 
 /* Virtual tables may matter for code generation even if they are not
-   directly refernced by the code because they may be used for devirtualizaiton.
+   directly referenced by the code because they may be used for
+   devirtualization.
    For this reason it is important to merge even virtual tables that have no
    associated symbol table entries.  Without doing so we lose optimization
    oppurtunities by losing track of the vtable constructor.

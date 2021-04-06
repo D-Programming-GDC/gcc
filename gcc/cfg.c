@@ -1,5 +1,5 @@
 /* Control flow graph manipulation code for GNU compiler.
-   Copyright (C) 1987-2020 Free Software Foundation, Inc.
+   Copyright (C) 1987-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -25,7 +25,7 @@ along with GCC; see the file COPYING3.  If not see
 
    Available functionality:
      - Initialization/deallocation
-	 init_flow, clear_edges
+	 init_flow, free_cfg
      - Low level basic block manipulation
 	 alloc_block, expunge_block
      - Edge manipulation
@@ -83,7 +83,7 @@ init_flow (struct function *the_fun)
   the_fun->cfg->bb_flags_allocated = BB_ALL_FLAGS;
 }
 
-/* Helper function for remove_edge and clear_edges.  Frees edge structure
+/* Helper function for remove_edge and free_cffg.  Frees edge structure
    without actually removing it from the pred/succ arrays.  */
 
 static void
@@ -93,29 +93,43 @@ free_edge (function *fn, edge e)
   ggc_free (e);
 }
 
-/* Free the memory associated with the edge structures.  */
+/* Free basic block BB.  */
+
+static void
+free_block (basic_block bb)
+{
+   vec_free (bb->succs);
+   bb->succs = NULL;
+   vec_free (bb->preds);
+   bb->preds = NULL;
+   ggc_free (bb);
+}
+
+/* Free the memory associated with the CFG in FN.  */
 
 void
-clear_edges (struct function *fn)
+free_cfg (struct function *fn)
 {
-  basic_block bb;
   edge e;
   edge_iterator ei;
+  basic_block next;
 
-  FOR_EACH_BB_FN (bb, fn)
+  for (basic_block bb = ENTRY_BLOCK_PTR_FOR_FN (fn); bb; bb = next)
     {
+      next = bb->next_bb;
       FOR_EACH_EDGE (e, ei, bb->succs)
 	free_edge (fn, e);
-      vec_safe_truncate (bb->succs, 0);
-      vec_safe_truncate (bb->preds, 0);
+      free_block (bb);
     }
 
-  FOR_EACH_EDGE (e, ei, ENTRY_BLOCK_PTR_FOR_FN (fn)->succs)
-    free_edge (fn, e);
-  vec_safe_truncate (EXIT_BLOCK_PTR_FOR_FN (fn)->preds, 0);
-  vec_safe_truncate (ENTRY_BLOCK_PTR_FOR_FN (fn)->succs, 0);
-
   gcc_assert (!n_edges_for_fn (fn));
+  /* Sanity check that dominance tree is freed.  */
+  gcc_assert (!fn->cfg->x_dom_computed[0] && !fn->cfg->x_dom_computed[1]);
+  
+  vec_free (fn->cfg->x_label_to_block_map);
+  vec_free (basic_block_info_for_fn (fn));
+  ggc_free (fn->cfg);
+  fn->cfg = NULL;
 }
 
 /* Allocate memory for basic_block.  */
@@ -190,8 +204,8 @@ expunge_block (basic_block b)
   /* We should be able to ggc_free here, but we are not.
      The dead SSA_NAMES are left pointing to dead statements that are pointing
      to dead basic blocks making garbage collector to die.
-     We should be able to release all dead SSA_NAMES and at the same time we should
-     clear out BB pointer of dead statements consistently.  */
+     We should be able to release all dead SSA_NAMES and at the same time we
+     should clear out BB pointer of dead statements consistently.  */
 }
 
 /* Connect E to E->src.  */
@@ -720,7 +734,7 @@ free_aux_for_edges (void)
 DEBUG_FUNCTION void
 debug_bb (basic_block bb)
 {
-  dump_bb (stderr, bb, 0, dump_flags);
+  debug_bb (bb, dump_flags);
 }
 
 DEBUG_FUNCTION basic_block
@@ -728,6 +742,24 @@ debug_bb_n (int n)
 {
   basic_block bb = BASIC_BLOCK_FOR_FN (cfun, n);
   debug_bb (bb);
+  return bb;
+}
+
+/* Print BB with specified FLAGS.  */
+
+DEBUG_FUNCTION void
+debug_bb (basic_block bb, dump_flags_t flags)
+{
+  dump_bb (stderr, bb, 0, flags);
+}
+
+/* Print basic block numbered N with specified FLAGS.  */
+
+DEBUG_FUNCTION basic_block
+debug_bb_n (int n, dump_flags_t flags)
+{
+  basic_block bb = BASIC_BLOCK_FOR_FN (cfun, n);
+  debug_bb (bb, flags);
   return bb;
 }
 
@@ -959,55 +991,23 @@ scale_bbs_frequencies (basic_block *bbs, int nbbs,
     bbs[i]->count = bbs[i]->count.apply_probability (p);
 }
 
-/* Helper types for hash tables.  */
-
-struct htab_bb_copy_original_entry
-{
-  /* Block we are attaching info to.  */
-  int index1;
-  /* Index of original or copy (depending on the hashtable) */
-  int index2;
-};
-
-struct bb_copy_hasher : nofree_ptr_hash <htab_bb_copy_original_entry>
-{
-  static inline hashval_t hash (const htab_bb_copy_original_entry *);
-  static inline bool equal (const htab_bb_copy_original_entry *existing,
-			    const htab_bb_copy_original_entry * candidate);
-};
-
-inline hashval_t
-bb_copy_hasher::hash (const htab_bb_copy_original_entry *data)
-{
-  return data->index1;
-}
-
-inline bool
-bb_copy_hasher::equal (const htab_bb_copy_original_entry *data,
-		       const htab_bb_copy_original_entry *data2)
-{
-  return data->index1 == data2->index1;
-}
-
 /* Data structures used to maintain mapping between basic blocks and
    copies.  */
-static hash_table<bb_copy_hasher> *bb_original;
-static hash_table<bb_copy_hasher> *bb_copy;
+typedef hash_map<int_hash<int, -1, -2>, int> copy_map_t;
+static copy_map_t *bb_original;
+static copy_map_t *bb_copy;
 
 /* And between loops and copies.  */
-static hash_table<bb_copy_hasher> *loop_copy;
-static object_allocator<htab_bb_copy_original_entry> *original_copy_bb_pool;
+static copy_map_t *loop_copy;
 
 /* Initialize the data structures to maintain mapping between blocks
    and its copies.  */
 void
 initialize_original_copy_tables (void)
 {
-  original_copy_bb_pool = new object_allocator<htab_bb_copy_original_entry>
-    ("original_copy");
-  bb_original = new hash_table<bb_copy_hasher> (10);
-  bb_copy = new hash_table<bb_copy_hasher> (10);
-  loop_copy = new hash_table<bb_copy_hasher> (10);
+  bb_original = new copy_map_t (10);
+  bb_copy = new copy_map_t (10);
+  loop_copy = new copy_map_t (10);
 }
 
 /* Reset the data structures to maintain mapping between blocks and
@@ -1016,7 +1016,6 @@ initialize_original_copy_tables (void)
 void
 reset_original_copy_tables (void)
 {
-  gcc_assert (original_copy_bb_pool);
   bb_original->empty ();
   bb_copy->empty ();
   loop_copy->empty ();
@@ -1027,15 +1026,12 @@ reset_original_copy_tables (void)
 void
 free_original_copy_tables (void)
 {
-  gcc_assert (original_copy_bb_pool);
   delete bb_copy;
   bb_copy = NULL;
   delete bb_original;
   bb_original = NULL;
   delete loop_copy;
   loop_copy = NULL;
-  delete original_copy_bb_pool;
-  original_copy_bb_pool = NULL;
 }
 
 /* Return true iff we have had a call to initialize_original_copy_tables
@@ -1044,51 +1040,31 @@ free_original_copy_tables (void)
 bool
 original_copy_tables_initialized_p (void)
 {
-  return original_copy_bb_pool != NULL;
+  return bb_copy != NULL;
 }
 
 /* Removes the value associated with OBJ from table TAB.  */
 
 static void
-copy_original_table_clear (hash_table<bb_copy_hasher> *tab, unsigned obj)
+copy_original_table_clear (copy_map_t *tab, unsigned obj)
 {
-  htab_bb_copy_original_entry **slot;
-  struct htab_bb_copy_original_entry key, *elt;
-
-  if (!original_copy_bb_pool)
+  if (!original_copy_tables_initialized_p ())
     return;
 
-  key.index1 = obj;
-  slot = tab->find_slot (&key, NO_INSERT);
-  if (!slot)
-    return;
-
-  elt = *slot;
-  tab->clear_slot (slot);
-  original_copy_bb_pool->remove (elt);
+  tab->remove (obj);
 }
 
 /* Sets the value associated with OBJ in table TAB to VAL.
    Do nothing when data structures are not initialized.  */
 
 static void
-copy_original_table_set (hash_table<bb_copy_hasher> *tab,
+copy_original_table_set (copy_map_t *tab,
 			 unsigned obj, unsigned val)
 {
-  struct htab_bb_copy_original_entry **slot;
-  struct htab_bb_copy_original_entry key;
-
-  if (!original_copy_bb_pool)
+  if (!original_copy_tables_initialized_p ())
     return;
 
-  key.index1 = obj;
-  slot = tab->find_slot (&key, INSERT);
-  if (!*slot)
-    {
-      *slot = original_copy_bb_pool->allocate ();
-      (*slot)->index1 = obj;
-    }
-  (*slot)->index2 = val;
+  tab->put (obj, val);
 }
 
 /* Set original for basic block.  Do nothing when data structures are not
@@ -1103,15 +1079,11 @@ set_bb_original (basic_block bb, basic_block original)
 basic_block
 get_bb_original (basic_block bb)
 {
-  struct htab_bb_copy_original_entry *entry;
-  struct htab_bb_copy_original_entry key;
+  gcc_assert (original_copy_tables_initialized_p ());
 
-  gcc_assert (original_copy_bb_pool);
-
-  key.index1 = bb->index;
-  entry = bb_original->find (&key);
+  int *entry = bb_original->get (bb->index);
   if (entry)
-    return BASIC_BLOCK_FOR_FN (cfun, entry->index2);
+    return BASIC_BLOCK_FOR_FN (cfun, *entry);
   else
     return NULL;
 }
@@ -1128,15 +1100,11 @@ set_bb_copy (basic_block bb, basic_block copy)
 basic_block
 get_bb_copy (basic_block bb)
 {
-  struct htab_bb_copy_original_entry *entry;
-  struct htab_bb_copy_original_entry key;
+  gcc_assert (original_copy_tables_initialized_p ());
 
-  gcc_assert (original_copy_bb_pool);
-
-  key.index1 = bb->index;
-  entry = bb_copy->find (&key);
+  int *entry = bb_copy->get (bb->index);
   if (entry)
-    return BASIC_BLOCK_FOR_FN (cfun, entry->index2);
+    return BASIC_BLOCK_FOR_FN (cfun, *entry);
   else
     return NULL;
 }
@@ -1158,15 +1126,11 @@ set_loop_copy (class loop *loop, class loop *copy)
 class loop *
 get_loop_copy (class loop *loop)
 {
-  struct htab_bb_copy_original_entry *entry;
-  struct htab_bb_copy_original_entry key;
+  gcc_assert (original_copy_tables_initialized_p ());
 
-  gcc_assert (original_copy_bb_pool);
-
-  key.index1 = loop->num;
-  entry = loop_copy->find (&key);
+  int *entry = loop_copy->get (loop->num);
   if (entry)
-    return get_loop (cfun, entry->index2);
+    return get_loop (cfun, *entry);
   else
     return NULL;
 }

@@ -1,5 +1,5 @@
 ;; Machine description for NVPTX.
-;; Copyright (C) 2014-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2021 Free Software Foundation, Inc.
 ;; Contributed by Bernd Schmidt <bernds@codesourcery.com>
 ;;
 ;; This file is part of GCC.
@@ -383,9 +383,13 @@
   [(set (match_operand:QHIM 0 "nvptx_nonimmediate_operand" "=R,m")
 	(truncate:QHIM (match_operand:SI 1 "nvptx_register_operand" "R,R")))]
   ""
-  "@
-   %.\\tcvt%t0.u32\\t%0, %1;
-   %.\\tst%A0.u%T0\\t%0, %1;"
+  {
+    if (which_alternative == 1)
+      return "%.\\tst%A0.u%T0\\t%0, %1;";
+    if (GET_MODE (operands[0]) == QImode)
+      return "%.\\tmov%t0\\t%0, %1;";
+    return "%.\\tcvt%t0.u32\\t%0, %1;";
+  }
   [(set_attr "subregs_ok" "true")])
 
 (define_insn "truncdi<mode>2"

@@ -1,6 +1,6 @@
 // Debug-mode error formatting implementation -*- C++ -*-
 
-// Copyright (C) 2003-2020 Free Software Foundation, Inc.
+// Copyright (C) 2003-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -72,7 +72,8 @@ namespace __gnu_debug
   using std::type_info;
 
   template<typename _Iterator>
-    bool __check_singular(const _Iterator&);
+    _GLIBCXX_CONSTEXPR
+    bool __check_singular(_Iterator const&);
 
   class _Safe_sequence_base;
 

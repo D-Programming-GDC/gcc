@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Free Software Foundation, Inc.
+// Copyright (C) 2019-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -29,7 +29,7 @@ test()
 
   const auto outqq = std::reverse_copy(ca0.rbegin(), ca0.rend(), out0.begin());
 
-  return true;
+  return outqq == (out0.begin() + ca0.size()) && out0[3] == 3;
 }
 
 static_assert(test());

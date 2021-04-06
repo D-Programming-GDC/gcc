@@ -1,7 +1,7 @@
 /* Routines for restoring various data types from a file stream.  This deals
    with various data types like strings, integers, enums, etc.
 
-   Copyright (C) 2011-2020 Free Software Foundation, Inc.
+   Copyright (C) 2011-2021 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@google.com>
 
 This file is part of GCC.
@@ -183,6 +183,17 @@ streamer_read_poly_uint64 (class lto_input_block *ib)
   poly_uint64 res;
   for (unsigned int i = 0; i < NUM_POLY_INT_COEFFS; ++i)
     res.coeffs[i] = streamer_read_uhwi (ib);
+  return res;
+}
+
+/* Read a poly_int64 from IB.  */
+
+poly_int64
+streamer_read_poly_int64 (class lto_input_block *ib)
+{
+  poly_int64 res;
+  for (unsigned int i = 0; i < NUM_POLY_INT_COEFFS; ++i)
+    res.coeffs[i] = streamer_read_hwi (ib);
   return res;
 }
 

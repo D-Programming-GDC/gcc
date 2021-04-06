@@ -1,5 +1,5 @@
 /* Structure for saving state for a nested function.
-   Copyright (C) 1989-2020 Free Software Foundation, Inc.
+   Copyright (C) 1989-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -268,6 +268,13 @@ struct GTY(()) function {
 
   /* Value histograms attached to particular statements.  */
   htab_t GTY((skip)) value_histograms;
+
+  /* Different from normal TODO_flags which are handled right at the
+     beginning or the end of one pass execution, the pending_TODOs
+     are passed down in the pipeline until one of its consumers can
+     perform the requested action.  Consumers should then clear the
+     flags for the actions that they have taken.  */
+  unsigned int pending_TODOs;
 
   /* For function.c.  */
 

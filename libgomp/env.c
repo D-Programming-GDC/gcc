@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2021 Free Software Foundation, Inc.
    Contributed by Richard Henderson <rth@redhat.com>.
 
    This file is part of the GNU Offloading and Multi Processing Library
@@ -68,13 +68,14 @@ struct gomp_task_icv gomp_global_icv = {
   .run_sched_chunk_size = 1,
   .default_device_var = 0,
   .dyn_var = false,
-  .nest_var = false,
+  .max_active_levels_var = 1,
   .bind_var = omp_proc_bind_false,
   .target_data = NULL
 };
 
-unsigned long gomp_max_active_levels_var = INT_MAX;
 bool gomp_cancel_var = false;
+enum gomp_target_offload_t gomp_target_offload_var
+  = GOMP_TARGET_OFFLOAD_DEFAULT;
 int gomp_max_task_priority_var = 0;
 #ifndef HAVE_SYNC_BUILTINS
 gomp_mutex_t gomp_managed_threads_lock;
@@ -372,6 +373,44 @@ parse_unsigned_long_list (const char *name, unsigned long *p1stvalue,
   free (values);
   gomp_error ("Invalid value for environment variable %s", name);
   return false;
+}
+
+static void
+parse_target_offload (const char *name, enum gomp_target_offload_t *offload)
+{
+  const char *env;
+  int new_offload = -1;
+
+  env = getenv (name);
+  if (env == NULL)
+    return;
+
+  while (isspace ((unsigned char) *env))
+    ++env;
+  if (strncasecmp (env, "default", 7) == 0)
+    {
+      env += 7;
+      new_offload = GOMP_TARGET_OFFLOAD_DEFAULT;
+    }
+  else if (strncasecmp (env, "mandatory", 9) == 0)
+    {
+      env += 9;
+      new_offload = GOMP_TARGET_OFFLOAD_MANDATORY;
+    }
+  else if (strncasecmp (env, "disabled", 8) == 0)
+    {
+      env += 8;
+      new_offload = GOMP_TARGET_OFFLOAD_DISABLED;
+    }
+  while (isspace ((unsigned char) *env))
+    ++env;
+  if (new_offload != -1 && *env == '\0')
+    {
+      *offload = new_offload;
+      return;
+    }
+
+  gomp_error ("Invalid value for environment variable OMP_TARGET_OFFLOAD");
 }
 
 /* Parse environment variable set to a boolean or list of omp_proc_bind_t
@@ -919,16 +958,17 @@ parse_spincount (const char *name, unsigned long long *pvalue)
 }
 
 /* Parse a boolean value for environment variable NAME and store the
-   result in VALUE.  */
+   result in VALUE.  Return true if one was present and it was
+   successfully parsed.  */
 
-static void
+static bool
 parse_boolean (const char *name, bool *value)
 {
   const char *env;
 
   env = getenv (name);
   if (env == NULL)
-    return;
+    return false;
 
   while (isspace ((unsigned char) *env))
     ++env;
@@ -947,7 +987,11 @@ parse_boolean (const char *name, bool *value)
   while (isspace ((unsigned char) *env))
     ++env;
   if (*env != '\0')
-    gomp_error ("Invalid value for environment variable %s", name);
+    {
+      gomp_error ("Invalid value for environment variable %s", name);
+      return false;
+    }
+  return true;
 }
 
 /* Parse the OMP_WAIT_POLICY environment variable and return the value.  */
@@ -1212,7 +1256,7 @@ handle_omp_display_env (unsigned long stacksize, int wait_policy)
   fprintf (stderr, "  OMP_DYNAMIC = '%s'\n",
 	   gomp_global_icv.dyn_var ? "TRUE" : "FALSE");
   fprintf (stderr, "  OMP_NESTED = '%s'\n",
-	   gomp_global_icv.nest_var ? "TRUE" : "FALSE");
+	   gomp_global_icv.max_active_levels_var > 1 ? "TRUE" : "FALSE");
 
   fprintf (stderr, "  OMP_NUM_THREADS = '%lu", gomp_global_icv.nthreads_var);
   for (i = 1; i < gomp_nthreads_var_list_len; i++)
@@ -1304,8 +1348,8 @@ handle_omp_display_env (unsigned long stacksize, int wait_policy)
 	   wait_policy > 0 ? "ACTIVE" : "PASSIVE");
   fprintf (stderr, "  OMP_THREAD_LIMIT = '%u'\n",
 	   gomp_global_icv.thread_limit_var);
-  fprintf (stderr, "  OMP_MAX_ACTIVE_LEVELS = '%lu'\n",
-	   gomp_max_active_levels_var);
+  fprintf (stderr, "  OMP_MAX_ACTIVE_LEVELS = '%u'\n",
+	   gomp_global_icv.max_active_levels_var);
 
   fprintf (stderr, "  OMP_CANCELLATION = '%s'\n",
 	   gomp_cancel_var ? "TRUE" : "FALSE");
@@ -1334,6 +1378,21 @@ handle_omp_display_env (unsigned long stacksize, int wait_policy)
     }
   fputs ("'\n", stderr);
 
+  fputs ("  OMP_TARGET_OFFLOAD = '", stderr);
+  switch (gomp_target_offload_var)
+    {
+    case GOMP_TARGET_OFFLOAD_DEFAULT:
+      fputs ("DEFAULT", stderr);
+      break;
+    case GOMP_TARGET_OFFLOAD_MANDATORY:
+      fputs ("MANDATORY", stderr);
+      break;
+    case GOMP_TARGET_OFFLOAD_DISABLED:
+      fputs ("DISABLED", stderr);
+      break;
+    }
+  fputs ("'\n", stderr);
+
   if (verbose)
     {
       fputs ("  GOMP_CPU_AFFINITY = ''\n", stderr);
@@ -1355,6 +1414,7 @@ static void __attribute__((constructor))
 initialize_env (void)
 {
   unsigned long thread_limit_var, stacksize = GOMP_DEFAULT_STACKSIZE;
+  unsigned long max_active_levels_var;
   int wait_policy;
 
   /* Do a compile time check that mkomp_h.pl did good job.  */
@@ -1362,13 +1422,11 @@ initialize_env (void)
 
   parse_schedule ();
   parse_boolean ("OMP_DYNAMIC", &gomp_global_icv.dyn_var);
-  parse_boolean ("OMP_NESTED", &gomp_global_icv.nest_var);
   parse_boolean ("OMP_CANCELLATION", &gomp_cancel_var);
   parse_boolean ("OMP_DISPLAY_AFFINITY", &gomp_display_affinity_var);
   parse_int ("OMP_DEFAULT_DEVICE", &gomp_global_icv.default_device_var, true);
+  parse_target_offload ("OMP_TARGET_OFFLOAD", &gomp_target_offload_var);
   parse_int ("OMP_MAX_TASK_PRIORITY", &gomp_max_task_priority_var, true);
-  parse_unsigned_long ("OMP_MAX_ACTIVE_LEVELS", &gomp_max_active_levels_var,
-		       true);
   gomp_def_allocator = parse_allocator ();
   if (parse_unsigned_long ("OMP_THREAD_LIMIT", &thread_limit_var, false))
     {
@@ -1393,6 +1451,22 @@ initialize_env (void)
 		      &gomp_bind_var_list_len)
       && gomp_global_icv.bind_var == omp_proc_bind_false)
     ignore = true;
+  if (parse_unsigned_long ("OMP_MAX_ACTIVE_LEVELS",
+			   &max_active_levels_var, true))
+    gomp_global_icv.max_active_levels_var
+      = (max_active_levels_var > gomp_supported_active_levels)
+	? gomp_supported_active_levels : max_active_levels_var;
+  else
+    {
+      bool nested = true;
+
+      /* OMP_NESTED is deprecated in OpenMP 5.0.  */
+      if (parse_boolean ("OMP_NESTED", &nested))
+	gomp_global_icv.max_active_levels_var
+	  = nested ? gomp_supported_active_levels : 1;
+      else if (gomp_nthreads_var_list_len > 1 || gomp_bind_var_list_len > 1)
+	gomp_global_icv.max_active_levels_var = gomp_supported_active_levels;
+    }
   /* Make sure OMP_PLACES and GOMP_CPU_AFFINITY env vars are always
      parsed if present in the environment.  If OMP_PROC_BIND was set
      explicitly to false, don't populate places list though.  If places

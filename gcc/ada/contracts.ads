@@ -69,15 +69,16 @@ package Contracts is
    --  subprogram body Body_Id as if they appeared at the end of a declarative
    --  region. Pragmas in question are:
    --
-   --    Contract_Cases   (stand alone subprogram body)
-   --    Depends          (stand alone subprogram body)
-   --    Global           (stand alone subprogram body)
-   --    Postcondition    (stand alone subprogram body)
-   --    Precondition     (stand alone subprogram body)
+   --    Contract_Cases     (stand alone subprogram body)
+   --    Depends            (stand alone subprogram body)
+   --    Global             (stand alone subprogram body)
+   --    Postcondition      (stand alone subprogram body)
+   --    Precondition       (stand alone subprogram body)
    --    Refined_Depends
    --    Refined_Global
    --    Refined_Post
-   --    Test_Case        (stand alone subprogram body)
+   --    Subprogram_Variant (stand alone subprogram body)
+   --    Test_Case          (stand alone subprogram body)
 
    procedure Analyze_Entry_Or_Subprogram_Contract
      (Subp_Id   : Entity_Id;
@@ -91,6 +92,7 @@ package Contracts is
    --    Global
    --    Postcondition
    --    Precondition
+   --    Subprogram_Variant
    --    Test_Case
    --
    --  Freeze_Id is the entity of a [generic] package body or a [generic]
@@ -185,6 +187,21 @@ package Contracts is
    --  list which contains entry, package, protected, subprogram, or task body
    --  denoted by Body_Decl. In addition, freeze the contract of the nearest
    --  enclosing package body.
+
+   function Get_Postcond_Enabled (Subp : Entity_Id) return Entity_Id;
+   --  Get the defining identifier for a subprogram's Postcond_Enabled
+   --  object created during the expansion of the subprogram's postconditions.
+
+   function Get_Result_Object_For_Postcond (Subp : Entity_Id) return Entity_Id;
+   --  Get the defining identifier for a subprogram's
+   --  Result_Object_For_Postcond object created during the expansion of the
+   --  subprogram's postconditions.
+
+   function Get_Return_Success_For_Postcond
+     (Subp : Entity_Id) return Entity_Id;
+   --  Get the defining identifier for a subprogram's
+   --  Return_Success_For_Postcond object created during the expansion of the
+   --  subprogram's postconditions.
 
    procedure Inherit_Subprogram_Contract
      (Subp      : Entity_Id;

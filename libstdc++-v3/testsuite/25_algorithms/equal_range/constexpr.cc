@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Free Software Foundation, Inc.
+// Copyright (C) 2019-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -28,7 +28,8 @@ test()
 
   const auto outc = std::equal_range(car.begin(), car.end(), 6);
 
-  return true;
+  return outc.first == (car.begin() + 6)
+    && outc.second == (car.begin() + 8);
 }
 
 static_assert(test());

@@ -13,16 +13,10 @@
 -- ware  Foundation;  either version 3,  or (at your option) any later ver- --
 -- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
 -- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
--- or FITNESS FOR A PARTICULAR PURPOSE.                                     --
---                                                                          --
--- As a special exception under Section 7 of GPL version 3, you are granted --
--- additional permissions described in the GCC Runtime Library Exception,   --
--- version 3.1, as published by the Free Software Foundation.               --
---                                                                          --
--- You should have received a copy of the GNU General Public License and    --
--- a copy of the GCC Runtime Library Exception along with this program;     --
--- see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see    --
--- <http://www.gnu.org/licenses/>.                                          --
+-- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+-- for  more details.  You should have  received  a copy of the GNU General --
+-- Public License  distributed with GNAT; see file COPYING3.  If not, go to --
+-- http://www.gnu.org/licenses for a complete copy of the license.          --
 --                                                                          --
 -- GNAT was originally developed  by the GNAT team at  New York University. --
 -- Extensive contributions were provided by Ada Core Technologies Inc.      --
@@ -2418,6 +2412,11 @@ package Sinfo is
    --    instantiation prologue renames these attributes, and expansion later
    --    converts them into subprogram bodies.
 
+   --  Was_Default_Init_Box_Association (Flag14-Sem)
+   --    Present in N_Component_Association. Set to True if the original source
+   --    is an aggregate component association with a box (<>) for a component
+   --    that is initialized by default.
+
    --  Was_Expression_Function (Flag18-Sem)
    --    Present in N_Subprogram_Body. True if the original source had an
    --    N_Expression_Function, which was converted to the N_Subprogram_Body
@@ -4126,6 +4125,7 @@ package Sinfo is
       --  Expression (Node3) (empty if Box_Present)
       --  Loop_Actions (List5-Sem)
       --  Box_Present (Flag15)
+      --  Was_Default_Init_Box_Association (Flag14)
       --  Inherited_Discriminant (Flag13)
 
       --  Note: this structure is used for both record component associations
@@ -4134,7 +4134,9 @@ package Sinfo is
       --  list of selector names in the record aggregate case, or a list of
       --  discrete choices in the array aggregate case or an N_Others_Choice
       --  node (which appears as a singleton list). Box_Present gives support
-      --  to Ada 2005 (AI-287).
+      --  to Ada 2005 (AI-287). Was_Default_Init_Box_Association is used for
+      --  determining the need for Default_Initial_Condition check on component
+      --  associations with a box.
 
       ----------------------------------
       -- 4.3.1  Component Choice List --
@@ -4251,6 +4253,7 @@ package Sinfo is
       --  Expression (Node3)
       --  Loop_Parameter_Specification (Node4)
       --  Loop_Actions (List5-Sem)
+      --  Box_Present (Flag15)
 
       --  Exactly one of Iterator_Specification or Loop_Parameter_
       --  specification is present. If the Key_Expression is absent,
@@ -5414,9 +5417,9 @@ package Sinfo is
 
       --  PARAMETER_SPECIFICATION ::=
       --    DEFINING_IDENTIFIER_LIST : [ALIASED] MODE [NULL_EXCLUSION]
-      --      SUBTYPE_MARK [:= DEFAULT_EXPRESSION]
+      --      SUBTYPE_MARK [:= DEFAULT_EXPRESSION] [ASPECT_SPECIFICATIONS]
       --  | DEFINING_IDENTIFIER_LIST : ACCESS_DEFINITION
-      --      [:= DEFAULT_EXPRESSION]
+      --      [:= DEFAULT_EXPRESSION] [ASPECT_SPECIFICATIONS]
 
       --  Although the syntax allows multiple identifiers in the list, the
       --  semantics is as though successive specifications were given with
@@ -7945,8 +7948,8 @@ package Sinfo is
       --  operation) are also in this list.
 
       --  Contract_Test_Cases contains a collection of pragmas that correspond
-      --  to aspects/pragmas Contract_Cases and Test_Case. The ordering in the
-      --  list is in LIFO fashion.
+      --  to aspects/pragmas Contract_Cases, Test_Case and Subprogram_Variant.
+      --  The ordering in the list is in LIFO fashion.
 
       --  Classifications contains pragmas that either declare, categorize, or
       --  establish dependencies between subprogram or package inputs and
@@ -10259,6 +10262,9 @@ package Sinfo is
    function Was_Attribute_Reference
      (N : Node_Id) return Boolean;    -- Flag2
 
+   function Was_Default_Init_Box_Association
+     (N : Node_Id) return Boolean;    -- Flag14
+
    function Was_Expression_Function
      (N : Node_Id) return Boolean;    -- Flag18
 
@@ -11370,6 +11376,9 @@ package Sinfo is
 
    procedure Set_Was_Attribute_Reference
      (N : Node_Id; Val : Boolean := True);    -- Flag2
+
+   procedure Set_Was_Default_Init_Box_Association
+     (N : Node_Id; Val : Boolean := True);    -- Flag14
 
    procedure Set_Was_Expression_Function
      (N : Node_Id; Val : Boolean := True);    -- Flag18
@@ -13482,6 +13491,7 @@ package Sinfo is
    pragma Inline (Visible_Declarations);
    pragma Inline (Used_Operations);
    pragma Inline (Was_Attribute_Reference);
+   pragma Inline (Was_Default_Init_Box_Association);
    pragma Inline (Was_Expression_Function);
    pragma Inline (Was_Originally_Stub);
 
@@ -13847,6 +13857,7 @@ package Sinfo is
    pragma Inline (Set_Variants);
    pragma Inline (Set_Visible_Declarations);
    pragma Inline (Set_Was_Attribute_Reference);
+   pragma Inline (Set_Was_Default_Init_Box_Association);
    pragma Inline (Set_Was_Expression_Function);
    pragma Inline (Set_Was_Originally_Stub);
 

@@ -1,7 +1,7 @@
 // -*- C++ -*-
 // Testing performance utilities for the C++ library testsuite.
 //
-// Copyright (C) 2003-2020 Free Software Foundation, Inc.
+// Copyright (C) 2003-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -249,7 +249,6 @@ namespace __gnu_test
   void
   report_header(const std::string file, const std::string header)
   {
-    const char space = ' ';
     const char tab = '\t';
     const char* name = "libstdc++-performance.sum";
     std::string::const_iterator i = file.begin() + file.find_last_of('/') + 1;

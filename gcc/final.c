@@ -1,5 +1,5 @@
 /* Convert RTL to assembler code and output it, for GNU compiler.
-   Copyright (C) 1987-2020 Free Software Foundation, Inc.
+   Copyright (C) 1987-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -81,6 +81,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl-iter.h"
 #include "print-rtl.h"
 #include "function-abi.h"
+#include "common/common-target.h"
 
 #ifdef XCOFF_DEBUGGING_INFO
 #include "xcoffout.h"		/* Needed for external data declarations.  */
@@ -1711,6 +1712,7 @@ final_start_function_1 (rtx_insn **firstp, FILE *file, int *seen,
   last_columnnum = LOCATION_COLUMN (prologue_location);
   last_discriminator = discriminator = 0;
   last_bb_discriminator = bb_discriminator = 0;
+  force_source_line = false;
 
   high_block_linenum = high_function_linenum = last_linenum;
 
@@ -2154,6 +2156,21 @@ asm_show_source (const char *filename, int linenum)
   fputc ('\n', asm_out_file);
 }
 
+/* Judge if an absolute jump table is relocatable.  */
+
+bool
+jumptable_relocatable (void)
+{
+  bool relocatable = false;
+
+  if (!CASE_VECTOR_PC_RELATIVE
+      && !targetm.asm_out.generate_pic_addr_diff_vec ()
+      && targetm_common.have_named_sections)
+     relocatable = targetm.asm_out.reloc_rw_mask ();
+
+  return relocatable;
+}
+
 /* The final scan for one insn, INSN.
    Args are same as in `final', except that INSN
    is the insn being scanned.
@@ -2493,7 +2510,8 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 	      int log_align;
 
 	      switch_to_section (targetm.asm_out.function_rodata_section
-				 (current_function_decl));
+				 (current_function_decl,
+				  jumptable_relocatable ()));
 
 #ifdef ADDR_VEC_ALIGN
 	      log_align = ADDR_VEC_ALIGN (table);
@@ -2572,7 +2590,8 @@ final_scan_insn_1 (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 
 	    if (! JUMP_TABLES_IN_TEXT_SECTION)
 	      switch_to_section (targetm.asm_out.function_rodata_section
-				 (current_function_decl));
+				 (current_function_decl,
+				  jumptable_relocatable ()));
 	    else
 	      switch_to_section (current_function_section ());
 
@@ -3232,12 +3251,11 @@ notice_source_line (rtx_insn *insn, bool *is_stmt)
     {
       location_t loc = NOTE_MARKER_LOCATION (insn);
       expanded_location xloc = expand_location (loc);
-      if (xloc.line == 0)
-	{
-	  gcc_checking_assert (LOCATION_LOCUS (loc) == UNKNOWN_LOCATION
-			       || LOCATION_LOCUS (loc) == BUILTINS_LOCATION);
-	  return false;
-	}
+      if (xloc.line == 0
+	  && (LOCATION_LOCUS (loc) == UNKNOWN_LOCATION
+	      || LOCATION_LOCUS (loc) == BUILTINS_LOCATION))
+	return false;
+
       filename = xloc.file;
       linenum = xloc.line;
       columnnum = xloc.column;

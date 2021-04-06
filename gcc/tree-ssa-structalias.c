@@ -1,5 +1,5 @@
 /* Tree based points-to analysis
-   Copyright (C) 2005-2020 Free Software Foundation, Inc.
+   Copyright (C) 2005-2021 Free Software Foundation, Inc.
    Contributed by Daniel Berlin <dberlin@dberlin.org>
 
    This file is part of GCC.
@@ -280,6 +280,9 @@ struct variable_info
   /* True if this represents a IPA function info.  */
   unsigned int is_fn_info : 1;
 
+  /* True if this appears as RHS in a ADDRESSOF constraint.  */
+  unsigned int address_taken : 1;
+
   /* ???  Store somewhere better.  */
   unsigned short ruid;
 
@@ -393,6 +396,7 @@ new_var_info (tree t, const char *name, bool add_id)
   ret->is_global_var = (t == NULL_TREE);
   ret->is_ipa_escape_point = false;
   ret->is_fn_info = false;
+  ret->address_taken = false;
   if (t && DECL_P (t))
     ret->is_global_var = (is_global_var (t)
 			  /* We have to treat even local register variables
@@ -674,7 +678,10 @@ dump_constraint (FILE *file, constraint_t c)
     fprintf (file, "&");
   else if (c->lhs.type == DEREF)
     fprintf (file, "*");
-  fprintf (file, "%s", get_varinfo (c->lhs.var)->name);
+  if (dump_file)
+    fprintf (file, "%s", get_varinfo (c->lhs.var)->name);
+  else
+    fprintf (file, "V%d", c->lhs.var);
   if (c->lhs.offset == UNKNOWN_OFFSET)
     fprintf (file, " + UNKNOWN");
   else if (c->lhs.offset != 0)
@@ -684,7 +691,10 @@ dump_constraint (FILE *file, constraint_t c)
     fprintf (file, "&");
   else if (c->rhs.type == DEREF)
     fprintf (file, "*");
-  fprintf (file, "%s", get_varinfo (c->rhs.var)->name);
+  if (dump_file)
+    fprintf (file, "%s", get_varinfo (c->rhs.var)->name);
+  else
+    fprintf (file, "V%d", c->rhs.var);
   if (c->rhs.offset == UNKNOWN_OFFSET)
     fprintf (file, " + UNKNOWN");
   else if (c->rhs.offset != 0)
@@ -3101,6 +3111,8 @@ process_constraint (constraint_t t)
   else
     {
       gcc_assert (rhs.type != ADDRESSOF || rhs.offset == 0);
+      if (rhs.type == ADDRESSOF)
+	get_varinfo (get_varinfo (rhs.var)->head)->address_taken = true;
       constraints.safe_push (t);
     }
 }
@@ -3851,6 +3863,23 @@ make_escape_constraint (tree op)
   make_constraint_to (escaped_id, op);
 }
 
+/* Make constraint necessary to make all indirect references
+   from VI escape.  */
+
+static void
+make_indirect_escape_constraint (varinfo_t vi)
+{
+  struct constraint_expr lhs, rhs;
+  /* escaped = *(VAR + UNKNOWN);  */
+  lhs.type = SCALAR;
+  lhs.var = escaped_id;
+  lhs.offset = 0;
+  rhs.type = DEREF;
+  rhs.var = vi->id;
+  rhs.offset = UNKNOWN_OFFSET;
+  process_constraint (new_constraint (lhs, rhs));
+}
+
 /* Add constraints to that the solution of VI is transitively closed.  */
 
 static void
@@ -4026,7 +4055,7 @@ handle_rhs_call (gcall *stmt, vec<ce_s> *results)
 	 set.  The argument would still get clobbered through the
 	 escape solution.  */
       if ((flags & EAF_NOCLOBBER)
-	   && (flags & EAF_NOESCAPE))
+	   && (flags & (EAF_NOESCAPE | EAF_NODIRECTESCAPE)))
 	{
 	  varinfo_t uses = get_call_use_vi (stmt);
 	  varinfo_t tem = new_var_info (NULL_TREE, "callarg", true);
@@ -4036,9 +4065,11 @@ handle_rhs_call (gcall *stmt, vec<ce_s> *results)
 	  if (!(flags & EAF_DIRECT))
 	    make_transitive_closure_constraints (tem);
 	  make_copy_constraint (uses, tem->id);
+	  if (!(flags & (EAF_NOESCAPE | EAF_DIRECT)))
+	    make_indirect_escape_constraint (tem);
 	  returns_uses = true;
 	}
-      else if (flags & EAF_NOESCAPE)
+      else if (flags & (EAF_NOESCAPE | EAF_NODIRECTESCAPE))
 	{
 	  struct constraint_expr lhs, rhs;
 	  varinfo_t uses = get_call_use_vi (stmt);
@@ -4061,6 +4092,8 @@ handle_rhs_call (gcall *stmt, vec<ce_s> *results)
 	  rhs.var = nonlocal_id;
 	  rhs.offset = 0;
 	  process_constraint (new_constraint (lhs, rhs));
+	  if (!(flags & (EAF_NOESCAPE | EAF_DIRECT)))
+	    make_indirect_escape_constraint (tem);
 	  returns_uses = true;
 	}
       else
@@ -4253,6 +4286,11 @@ handle_pure_call (gcall *stmt, vec<ce_s> *results)
   for (i = 0; i < gimple_call_num_args (stmt); ++i)
     {
       tree arg = gimple_call_arg (stmt, i);
+      int flags = gimple_call_arg_flags (stmt, i);
+
+      /* If the argument is not used we can ignore it.  */
+      if (flags & EAF_UNUSED)
+	continue;
       if (!uses)
 	{
 	  uses = get_call_use_vi (stmt);
@@ -4857,7 +4895,13 @@ find_func_aliases_for_call (struct function *fn, gcall *t)
 	 point for reachable memory of their arguments.  */
       else if (flags & (ECF_PURE|ECF_LOOPING_CONST_OR_PURE))
 	handle_pure_call (t, &rhsc);
-      else if (fndecl && DECL_IS_REPLACEABLE_OPERATOR_DELETE_P (fndecl))
+      /* If the call is to a replaceable operator delete and results
+	 from a delete expression as opposed to a direct call to
+	 such operator, then the effects for PTA (in particular
+	 the escaping of the pointer) can be ignored.  */
+      else if (fndecl
+	       && DECL_IS_OPERATOR_DELETE_P (fndecl)
+	       && gimple_call_from_new_or_delete (t))
 	;
       else
 	handle_rhs_call (t, &rhsc);
@@ -7256,15 +7300,14 @@ solve_constraints (void)
   unsigned int *map = XNEWVEC (unsigned int, varmap.length ());
   for (unsigned i = 0; i < integer_id + 1; ++i)
     map[i] = i;
-  /* Start with non-register vars (as possibly address-taken), followed
-     by register vars as conservative set of vars never appearing in
-     the points-to solution bitmaps.  */
+  /* Start with address-taken vars, followed by not address-taken vars
+     to move vars never appearing in the points-to solution bitmaps last.  */
   unsigned j = integer_id + 1;
   for (unsigned i = integer_id + 1; i < varmap.length (); ++i)
-    if (! varmap[i]->is_reg_var)
+    if (varmap[varmap[i]->head]->address_taken)
       map[i] = j++;
   for (unsigned i = integer_id + 1; i < varmap.length (); ++i)
-    if (varmap[i]->is_reg_var)
+    if (! varmap[varmap[i]->head]->address_taken)
       map[i] = j++;
   /* Shuffle varmap according to map.  */
   for (unsigned i = integer_id + 1; i < varmap.length (); ++i)
@@ -7966,7 +8009,7 @@ static bool
 associate_varinfo_to_alias (struct cgraph_node *node, void *data)
 {
   if ((node->alias
-       || (node->thunk.thunk_p
+       || (node->thunk
 	   && ! node->inlined_to))
       && node->analyzed
       && !node->ifunc_resolver)

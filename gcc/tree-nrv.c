@@ -1,5 +1,5 @@
 /* Language independent return value optimizations
-   Copyright (C) 2004-2020 Free Software Foundation, Inc.
+   Copyright (C) 2004-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -315,8 +315,8 @@ dest_safe_for_nrv_p (gcall *call)
   if (TREE_CODE (dest) == SSA_NAME)
     return true;
 
-  if (call_may_clobber_ref_p (call, dest)
-      || ref_maybe_used_by_stmt_p (call, dest))
+  if (call_may_clobber_ref_p (call, dest, false)
+      || ref_maybe_used_by_stmt_p (call, dest, false))
     return false;
 
   return true;

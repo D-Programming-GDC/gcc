@@ -1,6 +1,6 @@
 /* This file contains the definitions and documentation for the
    machine modes used in the GNU compiler.
-   Copyright (C) 1987-2020 Free Software Foundation, Inc.
+   Copyright (C) 1987-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -152,6 +152,9 @@ along with GCC; see the file COPYING3.  If not see
         element occupies (COUNT * BITS_PER_UNIT) / BYTESIZE bits, with
         the element at index 0 occupying the lsb of the first byte in
         memory.  Only the lowest bit of each element is significant.
+
+     OPAQUE_MODE (NAME, BYTESIZE)
+        Create an opaque mode called NAME that is BYTESIZE bytes wide.
 
      COMPLEX_MODES (CLASS);
         For all modes presently declared in class CLASS, construct

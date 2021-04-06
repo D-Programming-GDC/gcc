@@ -597,10 +597,16 @@ fix = {
     hackname  = aix_malloc;
     mach      = "*-*-aix*";
     files     = "malloc.h";
-    select    = "#ifdef __cplusplus";
+    select    = "#ifdef __cplusplus\n"
+                "extern \"C\" \\{\n"
+                "[ \t]extern \"builtin\" char \\*__alloca \\(size_t\\);";
     c_fix     = format;
-    c_fix_arg = "#if (defined(__cplusplus) && defined(__IBMCPP__))";
-    test_text = "#ifdef __cplusplus";
+    c_fix_arg = "#if (defined(__cplusplus) && defined(__IBMCPP__))\n"
+                "extern \"C\" {\n"
+	"\textern \"builtin\" char *__alloca (size_t);";
+    test_text = "#ifdef __cplusplus\n"
+                "extern \"C\" {\n"
+	"\textern \"builtin\" char *__alloca (size_t);";
 };
 
 /*
@@ -712,6 +718,20 @@ fix = {
 		"{{ \\\n";
     test_text = "#define PTHREAD_RWLOCK_INITIALIZER \\\\\n"
 		"{ \\\\\n";
+};
+
+
+/* On AIX 'typedef struct {<stuff>} * physadr_t;' needs to give the struct a
+   name for linkage purposes.  Fortunately it is on exactly one
+   line.  */
+fix = {
+    hackname  = aix_physadr_t;
+    mach      = "*-*-aix*";
+    files     = sys/types.h;
+    select    = "typedef[ \t]*struct[ \t]*([{][^}]*[}][ \t]*\\*[ \t]*physadr_t;)";
+    c_fix     = format;
+    c_fix_arg = "typedef struct __physadr_s %1";
+    test_text = "typedef	struct { random stuff } *	physadr_t;";
 };
 
 /*

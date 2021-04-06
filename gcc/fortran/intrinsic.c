@@ -1,6 +1,6 @@
 /* Build up a list of intrinsic subroutines and functions for the
    name-resolution stage.
-   Copyright (C) 2000-2020 Free Software Foundation, Inc.
+   Copyright (C) 2000-2021 Free Software Foundation, Inc.
    Contributed by Andy Vaught & Katherine Holcomb
 
 This file is part of GCC.
@@ -119,6 +119,43 @@ gfc_get_intrinsic_sub_symbol (const char *name)
 
   gfc_commit_symbol (sym);
 
+  return sym;
+}
+
+/* Get a symbol for a resolved function, with its special name.  The
+   actual argument list needs to be set by the caller.  */
+
+gfc_symbol *
+gfc_get_intrinsic_function_symbol (gfc_expr *expr)
+{
+  gfc_symbol *sym;
+
+  gfc_get_symbol (expr->value.function.name, gfc_intrinsic_namespace, &sym);
+  sym->attr.external = 1;
+  sym->attr.function = 1;
+  sym->attr.always_explicit = 1;
+  sym->attr.proc = PROC_INTRINSIC;
+  sym->attr.flavor = FL_PROCEDURE;
+  sym->result = sym;
+  if (expr->rank > 0)
+    {
+      sym->attr.dimension = 1;
+      sym->as = gfc_get_array_spec ();
+      sym->as->type = AS_ASSUMED_SHAPE;
+      sym->as->rank = expr->rank;
+    }
+  return sym;
+}
+
+/* Find a symbol for a resolved intrinsic procedure, return NULL if
+   not found.  */
+
+gfc_symbol *
+gfc_find_intrinsic_symbol (gfc_expr *expr)
+{
+  gfc_symbol *sym;
+  gfc_find_symbol (expr->value.function.name, gfc_intrinsic_namespace,
+		   0, &sym);
   return sym;
 }
 
@@ -5037,6 +5074,11 @@ got_specific:
 
   if (!sym->module)
     gfc_intrinsic_symbol (sym);
+
+  /* Have another stab at simplification since elemental intrinsics with array
+     actual arguments would be missed by the calls above to do_simplify.  */
+  if (isym->elemental)
+    gfc_simplify_expr (expr, 1);
 
   return MATCH_YES;
 }

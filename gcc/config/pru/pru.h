@@ -1,5 +1,5 @@
 /* Definitions of target machine for TI PRU.
-   Copyright (C) 2014-2020 Free Software Foundation, Inc.
+   Copyright (C) 2014-2021 Free Software Foundation, Inc.
    Contributed by Dimitar Dimitrov <dimitar@dinux.eu>
 
    This file is part of GCC.
@@ -561,6 +561,9 @@ do {									\
 #define FUNCTION_MODE Pmode
 
 #define CASE_VECTOR_MODE Pmode
+
+/* See definition of clz pattern for rationale of value -1.  */
+#define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) ((VALUE) = -1, 2)
 
 /* Jumps are cheap on PRU.  */
 #define LOGICAL_OP_NON_SHORT_CIRCUIT		0

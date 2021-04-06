@@ -133,11 +133,6 @@ package body Exp_Dbug is
    --  Determine whether the bounds of E match the size of the type. This is
    --  used to determine whether encoding is required for a discrete type.
 
-   function Is_Handled_Scale_Factor (U : Ureal) return Boolean;
-   --  The argument U is the Small_Value of a fixed-point type. This function
-   --  determines whether the back-end can handle this scale factor. When it
-   --  cannot, we have to output a GNAT encoding for the corresponding type.
-
    procedure Output_Homonym_Numbers_Suffix;
    --  If homonym numbers are stored, then output them into Name_Buffer
 
@@ -247,7 +242,7 @@ package body Exp_Dbug is
 
       --  Here we check if the static bounds match the natural size, which is
       --  the size passed through with the debugging information. This is the
-      --  Esize rounded up to 8, 16, 32 or 64 as appropriate.
+      --  Esize rounded up to 8, 16, 32, 64 or 128 as appropriate.
 
       else
          declare
@@ -261,8 +256,10 @@ package body Exp_Dbug is
                Siz := Uint_16;
             elsif Esize (E) <= 32 then
                Siz := Uint_32;
-            else
+            elsif Esize (E) <= 64 then
                Siz := Uint_64;
+            else
+               Siz := Uint_128;
             end if;
 
             if Is_Modular_Integer_Type (E) or else Is_Enumeration_Type (E) then
@@ -592,27 +589,6 @@ package body Exp_Dbug is
          return Make_Null_Statement (Loc);
    end Debug_Renaming_Declaration;
 
-   -----------------------------
-   -- Is_Handled_Scale_Factor --
-   -----------------------------
-
-   function Is_Handled_Scale_Factor (U : Ureal) return Boolean is
-   begin
-      --  Keep in sync with gigi (see E_*_Fixed_Point_Type handling in
-      --  decl.c:gnat_to_gnu_entity).
-
-      if UI_Eq (Numerator (U), Uint_1) then
-         if Rbase (U) = 2 or else Rbase (U) = 10 then
-            return True;
-         end if;
-      end if;
-
-      return
-        (UI_Is_In_Int_Range (Norm_Num (U))
-           and then
-         UI_Is_In_Int_Range (Norm_Den (U)));
-   end Is_Handled_Scale_Factor;
-
    ----------------------
    -- Get_Encoded_Name --
    ----------------------
@@ -669,12 +645,10 @@ package body Exp_Dbug is
 
       Has_Suffix := True;
 
-      --  Fixed-point case: generate GNAT encodings when asked to or when we
-      --  know the back-end will not be able to handle the scale factor.
+      --  Fixed-point case: generate GNAT encodings when asked to
 
       if Is_Fixed_Point_Type (E)
-        and then (GNAT_Encodings /= DWARF_GNAT_Encodings_Minimal
-                   or else not Is_Handled_Scale_Factor (Small_Value (E)))
+        and then GNAT_Encodings = DWARF_GNAT_Encodings_All
       then
          Get_External_Name (E, True, "XF_");
          Add_Real_To_Buffer (Delta_Value (E));

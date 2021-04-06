@@ -2,7 +2,7 @@
 // { dg-require-normal-mode "" }
 // { dg-require-normal-namespace "" }
 
-// Copyright (C) 2007-2020 Free Software Foundation, Inc.
+// Copyright (C) 2007-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -20,6 +20,12 @@
 // <http://www.gnu.org/licenses/>.
 
 #include <vector>
+
+#if __cplusplus >= 201103L
+# define NOTHROW(X) noexcept(X)
+#else
+# define NOTHROW(X)
+#endif
 
 namespace std {
   template <class T, class Allocator> class vector;
@@ -49,7 +55,8 @@ namespace std {
                     const vector<T,Allocator>& y);
 
   template <class T, class Allocator>
-    void swap(vector<T,Allocator>& x, vector<T,Allocator>& y);
+    void swap(vector<T,Allocator>& x, vector<T,Allocator>& y)
+      NOTHROW(noexcept(x.swap(y)));
 
   template <class Allocator> class vector<bool,Allocator>;
 

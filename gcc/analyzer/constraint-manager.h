@@ -1,5 +1,5 @@
 /* Tracking equivalence classes and constraints at a point on an execution path.
-   Copyright (C) 2019-2020 Free Software Foundation, Inc.
+   Copyright (C) 2019-2021 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -274,8 +274,7 @@ public:
 
   static void merge (const constraint_manager &cm_a,
 		     const constraint_manager &cm_b,
-		     constraint_manager *out,
-		     const model_merger &merger);
+		     constraint_manager *out);
 
   void for_each_fact (fact_visitor *) const;
 

@@ -3,7 +3,7 @@
 ;; expander, and the actual vector instructions will be in altivec.md and
 ;; vsx.md
 
-;; Copyright (C) 2009-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2009-2021 Free Software Foundation, Inc.
 ;; Contributed by Michael Meissner <meissner@linux.vnet.ibm.com>
 
 ;; This file is part of GCC.
@@ -1227,10 +1227,10 @@
 (define_expand "vec_set<mode>"
   [(match_operand:VEC_E 0 "vlogical_operand")
    (match_operand:<VEC_base> 1 "register_operand")
-   (match_operand 2 "const_int_operand")]
+   (match_operand 2 "reg_or_cint_operand")]
   "VECTOR_MEM_ALTIVEC_OR_VSX_P (<MODE>mode)"
 {
-  rs6000_expand_vector_set (operands[0], operands[1], INTVAL (operands[2]));
+  rs6000_expand_vector_set (operands[0], operands[1], operands[2]);
   DONE;
 })
 

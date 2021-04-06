@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Free Software Foundation, Inc.
+// Copyright (C) 2019-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -28,7 +28,9 @@ test()
 
   const auto out8 = std::count(ca0.begin(), ca0.end(), 6);
 
-  return true;
+  const auto out9 = std::count(ca0.begin(), ca0.end(), 16);
+
+  return out8 == 1 && out9 == 0;
 }
 
 static_assert(test());

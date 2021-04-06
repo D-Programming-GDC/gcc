@@ -1517,6 +1517,13 @@ Alphabetical List of All Switches
   an exception because ``Self(Obj)`` produces an anonymous object which does
   not share the memory location of ``Obj``.
 
+.. index:: -gnateb  (gcc)
+
+:switch:`-gnateb`
+  Store configuration files by their basename in ALI files. This switch is
+  used for instance by gprbuild for distributed builds in order to prevent
+  issues where machine-specific absolute paths could end up being stored in
+  ALI files.
 
 .. index:: -gnatec  (gcc)
 
@@ -2056,15 +2063,6 @@ Alphabetical List of All Switches
 
 :switch:`-gnat-p`
   Cancel effect of previous :switch:`-gnatp` switch.
-
-
-.. index:: -gnatP  (gcc)
-
-:switch:`-gnatP`
-  Enable polling. This is required on some systems (notably Windows NT) to
-  obtain asynchronous abort and asynchronous transfer of control capability.
-  See ``Pragma_Polling`` in the :title:`GNAT_Reference_Manual` for full
-  details.
 
 
 .. index:: -gnatq  (gcc)
@@ -3346,7 +3344,7 @@ of the pragma in the :title:`GNAT_Reference_manual`).
 :switch:`-gnatw.K`
   *Suppress warnings on redefinition of names in standard.*
 
-  This switch activates warnings for declarations that declare a name that
+  This switch disables warnings for declarations that declare a name that
   is defined in package Standard.
 
 
@@ -3874,8 +3872,14 @@ of the pragma in the :title:`GNAT_Reference_manual`).
 
   This switch activates warnings for access to variables which
   may not be properly initialized. The default is that
-  such warnings are generated.
+  such warnings are generated. This switch will also be emitted when
+  initializing an array or record object via the following aggregate:
 
+  .. code-block:: ada
+
+       Array_Or_Record : XXX := (others => <>);
+
+  unless the relevant type fully initializes all components.
 
 .. index:: -gnatwV  (gcc)
 
@@ -3884,17 +3888,6 @@ of the pragma in the :title:`GNAT_Reference_manual`).
 
   This switch suppresses warnings for access to variables which
   may not be properly initialized.
-  For variables of a composite type, the warning can also be suppressed in
-  Ada 2005 by using a default initialization with a box. For example, if
-  Table is an array of records whose components are only partially uninitialized,
-  then the following code:
-
-  .. code-block:: ada
-
-       Tab : Table := (others => <>);
-
-  will suppress warnings on subsequent statements that access components
-  of variable Tab.
 
 
 .. index:: -gnatw.v  (gcc)
@@ -4821,7 +4814,8 @@ checks to be performed. The following checks are defined:
 
   All keywords must be in lower case (with the exception of keywords
   such as ``digits`` used as attribute names to which this check
-  does not apply).
+  does not apply). A single error is reported for each line breaking
+  this rule even if multiple casing issues exist on a same line.
 
 
 .. index:: -gnatyl (gcc)
@@ -6508,8 +6502,8 @@ be presented in subsequent sections.
   limitations:
 
   * Starting the program's execution in the debugger will cause it to
-    stop at the start of the ``main`` function instead of the main subprogram. 
-    This can be worked around by manually inserting a breakpoint on that 
+    stop at the start of the ``main`` function instead of the main subprogram.
+    This can be worked around by manually inserting a breakpoint on that
     subprogram and resuming the program's execution until reaching that breakpoint.
   * Programs using GNAT.Compiler_Version will not link.
 
@@ -6717,6 +6711,9 @@ be presented in subsequent sections.
   Use the target-independent XDR protocol for stream oriented attributes
   instead of the default implementation which is based on direct binary
   representations and is therefore target-and endianness-dependent.
+  However it does not support 128-bit integer types and the exception
+  ``Ada.IO_Exceptions.Device_Error`` is raised if any attempt is made
+  at streaming 128-bit integer types with it.
 
 
   .. index:: -Xnnn  (gnatbind)

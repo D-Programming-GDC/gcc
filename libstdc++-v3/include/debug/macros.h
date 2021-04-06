@@ -1,6 +1,6 @@
 // Debugging support implementation -*- C++ -*-
 
-// Copyright (C) 2003-2020 Free Software Foundation, Inc.
+// Copyright (C) 2003-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -38,25 +38,15 @@
  * the user error and where the error is reported.
  *
  */
-#if 0 /* defined _GLIBCXX_HAVE_BUILTIN_IS_CONSTANT_EVALUATED */
-# define _GLIBCXX_DEBUG_VERIFY_COND_AT(_Cond,_ErrMsg,_File,_Line,_Func)	\
-  if (__builtin_is_constant_evaluated())				\
-    /* FIXME: Compilation error here when !_Cond. */			\
-    break;								\
-  if (! (_Cond))							\
+#define _GLIBCXX_DEBUG_VERIFY_COND_AT(_Cond,_ErrMsg,_File,_Line,_Func)	\
+  if (__builtin_expect(!bool(_Cond), false))				\
     __gnu_debug::_Error_formatter::_S_at(_File, _Line, _Func)		\
       ._ErrMsg._M_error()
-#else
-# define _GLIBCXX_DEBUG_VERIFY_COND_AT(_Cond,_ErrMsg,_File,_Line,_Func)	\
-  if (! (_Cond))							\
-    __gnu_debug::_Error_formatter::_S_at(_File, _Line, _Func)		\
-      ._ErrMsg._M_error()
-#endif
 
 #define _GLIBCXX_DEBUG_VERIFY_AT_F(_Cond,_ErrMsg,_File,_Line,_Func)	\
-  do									\
-  {									\
-    _GLIBCXX_DEBUG_VERIFY_COND_AT(_Cond,_ErrMsg,_File,_Line,_Func);	\
+  do {									\
+    __glibcxx_assert_1(_Cond)						\
+    { _GLIBCXX_DEBUG_VERIFY_COND_AT(_Cond,_ErrMsg,_File,_Line,_Func); } \
   } while (false)
 
 #define _GLIBCXX_DEBUG_VERIFY_AT(_Cond,_ErrMsg,_File,_Line)		\
@@ -108,13 +98,13 @@ _GLIBCXX_DEBUG_VERIFY(__gnu_debug::__can_advance(_First, _Size),	\
   do									\
   {									\
     typename __gnu_debug::_Distance_traits<__decltype(_First1)>::__type __dist;\
-    _GLIBCXX_DEBUG_VERIFY_COND_AT(					\
+    _GLIBCXX_DEBUG_VERIFY_AT_F(						\
 			__gnu_debug::__valid_range(_First1, _Last1, __dist),\
 			_M_message(__gnu_debug::__msg_valid_range)	\
 			._M_iterator(_First1, #_First1)			\
 			._M_iterator(_Last1, #_Last1),			\
 			__FILE__,__LINE__,__PRETTY_FUNCTION__);		\
-    _GLIBCXX_DEBUG_VERIFY_COND_AT(					\
+    _GLIBCXX_DEBUG_VERIFY_AT_F(						\
 			__gnu_debug::__can_advance(_First2, __dist.first),\
 			_M_message(__gnu_debug::__msg_iter_subscript_oob)\
 			._M_iterator(_First2, #_First2)			\
@@ -126,13 +116,13 @@ _GLIBCXX_DEBUG_VERIFY(__gnu_debug::__can_advance(_First, _Size),	\
   do									\
   {									\
     typename __gnu_debug::_Distance_traits<__decltype(_First1)>::__type __dist;\
-    _GLIBCXX_DEBUG_VERIFY_COND_AT(					\
+    _GLIBCXX_DEBUG_VERIFY_AT_F(						\
 			__gnu_debug::__valid_range(_First1, _Last1, __dist),\
 			_M_message(__gnu_debug::__msg_valid_range)	\
 			._M_iterator(_First1, #_First1)			\
 			._M_iterator(_Last1, #_Last1),			\
 			__FILE__,__LINE__,__PRETTY_FUNCTION__);		\
-    _GLIBCXX_DEBUG_VERIFY_COND_AT(					\
+    _GLIBCXX_DEBUG_VERIFY_AT_F(						\
 			__gnu_debug::__can_advance(_First2, -__dist.first),\
 			_M_message(__gnu_debug::__msg_iter_subscript_oob)\
 			._M_iterator(_First2, #_First2)			\
@@ -254,6 +244,11 @@ _GLIBCXX_DEBUG_VERIFY(_First._M_attached_to(this),			\
  *  valid iterator range within this sequence.
 */
 #define __glibcxx_check_erase_range_after(_First,_Last)			\
+_GLIBCXX_DEBUG_VERIFY(!_First._M_singular() && !_Last._M_singular(),	\
+		      _M_message(__gnu_debug::__msg_erase_different)	\
+		      ._M_sequence(*this, "this")			\
+		      ._M_iterator(_First, #_First)			\
+		      ._M_iterator(_Last, #_Last));			\
 _GLIBCXX_DEBUG_VERIFY(_First._M_can_compare(_Last),			\
 		      _M_message(__gnu_debug::__msg_erase_different)	\
 		      ._M_sequence(*this, "this")			\

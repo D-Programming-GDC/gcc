@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Free Software Foundation, Inc.
+// Copyright (C) 2019-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -29,7 +29,10 @@ test()
   const auto out3 = std::any_of(ca0.begin(), ca0.end(),
 			        [](int i){ return i % 2 == 0; });
 
-  return true;
+  const auto out4 = std::any_of(ca0.begin(), ca0.end(),
+			        [](int i){ return i == -1; });
+
+  return out3 && !out4;
 }
 
 static_assert(test());

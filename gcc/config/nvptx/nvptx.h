@@ -1,5 +1,5 @@
 /* Target Definitions for NVPTX.
-   Copyright (C) 2014-2020 Free Software Foundation, Inc.
+   Copyright (C) 2014-2021 Free Software Foundation, Inc.
    Contributed by Bernd Schmidt <bernds@codesourcery.com>
 
    This file is part of GCC.
@@ -29,7 +29,10 @@
 
 #define STARTFILE_SPEC "%{mmainkernel:crt0.o}"
 
-#define ASM_SPEC "%{misa=*:-m %*}"
+/* Default needs to be in sync with default for misa in nvptx.opt.
+   We add a default here to work around a hard-coded sm_30 default in
+   nvptx-as.  */
+#define ASM_SPEC "%{misa=*:-m %*; :-m sm_35}"
 
 #define TARGET_CPU_CPP_BUILTINS()		\
   do						\

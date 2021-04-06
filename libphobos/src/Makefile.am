@@ -1,5 +1,5 @@
 ## Makefile for the Phobos standard library.
-## Copyright (C) 2012-2020 Free Software Foundation, Inc.
+## Copyright (C) 2012-2021 Free Software Foundation, Inc.
 ##
 ## GCC is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@ D_EXTRA_DFLAGS=-nostdinc -I $(srcdir) \
 
 # D flags for compilation
 AM_DFLAGS= \
-	$(phobos_compiler_pic_flag) \
+	$(phobos_lt_pic_flag) $(phobos_compiler_shared_flag) \
 	$(WARN_DFLAGS) $(CHECKING_DFLAGS) $(CET_DFLAGS)
 
 # Flags for other kinds of sources

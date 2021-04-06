@@ -20,7 +20,7 @@ import (
 //mount(source *byte, target *byte, fstype *byte, flags _C_long, data *byte) _C_int
 
 //sysnb rawOpenat(dirfd int, pathname *byte, flags int, perm uint32) (fd int, err Errno)
-//openat(dirfd _C_int, pathname *byte, flags _C_int, perm Mode_t) _C_int
+//__go_openat(dirfd _C_int, pathname *byte, flags _C_int, perm Mode_t) _C_int
 
 // SysProcIDMap holds Container ID to Host ID mappings used for User Namespaces in Linux.
 // See user_namespaces(7).
@@ -538,7 +538,7 @@ func forkAndExecInChild1(argv0 *byte, argv, envv []*byte, chroot, dir *byte, att
 	// Do this right before exec so that we don't unnecessarily trace the runtime
 	// setting up after the fork. See issue #21428.
 	if sys.Ptrace {
-		err1 = raw_ptrace(_PTRACE_TRACEME, 0, nil, nil)
+		err1 = raw_ptrace(_PTRACE_TRACEME, 0, 0, 0)
 		if err1 != 0 {
 			goto childerror
 		}

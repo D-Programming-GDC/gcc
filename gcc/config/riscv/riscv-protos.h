@@ -1,5 +1,5 @@
 /* Definition of RISC-V target for GNU compiler.
-   Copyright (C) 2011-2020 Free Software Foundation, Inc.
+   Copyright (C) 2011-2021 Free Software Foundation, Inc.
    Contributed by Andrew Waterman (andrew@sifive.com).
    Based on MIPS target for GNU compiler.
 
@@ -93,5 +93,19 @@ extern std::string riscv_arch_str (bool version_p = true);
 extern bool riscv_hard_regno_rename_ok (unsigned, unsigned);
 
 rtl_opt_pass * make_pass_shorten_memrefs (gcc::context *ctxt);
+
+/* Information about one CPU we know about.  */
+struct riscv_cpu_info {
+  /* This CPU's canonical name.  */
+  const char *name;
+
+  /* Default arch for this CPU, could be NULL if no default arch.  */
+  const char *arch;
+
+  /* Which automaton to use for tuning.  */
+  const char *tune;
+};
+
+extern const riscv_cpu_info *riscv_find_cpu (const char *);
 
 #endif /* ! GCC_RISCV_PROTOS_H */

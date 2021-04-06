@@ -1,5 +1,5 @@
 /* Convert function calls to rtl insns, for GNU C compiler.
-   Copyright (C) 1989-2020 Free Software Foundation, Inc.
+   Copyright (C) 1989-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -58,6 +58,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "builtins.h"
 #include "gimple-fold.h"
+#include "attr-fnspec.h"
+#include "value-query.h"
 
 #include "tree-pretty-print.h"
 
@@ -628,39 +630,40 @@ special_function_p (const_tree fndecl, int flags)
   return flags;
 }
 
+/* Return fnspec for DECL.  */
+
+static attr_fnspec
+decl_fnspec (tree fndecl)
+{
+  tree attr;
+  tree type = TREE_TYPE (fndecl);
+  if (type)
+    {
+      attr = lookup_attribute ("fn spec", TYPE_ATTRIBUTES (type));
+      if (attr)
+	{
+	  return TREE_VALUE (TREE_VALUE (attr));
+	}
+    }
+  if (fndecl_built_in_p (fndecl, BUILT_IN_NORMAL))
+    return builtin_fnspec (fndecl);
+  return "";
+}
+
 /* Similar to special_function_p; return a set of ERF_ flags for the
    function FNDECL.  */
 static int
 decl_return_flags (tree fndecl)
 {
-  tree attr;
-  tree type = TREE_TYPE (fndecl);
-  if (!type)
-    return 0;
+  attr_fnspec fnspec = decl_fnspec (fndecl);
 
-  attr = lookup_attribute ("fn spec", TYPE_ATTRIBUTES (type));
-  if (!attr)
-    return 0;
+  unsigned int arg;
+  if (fnspec.returns_arg (&arg))
+    return ERF_RETURNS_ARG | arg;
 
-  attr = TREE_VALUE (TREE_VALUE (attr));
-  if (!attr || TREE_STRING_LENGTH (attr) < 1)
-    return 0;
-
-  switch (TREE_STRING_POINTER (attr)[0])
-    {
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-      return ERF_RETURNS_ARG | (TREE_STRING_POINTER (attr)[0] - '1');
-
-    case 'm':
-      return ERF_NOALIAS;
-
-    case '.':
-    default:
-      return 0;
-    }
+  if (fnspec.returns_noalias_p ())
+    return ERF_NOALIAS;
+  return 0;
 }
 
 /* Return nonzero when FNDECL represents a call to setjmp.  */
@@ -1244,14 +1247,17 @@ alloc_max_size (void)
    after adjusting it if necessary to make EXP a represents a valid size
    of object, or a valid size argument to an allocation function declared
    with attribute alloc_size (whose argument may be signed), or to a string
-   manipulation function like memset.  When ALLOW_ZERO is true, allow
-   returning a range of [0, 0] for a size in an anti-range [1, N] where
-   N > PTRDIFF_MAX.  A zero range is a (nearly) invalid argument to
-   allocation functions like malloc but it is a valid argument to
-   functions like memset.  */
+   manipulation function like memset.
+   When ALLOW_ZERO is set in FLAGS, allow returning a range of [0, 0] for
+   a size in an anti-range [1, N] where N > PTRDIFF_MAX.  A zero range is
+   a (nearly) invalid argument to allocation functions like malloc but it
+   is a valid argument to functions like memset.
+   When USE_LARGEST is set in FLAGS set RANGE to the largest valid subrange
+   in a multi-range, otherwise to the smallest valid subrange.  */
 
 bool
-get_size_range (tree exp, tree range[2], bool allow_zero /* = false */)
+get_size_range (range_query *query, tree exp, gimple *stmt, tree range[2],
+		int flags /* = 0 */)
 {
   if (!exp)
     return false;
@@ -1270,7 +1276,19 @@ get_size_range (tree exp, tree range[2], bool allow_zero /* = false */)
   enum value_range_kind range_type;
 
   if (integral)
-    range_type = determine_value_range (exp, &min, &max);
+    {
+      value_range vr;
+      if (query && query->range_of_expr (vr, exp, stmt))
+	{
+	  if (vr.undefined_p ())
+	    vr.set_varying (TREE_TYPE (exp));
+	  range_type = vr.kind ();
+	  min = wi::to_wide (vr.min ());
+	  max = wi::to_wide (vr.max ());
+	}
+      else
+	range_type = determine_value_range (exp, &min, &max);
+    }
   else
     range_type = VR_VARYING;
 
@@ -1323,25 +1341,50 @@ get_size_range (tree exp, tree range[2], bool allow_zero /* = false */)
 	      min = wi::zero (expprec);
 	    }
 	}
-      else if (wi::eq_p (0, min - 1))
-	{
-	  /* EXP is unsigned and not in the range [1, MAX].  That means
-	     it's either zero or greater than MAX.  Even though 0 would
-	     normally be detected by -Walloc-zero, unless ALLOW_ZERO
-	     is true, set the range to [MAX, TYPE_MAX] so that when MAX
-	     is greater than the limit the whole range is diagnosed.  */
-	  if (allow_zero)
-	    min = max = wi::zero (expprec);
-	  else
-	    {
-	      min = max + 1;
-	      max = wi::to_wide (TYPE_MAX_VALUE (exptype));
-	    }
-	}
       else
 	{
-	  max = min - 1;
-	  min = wi::zero (expprec);
+	  wide_int maxsize = wi::to_wide (max_object_size ());
+	  min = wide_int::from (min, maxsize.get_precision (), UNSIGNED);
+	  max = wide_int::from (max, maxsize.get_precision (), UNSIGNED);
+	  if (wi::eq_p (0, min - 1))
+	    {
+	      /* EXP is unsigned and not in the range [1, MAX].  That means
+		 it's either zero or greater than MAX.  Even though 0 would
+		 normally be detected by -Walloc-zero, unless ALLOW_ZERO
+		 is set, set the range to [MAX, TYPE_MAX] so that when MAX
+		 is greater than the limit the whole range is diagnosed.  */
+	      wide_int maxsize = wi::to_wide (max_object_size ());
+	      if (flags & SR_ALLOW_ZERO)
+		{
+		  if (wi::leu_p (maxsize, max + 1)
+		      || !(flags & SR_USE_LARGEST))
+		    min = max = wi::zero (expprec);
+		  else
+		    {
+		      min = max + 1;
+		      max = wi::to_wide (TYPE_MAX_VALUE (exptype));
+		    }
+		}
+	      else
+		{
+		  min = max + 1;
+		  max = wi::to_wide (TYPE_MAX_VALUE (exptype));
+		}
+	    }
+	  else if ((flags & SR_USE_LARGEST)
+		   && wi::ltu_p (max + 1, maxsize))
+	    {
+	      /* When USE_LARGEST is set and the larger of the two subranges
+		 is a valid size, use it...  */
+	      min = max + 1;
+	      max = maxsize;
+	    }
+	  else
+	    {
+	      /* ...otherwise use the smaller subrange.  */
+	      max = min - 1;
+	      min = wi::zero (expprec);
+	    }
 	}
     }
 
@@ -1349,6 +1392,12 @@ get_size_range (tree exp, tree range[2], bool allow_zero /* = false */)
   range[1] = wide_int_to_tree (exptype, max);
 
   return true;
+}
+
+bool
+get_size_range (tree exp, tree range[2], int flags /* = 0 */)
+{
+  return get_size_range (/*query=*/NULL, exp, /*stmt=*/NULL, range, flags);
 }
 
 /* Diagnose a call EXP to function FN decorated with attribute alloc_size
@@ -1499,7 +1548,7 @@ maybe_warn_alloc_args_overflow (tree fn, tree exp, tree args[2], int idx[2])
     {
       location_t fnloc = DECL_SOURCE_LOCATION (fn);
 
-      if (DECL_IS_BUILTIN (fn))
+      if (DECL_IS_UNDECLARED_BUILTIN (fn))
 	inform (loc,
 		"in a call to built-in allocation function %qD", fn);
       else
@@ -1873,7 +1922,7 @@ maybe_warn_nonstring_arg (tree fndecl, tree exp)
 /* Issue an error if CALL_EXPR was flagged as requiring
    tall-call optimization.  */
 
-static void
+void
 maybe_complain_about_tail_call (tree call_expr, const char *reason)
 {
   gcc_assert (TREE_CODE (call_expr) == CALL_EXPR);
@@ -1983,7 +2032,7 @@ maybe_warn_rdwr_sizes (rdwr_map *rwm, tree fndecl, tree fntype, tree exp)
       tree sizrng[2] = { size_zero_node, build_all_ones_cst (sizetype) };
       if (get_size_range (access_size, sizrng, true))
 	{
-	  const char *s0 = print_generic_expr_to_str (sizrng[0]);
+	  char *s0 = print_generic_expr_to_str (sizrng[0]);
 	  if (tree_int_cst_equal (sizrng[0], sizrng[1]))
 	    {
 	      gcc_checking_assert (strlen (s0) < sizeof sizstr);
@@ -1991,11 +2040,13 @@ maybe_warn_rdwr_sizes (rdwr_map *rwm, tree fndecl, tree fntype, tree exp)
 	    }
 	  else
 	    {
-	      const char *s1 = print_generic_expr_to_str (sizrng[1]);
+	      char *s1 = print_generic_expr_to_str (sizrng[1]);
 	      gcc_checking_assert (strlen (s0) + strlen (s1)
 				   < sizeof sizstr - 4);
 	      sprintf (sizstr, "[%s, %s]", s0, s1);
+	      free (s1);
 	    }
+	  free (s0);
 	}
       else
 	*sizstr = '\0';
@@ -2337,19 +2388,17 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
       function_arg_info arg (type, argpos < n_named_args);
       if (pass_by_reference (args_so_far_pnt, arg))
 	{
-	  bool callee_copies;
-	  tree base = NULL_TREE;
+	  const bool callee_copies
+	    = reference_callee_copied (args_so_far_pnt, arg);
+	  tree base;
 
-	  callee_copies = reference_callee_copied (args_so_far_pnt, arg);
-
-	  /* If we're compiling a thunk, pass through invisible references
-	     instead of making a copy.  */
-	  if (call_from_thunk_p
-	      || (callee_copies
-		  && !TREE_ADDRESSABLE (type)
-		  && (base = get_base_address (args[i].tree_value))
-		  && TREE_CODE (base) != SSA_NAME
-		  && (!DECL_P (base) || MEM_P (DECL_RTL (base)))))
+	  /* If we're compiling a thunk, pass directly the address of an object
+	     already in memory, instead of making a copy.  Likewise if we want
+	     to make the copy in the callee instead of the caller.  */
+	  if ((call_from_thunk_p || callee_copies)
+	      && (base = get_base_address (args[i].tree_value))
+	      && TREE_CODE (base) != SSA_NAME
+	      && (!DECL_P (base) || MEM_P (DECL_RTL (base))))
 	    {
 	      /* We may have turned the parameter value into an SSA name.
 		 Go back to the original parameter so we can take the
@@ -2574,6 +2623,10 @@ initialize_argument_information (int num_actuals ATTRIBUTE_UNUSED,
 
   /* Check attribute access arguments.  */
   maybe_warn_rdwr_sizes (&rdwr_idx, fndecl, fntype, exp);
+
+  /* Check calls to operator new for mismatched forms and attempts
+     to deallocate unallocated objects.  */
+  maybe_emit_free_warning (exp);
 }
 
 /* Update ARGS_SIZE to contain the total size for the argument block.
@@ -3476,7 +3529,6 @@ static bool
 can_implement_as_sibling_call_p (tree exp,
 				 rtx structure_value_addr,
 				 tree funtype,
-				 int reg_parm_stack_space ATTRIBUTE_UNUSED,
 				 tree fndecl,
 				 int flags,
 				 tree addr,
@@ -3500,20 +3552,6 @@ can_implement_as_sibling_call_p (tree exp,
       maybe_complain_about_tail_call (exp, "callee returns a structure");
       return false;
     }
-
-#ifdef REG_PARM_STACK_SPACE
-  /* If outgoing reg parm stack space changes, we cannot do sibcall.  */
-  if (OUTGOING_REG_PARM_STACK_SPACE (funtype)
-      != OUTGOING_REG_PARM_STACK_SPACE (TREE_TYPE (current_function_decl))
-      || (reg_parm_stack_space != REG_PARM_STACK_SPACE (current_function_decl)))
-    {
-      maybe_complain_about_tail_call (exp,
-				      "inconsistent size of stack space"
-				      " allocated for arguments which are"
-				      " passed in registers");
-      return false;
-    }
-#endif
 
   /* Check whether the target is able to optimize the call
      into a sibcall.  */
@@ -4039,7 +4077,6 @@ expand_call (tree exp, rtx target, int ignore)
     try_tail_call = can_implement_as_sibling_call_p (exp,
 						     structure_value_addr,
 						     funtype,
-						     reg_parm_stack_space,
 						     fndecl,
 						     flags, addr, args_size);
 

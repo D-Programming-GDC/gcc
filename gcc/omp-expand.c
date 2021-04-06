@@ -2,7 +2,7 @@
    directives to separate functions, converts others into explicit calls to the
    runtime library (libgomp) and so forth
 
-Copyright (C) 2005-2020 Free Software Foundation, Inc.
+Copyright (C) 2005-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -762,6 +762,7 @@ expand_task_call (struct omp_region *region, basic_block bb,
   tree depend = omp_find_clause (clauses, OMP_CLAUSE_DEPEND);
   tree finalc = omp_find_clause (clauses, OMP_CLAUSE_FINAL);
   tree priority = omp_find_clause (clauses, OMP_CLAUSE_PRIORITY);
+  tree detach = omp_find_clause (clauses, OMP_CLAUSE_DETACH);
 
   unsigned int iflags
     = (untied ? GOMP_TASK_FLAG_UNTIED : 0)
@@ -811,8 +812,13 @@ expand_task_call (struct omp_region *region, basic_block bb,
       if (omp_find_clause (clauses, OMP_CLAUSE_REDUCTION))
 	iflags |= GOMP_TASK_FLAG_REDUCTION;
     }
-  else if (priority)
-    iflags |= GOMP_TASK_FLAG_PRIORITY;
+  else
+    {
+      if (priority)
+	iflags |= GOMP_TASK_FLAG_PRIORITY;
+      if (detach)
+	iflags |= GOMP_TASK_FLAG_DETACH;
+    }
 
   tree flags = build_int_cst (unsigned_type_node, iflags);
 
@@ -853,6 +859,11 @@ expand_task_call (struct omp_region *region, basic_block bb,
     priority = integer_zero_node;
 
   gsi = gsi_last_nondebug_bb (bb);
+
+  detach = (detach
+	    ? build_fold_addr_expr (OMP_CLAUSE_DECL (detach))
+	    : null_pointer_node);
+
   tree t = gimple_omp_task_data_arg (entry_stmt);
   if (t == NULL)
     t2 = null_pointer_node;
@@ -875,10 +886,10 @@ expand_task_call (struct omp_region *region, basic_block bb,
 			 num_tasks, priority, startvar, endvar, step);
   else
     t = build_call_expr (builtin_decl_explicit (BUILT_IN_GOMP_TASK),
-			 9, t1, t2, t3,
+			 10, t1, t2, t3,
 			 gimple_omp_task_arg_size (entry_stmt),
 			 gimple_omp_task_arg_align (entry_stmt), cond, flags,
-			 depend, priority);
+			 depend, priority, detach);
 
   force_gimple_operand_gsi (&gsi, t, true, NULL_TREE,
 			    false, GSI_CONTINUE_LINKING);
@@ -1510,8 +1521,8 @@ struct oacc_collapse
 static tree
 expand_oacc_collapse_init (const struct omp_for_data *fd,
 			   gimple_stmt_iterator *gsi,
-			   oacc_collapse *counts, tree bound_type,
-			   location_t loc)
+			   oacc_collapse *counts, tree diff_type,
+			   tree bound_type, location_t loc)
 {
   tree tiling = fd->tiling;
   tree total = build_int_cst (bound_type, 1);
@@ -1528,17 +1539,12 @@ expand_oacc_collapse_init (const struct omp_for_data *fd,
       const omp_for_data_loop *loop = &fd->loops[ix];
 
       tree iter_type = TREE_TYPE (loop->v);
-      tree diff_type = iter_type;
       tree plus_type = iter_type;
 
       gcc_assert (loop->cond_code == fd->loop.cond_code);
 
       if (POINTER_TYPE_P (iter_type))
 	plus_type = sizetype;
-      if (POINTER_TYPE_P (diff_type) || TYPE_UNSIGNED (diff_type))
-	diff_type = signed_type_for (diff_type);
-      if (TYPE_PRECISION (diff_type) < TYPE_PRECISION (integer_type_node))
-	diff_type = integer_type_node;
 
       if (tiling)
 	{
@@ -1626,7 +1632,8 @@ expand_oacc_collapse_init (const struct omp_for_data *fd,
 static void
 expand_oacc_collapse_vars (const struct omp_for_data *fd, bool inner,
 			   gimple_stmt_iterator *gsi,
-			   const oacc_collapse *counts, tree ivar)
+			   const oacc_collapse *counts, tree ivar,
+			   tree diff_type)
 {
   tree ivar_type = TREE_TYPE (ivar);
 
@@ -1638,7 +1645,6 @@ expand_oacc_collapse_vars (const struct omp_for_data *fd, bool inner,
       const oacc_collapse *collapse = &counts[ix];
       tree v = inner ? loop->v : collapse->outer;
       tree iter_type = TREE_TYPE (v);
-      tree diff_type = TREE_TYPE (collapse->step);
       tree plus_type = iter_type;
       enum tree_code plus_code = PLUS_EXPR;
       tree expr;
@@ -1660,7 +1666,7 @@ expand_oacc_collapse_vars (const struct omp_for_data *fd, bool inner,
 	}
 
       expr = fold_build2 (MULT_EXPR, diff_type, fold_convert (diff_type, expr),
-			  collapse->step);
+			  fold_convert (diff_type, collapse->step));
       expr = fold_build2 (plus_code, iter_type,
 			  inner ? collapse->outer : collapse->base,
 			  fold_convert (plus_type, expr));
@@ -1789,6 +1795,23 @@ expand_omp_for_init_counts (struct omp_for_data *fd, gimple_stmt_iterator *gsi,
 	    counts[i] = OMP_CLAUSE_DECL (innerc);
 	  else
 	    counts[0] = NULL_TREE;
+	}
+      if (fd->non_rect
+	  && fd->last_nonrect == fd->first_nonrect + 1
+	  && !TYPE_UNSIGNED (TREE_TYPE (fd->loops[fd->last_nonrect].v)))
+	{
+	  tree c[4];
+	  for (i = 0; i < 4; i++)
+	    {
+	      innerc = omp_find_clause (OMP_CLAUSE_CHAIN (innerc),
+					OMP_CLAUSE__LOOPTEMP_);
+	      gcc_assert (innerc);
+	      c[i] = OMP_CLAUSE_DECL (innerc);
+	    }
+	  counts[0] = c[0];
+	  fd->first_inner_iterations = c[1];
+	  fd->factor = c[2];
+	  fd->adjn1 = c[3];
 	}
       return;
     }
@@ -2434,7 +2457,12 @@ expand_omp_for_init_vars (struct omp_for_data *fd, gimple_stmt_iterator *gsi,
 	 use it.  */
       tree innerc = omp_find_clause (clauses, OMP_CLAUSE__LOOPTEMP_);
       gcc_assert (innerc);
-      for (i = 0; i < fd->collapse; i++)
+      int count = 0;
+      if (fd->non_rect
+	  && fd->last_nonrect == fd->first_nonrect + 1
+	  && !TYPE_UNSIGNED (TREE_TYPE (fd->loops[fd->last_nonrect].v)))
+	count = 4;
+      for (i = 0; i < fd->collapse + count; i++)
 	{
 	  innerc = omp_find_clause (OMP_CLAUSE_CHAIN (innerc),
 				    OMP_CLAUSE__LOOPTEMP_);
@@ -2442,7 +2470,19 @@ expand_omp_for_init_vars (struct omp_for_data *fd, gimple_stmt_iterator *gsi,
 	  if (i)
 	    {
 	      tree tem = OMP_CLAUSE_DECL (innerc);
-	      tree t = fold_convert (TREE_TYPE (tem), counts[i]);
+	      tree t;
+	      if (i < fd->collapse)
+		t = counts[i];
+	      else
+		switch (i - fd->collapse)
+		  {
+		  case 0: t = counts[0]; break;
+		  case 1: t = fd->first_inner_iterations; break;
+		  case 2: t = fd->factor; break;
+		  case 3: t = fd->adjn1; break;
+		  default: gcc_unreachable ();
+		  }
+	      t = fold_convert (TREE_TYPE (tem), t);
 	      t = force_gimple_operand_gsi (gsi, t, false, NULL_TREE,
 					    false, GSI_CONTINUE_LINKING);
 	      gassign *stmt = gimple_build_assign (tem, t);
@@ -2478,12 +2518,10 @@ expand_omp_for_init_vars (struct omp_for_data *fd, gimple_stmt_iterator *gsi,
 	  basic_block bb_triang = NULL, bb_triang_dom = NULL;
 	  if (fd->first_nonrect + 1 == fd->last_nonrect
 	      && (TREE_CODE (fd->loop.n2) == INTEGER_CST
-		  || (fd->first_inner_iterations
-		      /* For now.  Later add clauses to propagate the
-			 values.  */
-		      && !gimple_omp_for_combined_into_p (fd->for_stmt)))
+		  || fd->first_inner_iterations)
 	      && (optab_handler (sqrt_optab, TYPE_MODE (double_type_node))
-		  != CODE_FOR_nothing))
+		  != CODE_FOR_nothing)
+	      && !integer_zerop (fd->loop.n2))
 	    {
 	      tree outer_n1 = fd->adjn1 ? fd->adjn1 : fd->loops[i - 1].n1;
 	      tree itype = TREE_TYPE (fd->loops[i].v);
@@ -4224,8 +4262,7 @@ expand_omp_for_generic (struct omp_region *region,
 			   : POINTER_PLUS_EXPR, TREE_TYPE (t), v, a);
 	  t = force_gimple_operand_gsi (&gsi, t, true, NULL_TREE,
 					false, GSI_CONTINUE_LINKING);
-	  assign_stmt = gimple_build_assign (dest, t);
-	  gsi_insert_after (&gsi, assign_stmt, GSI_CONTINUE_LINKING);
+	  expand_omp_build_assign (&gsi, dest, t, true);
 	}
   if (fd->collapse > 1)
     expand_omp_for_init_vars (fd, &gsi, counts, NULL, inner_stmt, startvar);
@@ -4278,13 +4315,18 @@ expand_omp_for_generic (struct omp_region *region,
 	  gsi = gsi_last_bb (l0_bb);
 	  expand_omp_build_assign (&gsi, counts[fd->collapse - 1],
 				   istart0, true);
-	  gsi = gsi_last_bb (cont_bb);
-	  t = fold_build2 (PLUS_EXPR, fd->iter_type, counts[fd->collapse - 1],
-			   build_int_cst (fd->iter_type, 1));
-	  expand_omp_build_assign (&gsi, counts[fd->collapse - 1], t);
-	  tree aref = build4 (ARRAY_REF, fd->iter_type, counts[fd->ordered],
-			      size_zero_node, NULL_TREE, NULL_TREE);
-	  expand_omp_build_assign (&gsi, aref, counts[fd->collapse - 1]);
+	  if (cont_bb)
+	    {
+	      gsi = gsi_last_bb (cont_bb);
+	      t = fold_build2 (PLUS_EXPR, fd->iter_type,
+			       counts[fd->collapse - 1],
+			       build_int_cst (fd->iter_type, 1));
+	      expand_omp_build_assign (&gsi, counts[fd->collapse - 1], t);
+	      tree aref = build4 (ARRAY_REF, fd->iter_type,
+				  counts[fd->ordered], size_zero_node,
+				  NULL_TREE, NULL_TREE);
+	      expand_omp_build_assign (&gsi, aref, counts[fd->collapse - 1]);
+	    }
 	  t = counts[fd->collapse - 1];
 	}
       else if (fd->collapse > 1)
@@ -4639,6 +4681,35 @@ expand_omp_scantemp_alloc (tree clauses, tree ptr, unsigned HOST_WIDE_INT sz,
     }
   else
     return ptr;
+}
+
+/* Return the last _looptemp_ clause if one has been created for
+   lastprivate on distribute parallel for{, simd} or taskloop.
+   FD is the loop data and INNERC should be the second _looptemp_
+   clause (the one holding the end of the range).
+   This is followed by collapse - 1 _looptemp_ clauses for the
+   counts[1] and up, and for triangular loops followed by 4
+   further _looptemp_ clauses (one for counts[0], one first_inner_iterations,
+   one factor and one adjn1).  After this there is optionally one
+   _looptemp_ clause that this function returns.  */
+
+static tree
+find_lastprivate_looptemp (struct omp_for_data *fd, tree innerc)
+{
+  gcc_assert (innerc);
+  int count = fd->collapse - 1;
+  if (fd->non_rect
+      && fd->last_nonrect == fd->first_nonrect + 1
+      && !TYPE_UNSIGNED (TREE_TYPE (fd->loops[fd->last_nonrect].v)))
+    count += 4;
+  for (int i = 0; i < count; i++)
+    {
+      innerc = omp_find_clause (OMP_CLAUSE_CHAIN (innerc),
+				OMP_CLAUSE__LOOPTEMP_);
+      gcc_assert (innerc);
+    }
+  return omp_find_clause (OMP_CLAUSE_CHAIN (innerc),
+			  OMP_CLAUSE__LOOPTEMP_);
 }
 
 /* A subroutine of expand_omp_for.  Generate code for a parallel
@@ -5065,15 +5136,7 @@ expand_omp_for_static_nochunk (struct omp_region *region,
       if (fd->collapse > 1 && TREE_CODE (fd->loop.n2) != INTEGER_CST
 	  && gimple_omp_for_kind (fd->for_stmt) == GF_OMP_FOR_KIND_DISTRIBUTE)
 	{
-	  int i;
-	  for (i = 1; i < fd->collapse; i++)
-	    {
-	      innerc = omp_find_clause (OMP_CLAUSE_CHAIN (innerc),
-					OMP_CLAUSE__LOOPTEMP_);
-	      gcc_assert (innerc);
-	    }
-	  innerc = omp_find_clause (OMP_CLAUSE_CHAIN (innerc),
-				    OMP_CLAUSE__LOOPTEMP_);
+	  innerc = find_lastprivate_looptemp (fd, innerc);
 	  if (innerc)
 	    {
 	      /* If needed (distribute parallel for with lastprivate),
@@ -5198,8 +5261,7 @@ expand_omp_for_static_nochunk (struct omp_region *region,
 			   : POINTER_PLUS_EXPR, TREE_TYPE (t), t, a);
 	  t = force_gimple_operand_gsi (&gsi, t, true, NULL_TREE,
 					false, GSI_CONTINUE_LINKING);
-	  assign_stmt = gimple_build_assign (dest, t);
-	  gsi_insert_after (&gsi, assign_stmt, GSI_CONTINUE_LINKING);
+	  expand_omp_build_assign (&gsi, dest, t, true);
 	}
   if (fd->collapse > 1)
     {
@@ -5790,15 +5852,7 @@ expand_omp_for_static_chunk (struct omp_region *region,
       if (fd->collapse > 1 && TREE_CODE (fd->loop.n2) != INTEGER_CST
 	  && gimple_omp_for_kind (fd->for_stmt) == GF_OMP_FOR_KIND_DISTRIBUTE)
 	{
-	  int i;
-	  for (i = 1; i < fd->collapse; i++)
-	    {
-	      innerc = omp_find_clause (OMP_CLAUSE_CHAIN (innerc),
-					OMP_CLAUSE__LOOPTEMP_);
-	      gcc_assert (innerc);
-	    }
-	  innerc = omp_find_clause (OMP_CLAUSE_CHAIN (innerc),
-				    OMP_CLAUSE__LOOPTEMP_);
+	  innerc = find_lastprivate_looptemp (fd, innerc);
 	  if (innerc)
 	    {
 	      /* If needed (distribute parallel for with lastprivate),
@@ -5930,8 +5984,7 @@ expand_omp_for_static_chunk (struct omp_region *region,
 			   : POINTER_PLUS_EXPR, TREE_TYPE (t), v, a);
 	  t = force_gimple_operand_gsi (&gsi, t, true, NULL_TREE,
 					false, GSI_CONTINUE_LINKING);
-	  assign_stmt = gimple_build_assign (dest, t);
-	  gsi_insert_after (&gsi, assign_stmt, GSI_CONTINUE_LINKING);
+	  expand_omp_build_assign (&gsi, dest, t, true);
 	}
   if (fd->collapse > 1)
     expand_omp_for_init_vars (fd, &gsi, counts, NULL, inner_stmt, startvar);
@@ -6347,6 +6400,7 @@ expand_omp_simd (struct omp_region *region, struct omp_for_data *fd)
   tree n2var = NULL_TREE;
   tree n2v = NULL_TREE;
   tree *nonrect_bounds = NULL;
+  tree min_arg1 = NULL_TREE, min_arg2 = NULL_TREE;
   if (fd->collapse > 1)
     {
       if (broken_loop || gimple_omp_for_combined_into_p (fd->for_stmt))
@@ -6406,9 +6460,10 @@ expand_omp_simd (struct omp_region *region, struct omp_for_data *fd)
 			     fold_convert (itype, fd->loops[i].step));
 	  t = fold_convert (type, t);
 	  tree t2 = fold_build2 (MINUS_EXPR, type, n2, n1);
-	  t = fold_build2 (MIN_EXPR, type, t2, t);
-	  t = fold_build2 (PLUS_EXPR, type, fd->loop.v, t);
-	  expand_omp_build_assign (&gsi, n2var, t);
+	  min_arg1 = create_tmp_var (type);
+	  expand_omp_build_assign (&gsi, min_arg1, t2);
+	  min_arg2 = create_tmp_var (type);
+	  expand_omp_build_assign (&gsi, min_arg2, t);
 	}
       else
 	{
@@ -6815,7 +6870,16 @@ expand_omp_simd (struct omp_region *region, struct omp_for_data *fd)
 		}
 	      else
 		t = counts[i + 1];
-	      t = fold_build2 (MIN_EXPR, type, t2, t);
+	      expand_omp_build_assign (&gsi, min_arg1, t2);
+	      expand_omp_build_assign (&gsi, min_arg2, t);
+	      e = split_block (init_bb, last_stmt (init_bb));
+	      gsi = gsi_after_labels (e->dest);
+	      init_bb = e->dest;
+	      remove_edge (FALLTHRU_EDGE (entry_bb));
+	      make_edge (entry_bb, init_bb, EDGE_FALLTHRU);
+	      set_immediate_dominator (CDI_DOMINATORS, init_bb, entry_bb);
+	      set_immediate_dominator (CDI_DOMINATORS, l1_bb, init_bb);
+	      t = fold_build2 (MIN_EXPR, type, min_arg1, min_arg2);
 	      t = fold_build2 (PLUS_EXPR, type, fd->loop.v, t);
 	      expand_omp_build_assign (&gsi, n2var, t);
 	    }
@@ -7030,15 +7094,7 @@ expand_omp_taskloop_for_outer (struct omp_region *region,
   tree endvar = OMP_CLAUSE_DECL (innerc);
   if (fd->collapse > 1 && TREE_CODE (fd->loop.n2) != INTEGER_CST)
     {
-      gcc_assert (innerc);
-      for (i = 1; i < fd->collapse; i++)
-	{
-	  innerc = omp_find_clause (OMP_CLAUSE_CHAIN (innerc),
-				    OMP_CLAUSE__LOOPTEMP_);
-	  gcc_assert (innerc);
-	}
-      innerc = omp_find_clause (OMP_CLAUSE_CHAIN (innerc),
-				OMP_CLAUSE__LOOPTEMP_);
+      innerc = find_lastprivate_looptemp (fd, innerc);
       if (innerc)
 	{
 	  /* If needed (inner taskloop has lastprivate clause), propagate
@@ -7368,6 +7424,21 @@ expand_omp_taskloop_for_inner (struct omp_region *region,
 static void
 expand_oacc_for (struct omp_region *region, struct omp_for_data *fd)
 {
+  bool is_oacc_kernels_parallelized
+    = (lookup_attribute ("oacc kernels parallelized",
+			 DECL_ATTRIBUTES (current_function_decl)) != NULL);
+  {
+    bool is_oacc_kernels
+      = (lookup_attribute ("oacc kernels",
+			   DECL_ATTRIBUTES (current_function_decl)) != NULL);
+    if (is_oacc_kernels_parallelized)
+      gcc_checking_assert (is_oacc_kernels);
+  }
+  gcc_assert (gimple_in_ssa_p (cfun) == is_oacc_kernels_parallelized);
+  /* In the following, some of the 'gimple_in_ssa_p (cfun)' conditionals are
+     for SSA specifics, and some are for 'parloops' OpenACC
+     'kernels'-parallelized specifics.  */
+
   tree v = fd->loop.v;
   enum tree_code cond_code = fd->loop.cond_code;
   enum tree_code plus_code = PLUS_EXPR;
@@ -7388,6 +7459,12 @@ expand_oacc_for (struct omp_region *region, struct omp_for_data *fd)
     {
       plus_code = POINTER_PLUS_EXPR;
       plus_type = sizetype;
+    }
+  for (int ix = fd->collapse; ix--;)
+    {
+      tree diff_type2 = TREE_TYPE (fd->loops[ix].step);
+      if (TYPE_PRECISION (diff_type) < TYPE_PRECISION (diff_type2))
+	diff_type = diff_type2;
     }
   if (POINTER_TYPE_P (diff_type) || TYPE_UNSIGNED (diff_type))
     diff_type = signed_type_for (diff_type);
@@ -7472,7 +7549,7 @@ expand_oacc_for (struct omp_region *region, struct omp_for_data *fd)
     {
       gcc_assert (!gimple_in_ssa_p (cfun) && up);
       counts = XALLOCAVEC (struct oacc_collapse, fd->collapse);
-      tree total = expand_oacc_collapse_init (fd, &gsi, counts,
+      tree total = expand_oacc_collapse_init (fd, &gsi, counts, diff_type,
 					      TREE_TYPE (fd->loop.n2), loc);
 
       if (SSA_VAR_P (fd->loop.n2))
@@ -7634,7 +7711,7 @@ expand_oacc_for (struct omp_region *region, struct omp_for_data *fd)
       gsi_insert_before (&gsi, ass, GSI_SAME_STMT);
 
       if (fd->collapse > 1 || fd->tiling)
-	expand_oacc_collapse_vars (fd, false, &gsi, counts, v);
+	expand_oacc_collapse_vars (fd, false, &gsi, counts, v, diff_type);
 
       if (fd->tiling)
 	{
@@ -7704,7 +7781,8 @@ expand_oacc_for (struct omp_region *region, struct omp_for_data *fd)
 
 	  /* Initialize the user's loop vars.  */
 	  gsi = gsi_start_bb (elem_body_bb);
-	  expand_oacc_collapse_vars (fd, true, &gsi, counts, e_offset);
+	  expand_oacc_collapse_vars (fd, true, &gsi, counts, e_offset,
+				     diff_type);
 	}
     }
 
@@ -9193,7 +9271,7 @@ expand_omp_target (struct omp_region *region)
   gomp_target *entry_stmt;
   gimple *stmt;
   edge e;
-  bool offloaded, data_region;
+  bool offloaded;
   int target_kind;
 
   entry_stmt = as_a <gomp_target *> (last_stmt (region->entry));
@@ -9213,12 +9291,12 @@ expand_omp_target (struct omp_region *region)
     case GF_OMP_TARGET_KIND_OACC_UPDATE:
     case GF_OMP_TARGET_KIND_OACC_ENTER_EXIT_DATA:
     case GF_OMP_TARGET_KIND_OACC_DECLARE:
-      data_region = false;
-      break;
+    case GF_OMP_TARGET_KIND_OACC_PARALLEL_KERNELS_PARALLELIZED:
+    case GF_OMP_TARGET_KIND_OACC_PARALLEL_KERNELS_GANG_SINGLE:
     case GF_OMP_TARGET_KIND_DATA:
     case GF_OMP_TARGET_KIND_OACC_DATA:
     case GF_OMP_TARGET_KIND_OACC_HOST_DATA:
-      data_region = true;
+    case GF_OMP_TARGET_KIND_OACC_DATA_KERNELS:
       break;
     default:
       gcc_unreachable ();
@@ -9240,27 +9318,43 @@ expand_omp_target (struct omp_region *region)
   entry_bb = region->entry;
   exit_bb = region->exit;
 
+  if (target_kind == GF_OMP_TARGET_KIND_OACC_KERNELS)
+    mark_loops_in_oacc_kernels_region (region->entry, region->exit);
+
+  /* Going on, all OpenACC compute constructs are mapped to
+     'BUILT_IN_GOACC_PARALLEL', and get their compute regions outlined.
+     To distinguish between them, we attach attributes.  */
   switch (target_kind)
     {
+    case GF_OMP_TARGET_KIND_OACC_PARALLEL:
+      DECL_ATTRIBUTES (child_fn)
+	= tree_cons (get_identifier ("oacc parallel"),
+		     NULL_TREE, DECL_ATTRIBUTES (child_fn));
+      break;
     case GF_OMP_TARGET_KIND_OACC_KERNELS:
-      mark_loops_in_oacc_kernels_region (region->entry, region->exit);
-
-      /* Further down, all OpenACC compute constructs will be mapped to
-	 BUILT_IN_GOACC_PARALLEL, and to distinguish between them, there
-	 is an "oacc kernels" attribute set for OpenACC kernels.  */
       DECL_ATTRIBUTES (child_fn)
 	= tree_cons (get_identifier ("oacc kernels"),
 		     NULL_TREE, DECL_ATTRIBUTES (child_fn));
       break;
     case GF_OMP_TARGET_KIND_OACC_SERIAL:
-      /* Further down, all OpenACC compute constructs will be mapped to
-	 BUILT_IN_GOACC_PARALLEL, and to distinguish between them, there
-	 is an "oacc serial" attribute set for OpenACC serial.  */
       DECL_ATTRIBUTES (child_fn)
 	= tree_cons (get_identifier ("oacc serial"),
 		     NULL_TREE, DECL_ATTRIBUTES (child_fn));
       break;
+    case GF_OMP_TARGET_KIND_OACC_PARALLEL_KERNELS_PARALLELIZED:
+      DECL_ATTRIBUTES (child_fn)
+	= tree_cons (get_identifier ("oacc parallel_kernels_parallelized"),
+		     NULL_TREE, DECL_ATTRIBUTES (child_fn));
+      break;
+    case GF_OMP_TARGET_KIND_OACC_PARALLEL_KERNELS_GANG_SINGLE:
+      DECL_ATTRIBUTES (child_fn)
+	= tree_cons (get_identifier ("oacc parallel_kernels_gang_single"),
+		     NULL_TREE, DECL_ATTRIBUTES (child_fn));
+      break;
     default:
+      /* Make sure we don't miss any.  */
+      gcc_checking_assert (!(is_gimple_omp_oacc (entry_stmt)
+			     && is_gimple_omp_offloaded (entry_stmt)));
       break;
     }
 
@@ -9467,10 +9561,13 @@ expand_omp_target (struct omp_region *region)
     case GF_OMP_TARGET_KIND_OACC_PARALLEL:
     case GF_OMP_TARGET_KIND_OACC_KERNELS:
     case GF_OMP_TARGET_KIND_OACC_SERIAL:
+    case GF_OMP_TARGET_KIND_OACC_PARALLEL_KERNELS_PARALLELIZED:
+    case GF_OMP_TARGET_KIND_OACC_PARALLEL_KERNELS_GANG_SINGLE:
       start_ix = BUILT_IN_GOACC_PARALLEL;
       break;
     case GF_OMP_TARGET_KIND_OACC_DATA:
     case GF_OMP_TARGET_KIND_OACC_HOST_DATA:
+    case GF_OMP_TARGET_KIND_OACC_DATA_KERNELS:
       start_ix = BUILT_IN_GOACC_DATA_START;
       break;
     case GF_OMP_TARGET_KIND_OACC_UPDATE:
@@ -9766,13 +9863,6 @@ expand_omp_target (struct omp_region *region)
       gcc_assert (g && gimple_code (g) == GIMPLE_OMP_TARGET);
       gsi_remove (&gsi, true);
     }
-  if (data_region && region->exit)
-    {
-      gsi = gsi_last_nondebug_bb (region->exit);
-      g = gsi_stmt (gsi);
-      gcc_assert (g && gimple_code (g) == GIMPLE_OMP_RETURN);
-      gsi_remove (&gsi, true);
-    }
 }
 
 /* Expand the parallel region tree rooted at REGION.  Expansion
@@ -9937,16 +10027,19 @@ build_omp_regions_1 (basic_block bb, struct omp_region *parent,
 	      switch (gimple_omp_target_kind (stmt))
 		{
 		case GF_OMP_TARGET_KIND_REGION:
-		case GF_OMP_TARGET_KIND_DATA:
 		case GF_OMP_TARGET_KIND_OACC_PARALLEL:
 		case GF_OMP_TARGET_KIND_OACC_KERNELS:
 		case GF_OMP_TARGET_KIND_OACC_SERIAL:
-		case GF_OMP_TARGET_KIND_OACC_DATA:
-		case GF_OMP_TARGET_KIND_OACC_HOST_DATA:
+		case GF_OMP_TARGET_KIND_OACC_PARALLEL_KERNELS_PARALLELIZED:
+		case GF_OMP_TARGET_KIND_OACC_PARALLEL_KERNELS_GANG_SINGLE:
 		  break;
 		case GF_OMP_TARGET_KIND_UPDATE:
 		case GF_OMP_TARGET_KIND_ENTER_DATA:
 		case GF_OMP_TARGET_KIND_EXIT_DATA:
+		case GF_OMP_TARGET_KIND_DATA:
+		case GF_OMP_TARGET_KIND_OACC_DATA:
+		case GF_OMP_TARGET_KIND_OACC_HOST_DATA:
+		case GF_OMP_TARGET_KIND_OACC_DATA_KERNELS:
 		case GF_OMP_TARGET_KIND_OACC_UPDATE:
 		case GF_OMP_TARGET_KIND_OACC_ENTER_EXIT_DATA:
 		case GF_OMP_TARGET_KIND_OACC_DECLARE:
@@ -10191,16 +10284,19 @@ omp_make_gimple_edges (basic_block bb, struct omp_region **region,
       switch (gimple_omp_target_kind (last))
 	{
 	case GF_OMP_TARGET_KIND_REGION:
-	case GF_OMP_TARGET_KIND_DATA:
 	case GF_OMP_TARGET_KIND_OACC_PARALLEL:
 	case GF_OMP_TARGET_KIND_OACC_KERNELS:
 	case GF_OMP_TARGET_KIND_OACC_SERIAL:
-	case GF_OMP_TARGET_KIND_OACC_DATA:
-	case GF_OMP_TARGET_KIND_OACC_HOST_DATA:
+	case GF_OMP_TARGET_KIND_OACC_PARALLEL_KERNELS_PARALLELIZED:
+	case GF_OMP_TARGET_KIND_OACC_PARALLEL_KERNELS_GANG_SINGLE:
 	  break;
 	case GF_OMP_TARGET_KIND_UPDATE:
 	case GF_OMP_TARGET_KIND_ENTER_DATA:
 	case GF_OMP_TARGET_KIND_EXIT_DATA:
+	case GF_OMP_TARGET_KIND_DATA:
+	case GF_OMP_TARGET_KIND_OACC_DATA:
+	case GF_OMP_TARGET_KIND_OACC_HOST_DATA:
+	case GF_OMP_TARGET_KIND_OACC_DATA_KERNELS:
 	case GF_OMP_TARGET_KIND_OACC_UPDATE:
 	case GF_OMP_TARGET_KIND_OACC_ENTER_EXIT_DATA:
 	case GF_OMP_TARGET_KIND_OACC_DECLARE:

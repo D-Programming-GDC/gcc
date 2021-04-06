@@ -1,4 +1,4 @@
-!  Copyright (C) 2005-2020 Free Software Foundation, Inc.
+!  Copyright (C) 2005-2021 Free Software Foundation, Inc.
 !  Contributed by Jakub Jelinek <jakub@redhat.com>.
 
 !  This file is part of the GNU Offloading and Multi Processing Library
@@ -39,6 +39,7 @@
         integer, parameter :: omp_alloctrait_val_kind = c_intptr_t
         integer, parameter :: omp_memspace_handle_kind = c_intptr_t
         integer, parameter :: omp_depend_kind = @OMP_DEPEND_KIND@
+        integer, parameter :: omp_event_handle_kind = c_intptr_t
         integer (omp_sched_kind), parameter :: omp_sched_static = 1
         integer (omp_sched_kind), parameter :: omp_sched_dynamic = 2
         integer (omp_sched_kind), parameter :: omp_sched_guided = 3
@@ -394,6 +395,12 @@
         end interface
 
         interface
+          function omp_get_supported_active_levels ()
+            integer (4) :: omp_get_supported_active_levels
+          end function omp_get_supported_active_levels
+        end interface
+
+        interface
           function omp_get_level ()
             integer (4) :: omp_get_level
           end function omp_get_level
@@ -550,6 +557,14 @@
         end interface
 
         interface
+          subroutine omp_fulfill_event (event)
+            use omp_lib_kinds
+            integer (kind=omp_event_handle_kind), &
+              value, intent(in) :: event
+          end subroutine omp_fulfill_event
+        end interface
+
+        interface
           subroutine omp_set_affinity_format (format)
             character(len=*), intent(in) :: format
           end subroutine omp_set_affinity_format
@@ -637,5 +652,9 @@
                omp_get_default_allocator
           end function
         end interface
+
+#if _OPENMP >= 201811
+!GCC$ ATTRIBUTES DEPRECATED :: omp_get_nested, omp_set_nested
+#endif
 
       end module omp_lib

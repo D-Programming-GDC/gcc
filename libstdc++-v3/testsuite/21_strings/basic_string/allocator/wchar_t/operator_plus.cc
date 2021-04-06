@@ -1,5 +1,5 @@
 // 2019-04-30  Nina Dinka Ranns  <dinka.ranns@gmail.com>
-// Copyright (C) 2019-2020 Free Software Foundation, Inc.
+// Copyright (C) 2019-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -17,7 +17,7 @@
 // <http://www.gnu.org/licenses/>.
 
 // { dg-do run { target c++11 } }
-// COW strings don't support C++11 allocators:
+// COW strings don't support C++11 allocator propagation:
 // { dg-require-effective-target cxx11-abi }
 
 #include <string>

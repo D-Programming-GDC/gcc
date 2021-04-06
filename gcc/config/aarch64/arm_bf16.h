@@ -1,6 +1,6 @@
 /* Arm BF16 instrinsics include file.
 
-   Copyright (C) 2019-2020 Free Software Foundation, Inc.
+   Copyright (C) 2019-2021 Free Software Foundation, Inc.
    Contributed by Arm.
 
    This file is part of GCC.
@@ -38,6 +38,13 @@ __attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
 vcvth_bf16_f32 (float32_t __a)
 {
   return __builtin_aarch64_bfcvtbf (__a);
+}
+
+__extension__ extern __inline float32_t
+__attribute__ ((__always_inline__, __gnu_inline__, __artificial__))
+vcvtah_f32_bf16 (bfloat16_t __a)
+{
+  return __builtin_aarch64_bfcvtsf (__a);
 }
 
 #pragma GCC pop_options

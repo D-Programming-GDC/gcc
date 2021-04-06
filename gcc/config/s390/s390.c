@@ -1,5 +1,5 @@
 /* Subroutines used for code generation on IBM S/390 and zSeries
-   Copyright (C) 1999-2020 Free Software Foundation, Inc.
+   Copyright (C) 1999-2021 Free Software Foundation, Inc.
    Contributed by Hartmut Penner (hpenner@de.ibm.com) and
                   Ulrich Weigand (uweigand@de.ibm.com) and
                   Andreas Krebbel (Andreas.Krebbel@de.ibm.com).
@@ -337,6 +337,7 @@ const struct s390_processor processor_table[] =
   { "z13",    "z13",    PROCESSOR_2964_Z13,    &zEC12_cost,  11 },
   { "z14",    "arch12", PROCESSOR_3906_Z14,    &zEC12_cost,  12 },
   { "z15",    "arch13", PROCESSOR_8561_Z15,    &zEC12_cost,  13 },
+  { "arch14", "arch14", PROCESSOR_ARCH14,      &zEC12_cost,  14 },
   { "native", "",       PROCESSOR_NATIVE,      NULL,         0  }
 };
 
@@ -454,6 +455,16 @@ bool
 s390_return_addr_from_memory ()
 {
   return cfun_gpr_save_slot(RETURN_REGNUM) == SAVE_SLOT_STACK;
+}
+
+/* Return nonzero if it's OK to use fused multiply-add for MODE.  */
+bool
+s390_fma_allowed_p (machine_mode mode)
+{
+  if (TARGET_VXE && mode == TFmode)
+    return flag_vx_long_double_fma;
+
+  return true;
 }
 
 /* Indicate which ABI has been used for passing vector args.
@@ -814,6 +825,12 @@ s390_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
       if ((bflags & B_VXE2) && !TARGET_VXE2)
 	{
 	  error ("Builtin %qF requires z15 or higher.", fndecl);
+	  return const0_rtx;
+	}
+
+      if ((bflags & B_NNPA) && !TARGET_NNPA)
+	{
+	  error ("Builtin %qF requires arch14 or higher.", fndecl);
 	  return const0_rtx;
 	}
     }
@@ -1850,6 +1867,10 @@ s390_emit_compare (enum rtx_code code, rtx op0, rtx op1)
   machine_mode mode = s390_select_ccmode (code, op0, op1);
   rtx cc;
 
+  /* Force OP1 into register in order to satisfy VXE TFmode patterns.  */
+  if (TARGET_VXE && GET_MODE (op1) == TFmode)
+    op1 = force_reg (TFmode, op1);
+
   if (GET_MODE_CLASS (GET_MODE (op0)) == MODE_CC)
     {
       /* Do not output a redundant compare instruction if a
@@ -2466,6 +2487,9 @@ s390_contiguous_bitmask_vector_p (rtx op, int *start, int *end)
   int size;
   rtx elt;
   bool b;
+
+  /* Handle floats by bitcasting them to ints.  */
+  op = gen_lowpart (related_int_vector_mode (GET_MODE (op)).require (), op);
 
   gcc_assert (!!start == !!end);
   if (!const_vec_duplicate_p (op, &elt)
@@ -5952,6 +5976,7 @@ s390_expand_vec_strlen (rtx target, rtx string, rtx alignment)
   rtx temp;
   rtx len = gen_reg_rtx (QImode);
   rtx cond;
+  rtx mem;
 
   s390_load_address (str_addr_base_reg, XEXP (string, 0));
   emit_move_insn (str_idx_reg, const0_rtx);
@@ -5993,10 +6018,10 @@ s390_expand_vec_strlen (rtx target, rtx string, rtx alignment)
   LABEL_NUSES (loop_start_label) = 1;
 
   /* Load 16 bytes of the string into VR.  */
-  emit_move_insn (str_reg,
-		  gen_rtx_MEM (V16QImode,
-			       gen_rtx_PLUS (Pmode, str_idx_reg,
-					     str_addr_base_reg)));
+  mem = gen_rtx_MEM (V16QImode,
+		     gen_rtx_PLUS (Pmode, str_idx_reg, str_addr_base_reg));
+  set_mem_align (mem, 128);
+  emit_move_insn (str_reg, mem);
   if (into_loop_label != NULL_RTX)
     {
       emit_label (into_loop_label);
@@ -6544,6 +6569,7 @@ s390_expand_vec_compare (rtx target, enum rtx_code cond,
 
   if (GET_MODE_CLASS (GET_MODE (cmp_op1)) == MODE_VECTOR_FLOAT)
     {
+      cmp_op2 = force_reg (GET_MODE (cmp_op1), cmp_op2);
       switch (cond)
 	{
 	  /* NE a != b -> !(a == b) */
@@ -6582,6 +6608,19 @@ s390_expand_vec_compare (rtx target, enum rtx_code cond,
     }
   else
     {
+      /* Turn x < 0 into x >> (bits per element - 1)  */
+      if (cond == LT && cmp_op2 == CONST0_RTX (mode))
+	{
+	  int shift = GET_MODE_BITSIZE (GET_MODE_INNER (mode)) - 1;
+	  rtx res = expand_simple_binop (mode, ASHIFTRT, cmp_op1,
+					 GEN_INT (shift), target,
+					 0, OPTAB_DIRECT);
+	  if (res != target)
+	    emit_move_insn (target, res);
+	  return;
+	}
+      cmp_op2 = force_reg (GET_MODE (cmp_op1), cmp_op2);
+
       switch (cond)
 	{
 	  /* NE: a != b -> !(a == b) */
@@ -6799,11 +6838,7 @@ s390_expand_vcond (rtx target, rtx then, rtx els,
   if (!REG_P (cmp_op1))
     cmp_op1 = force_reg (GET_MODE (cmp_op1), cmp_op1);
 
-  if (!REG_P (cmp_op2))
-    cmp_op2 = force_reg (GET_MODE (cmp_op2), cmp_op2);
-
-  s390_expand_vec_compare (result_target, cond,
-			   cmp_op1, cmp_op2);
+  s390_expand_vec_compare (result_target, cond, cmp_op1, cmp_op2);
 
   /* If the results are supposed to be either -1 or 0 we are done
      since this is what our compare instructions generate anyway.  */
@@ -6863,15 +6898,16 @@ s390_expand_vec_init (rtx target, rtx vals)
     }
 
   /* Use vector gen mask or vector gen byte mask if possible.  */
-  if (all_same && all_const_int
-      && (XVECEXP (vals, 0, 0) == const0_rtx
-	  || s390_contiguous_bitmask_vector_p (XVECEXP (vals, 0, 0),
-					       NULL, NULL)
-	  || s390_bytemask_vector_p (XVECEXP (vals, 0, 0), NULL)))
+  if (all_same && all_const_int)
     {
-      emit_insn (gen_rtx_SET (target,
-			      gen_rtx_CONST_VECTOR (mode, XVEC (vals, 0))));
-      return;
+      rtx vec = gen_rtx_CONST_VECTOR (mode, XVEC (vals, 0));
+      if (XVECEXP (vals, 0, 0) == const0_rtx
+	  || s390_contiguous_bitmask_vector_p (vec, NULL, NULL)
+	  || s390_bytemask_vector_p (vec, NULL))
+	{
+	  emit_insn (gen_rtx_SET (target, vec));
+	  return;
+	}
     }
 
   /* Use vector replicate instructions.  vlrep/vrepi/vrep  */
@@ -6947,6 +6983,37 @@ s390_expand_vec_init (rtx target, rtx vals)
 							 GEN_INT (i), target),
 					      UNSPEC_VEC_SET)));
     }
+}
+
+/* Emit a vector constant that contains 1s in each element's sign bit position
+   and 0s in other positions.  MODE is the desired constant's mode.  */
+extern rtx
+s390_build_signbit_mask (machine_mode mode)
+{
+  if (mode == TFmode && TARGET_VXE)
+    {
+      wide_int mask_val = wi::set_bit_in_zero (127, 128);
+      rtx mask = immed_wide_int_const (mask_val, TImode);
+      return gen_lowpart (TFmode, mask);
+    }
+
+  /* Generate the integral element mask value.  */
+  machine_mode inner_mode = GET_MODE_INNER (mode);
+  int inner_bitsize = GET_MODE_BITSIZE (inner_mode);
+  wide_int mask_val = wi::set_bit_in_zero (inner_bitsize - 1, inner_bitsize);
+
+  /* Emit the element mask rtx.  Use gen_lowpart in order to cast the integral
+     value to the desired mode.  */
+  machine_mode int_mode = related_int_vector_mode (mode).require ();
+  rtx mask = immed_wide_int_const (mask_val, GET_MODE_INNER (int_mode));
+  mask = gen_lowpart (inner_mode, mask);
+
+  /* Emit the vector mask rtx by mode the element mask rtx.  */
+  int nunits = GET_MODE_NUNITS (mode);
+  rtvec v = rtvec_alloc (nunits);
+  for (int i = 0; i < nunits; i++)
+    RTVEC_ELT (v, i) = mask;
+  return gen_rtx_CONST_VECTOR (mode, v);
 }
 
 /* Structure to hold the initial parameters for a compare_and_swap operation
@@ -7873,6 +7940,7 @@ print_operand_address (FILE *file, rtx addr)
 	 CONST_VECTOR: Generate a bitmask for vgbm instruction.
     'x': print integer X as if it's an unsigned halfword.
     'v': print register number as vector register (v1 instead of f1).
+    'V': print the second word of a TFmode operand as vector register.
 */
 
 void
@@ -8042,13 +8110,13 @@ print_operand (FILE *file, rtx x, int code)
     case REG:
       /* Print FP regs as fx instead of vx when they are accessed
 	 through non-vector mode.  */
-      if (code == 'v'
+      if ((code == 'v' || code == 'V')
 	  || VECTOR_NOFP_REG_P (x)
 	  || (FP_REG_P (x) && VECTOR_MODE_P (GET_MODE (x)))
 	  || (VECTOR_REG_P (x)
 	      && (GET_MODE_SIZE (GET_MODE (x)) /
 		  s390_class_max_nregs (FP_REGS, GET_MODE (x))) > 8))
-	fprintf (file, "%%v%s", reg_names[REGNO (x)] + 2);
+	fprintf (file, "%%v%s", reg_names[REGNO (x) + (code == 'V')] + 2);
       else
 	fprintf (file, "%s", reg_names[REGNO (x)]);
       break;
@@ -8358,6 +8426,7 @@ s390_issue_rate (void)
     case PROCESSOR_2827_ZEC12:
     case PROCESSOR_2964_Z13:
     case PROCESSOR_3906_Z14:
+    case PROCESSOR_ARCH14:
     default:
       return 1;
     }
@@ -8592,10 +8661,9 @@ replace_constant_pool_ref (rtx_insn *insn, rtx ref, rtx offset)
 /* We keep a list of constants which we have to add to internal
    constant tables in the middle of large functions.  */
 
-#define NR_C_MODES 32
-machine_mode constant_modes[NR_C_MODES] =
+static machine_mode constant_modes[] =
 {
-  TFmode, TImode, TDmode,
+  TFmode, FPRX2mode, TImode, TDmode,
   V16QImode, V8HImode, V4SImode, V2DImode, V1TImode,
   V4SFmode, V2DFmode, V1TFmode,
   DFmode, DImode, DDmode,
@@ -8607,6 +8675,7 @@ machine_mode constant_modes[NR_C_MODES] =
   QImode,
   V1QImode
 };
+#define NR_C_MODES (sizeof (constant_modes) / sizeof (constant_modes[0]))
 
 struct constant
 {
@@ -8635,7 +8704,7 @@ static struct constant_pool *
 s390_alloc_pool (void)
 {
   struct constant_pool *pool;
-  int i;
+  size_t i;
 
   pool = (struct constant_pool *) xmalloc (sizeof *pool);
   pool->next = NULL;
@@ -8714,7 +8783,7 @@ static void
 s390_add_constant (struct constant_pool *pool, rtx val, machine_mode mode)
 {
   struct constant *c;
-  int i;
+  size_t i;
 
   for (i = 0; i < NR_C_MODES; i++)
     if (constant_modes[i] == mode)
@@ -8759,7 +8828,7 @@ s390_find_constant (struct constant_pool *pool, rtx val,
 		    machine_mode mode)
 {
   struct constant *c;
-  int i;
+  size_t i;
 
   for (i = 0; i < NR_C_MODES; i++)
     if (constant_modes[i] == mode)
@@ -8866,7 +8935,7 @@ s390_dump_pool (struct constant_pool *pool, bool remote_label)
 {
   struct constant *c;
   rtx_insn *insn = pool->pool_insn;
-  int i;
+  size_t i;
 
   /* Switch to rodata section.  */
   insn = emit_insn_after (gen_pool_section_start (), insn);
@@ -8937,7 +9006,7 @@ static void
 s390_free_pool (struct constant_pool *pool)
 {
   struct constant *c, *next;
-  int i;
+  size_t i;
 
   for (i = 0; i < NR_C_MODES; i++)
     for (c = pool->constants[i]; c; c = next)
@@ -9349,6 +9418,37 @@ s390_output_pool_entry (rtx exp, machine_mode mode, unsigned int align)
     }
 }
 
+/* Return true if MEM refers to an integer constant in the literal pool.  If
+   VAL is not nullptr, then also fill it with the constant's value.  */
+
+bool
+s390_const_int_pool_entry_p (rtx mem, HOST_WIDE_INT *val)
+{
+  /* Try to match the following:
+     - (mem (unspec [(symbol_ref) (reg)] UNSPEC_LTREF)).
+     - (mem (symbol_ref)).  */
+
+  if (!MEM_P (mem))
+    return false;
+
+  rtx addr = XEXP (mem, 0);
+  rtx sym;
+  if (GET_CODE (addr) == UNSPEC && XINT (addr, 1) == UNSPEC_LTREF)
+    sym = XVECEXP (addr, 0, 0);
+  else
+    sym = addr;
+
+  if (!SYMBOL_REF_P (sym) || !CONSTANT_POOL_ADDRESS_P (sym))
+    return false;
+
+  rtx val_rtx = get_pool_constant (sym);
+  if (!CONST_INT_P (val_rtx))
+    return false;
+
+  if (val != nullptr)
+    *val = INTVAL (val_rtx);
+  return true;
+}
 
 /* Return an RTL expression representing the value of the return address
    for the frame COUNT steps up from the current frame.  FRAME is the
@@ -10347,9 +10447,16 @@ static bool
 s390_hard_regno_call_part_clobbered (unsigned int, unsigned int regno,
 				     machine_mode mode)
 {
+  /* For r12 we know that the only bits we actually care about are
+     preserved across function calls.  Since r12 is a fixed reg all
+     accesses to r12 are generated by the backend.
+
+     This workaround is necessary until gcse implements proper
+     tracking of partially clobbered registers.  */
   if (!TARGET_64BIT
       && TARGET_ZARCH
       && GET_MODE_SIZE (mode) > 4
+      && (!flag_pic || regno != PIC_OFFSET_TABLE_REGNUM)
       && ((regno >= 6 && regno <= 15) || regno == 32))
     return true;
 
@@ -10382,7 +10489,8 @@ s390_class_max_nregs (enum reg_class rclass, machine_mode mode)
 	 full VRs.  */
       if (TARGET_VX
 	  && SCALAR_FLOAT_MODE_P (mode)
-	  && GET_MODE_SIZE (mode) >= 16)
+	  && GET_MODE_SIZE (mode) >= 16
+	  && !(TARGET_VXE && mode == TFmode))
 	reg_pair_required_p = true;
 
       /* Even if complex types would fit into a single FPR/VR we force
@@ -10405,6 +10513,24 @@ s390_class_max_nregs (enum reg_class rclass, machine_mode mode)
   return (GET_MODE_SIZE (mode) + reg_size - 1) / reg_size;
 }
 
+/* Return nonzero if mode M describes a 128-bit float in a floating point
+   register pair.  */
+
+static bool
+s390_is_fpr128 (machine_mode m)
+{
+  return m == FPRX2mode || (!TARGET_VXE && m == TFmode);
+}
+
+/* Return nonzero if mode M describes a 128-bit float in a vector
+   register.  */
+
+static bool
+s390_is_vr128 (machine_mode m)
+{
+  return m == V1TFmode || (TARGET_VXE && m == TFmode);
+}
+
 /* Implement TARGET_CAN_CHANGE_MODE_CLASS.  */
 
 static bool
@@ -10415,11 +10541,11 @@ s390_can_change_mode_class (machine_mode from_mode,
   machine_mode small_mode;
   machine_mode big_mode;
 
-  /* V1TF and TF have different representations in vector
-     registers.  */
+  /* 128-bit values have different representations in floating point and
+     vector registers.  */
   if (reg_classes_intersect_p (VEC_REGS, rclass)
-      && ((from_mode == V1TFmode && to_mode == TFmode)
-	  || (from_mode == TFmode && to_mode == V1TFmode)))
+      && ((s390_is_fpr128 (from_mode) && s390_is_vr128 (to_mode))
+	  || (s390_is_vr128 (from_mode) && s390_is_fpr128 (to_mode))))
     return false;
 
   if (GET_MODE_SIZE (from_mode) == GET_MODE_SIZE (to_mode))
@@ -10974,7 +11100,7 @@ s390_prologue_plus_offset (rtx target, rtx reg, rtx offset, bool frame_related_p
 static void
 s390_emit_stack_probe (rtx addr)
 {
-  rtx mem = gen_rtx_MEM (Pmode, addr);
+  rtx mem = gen_rtx_MEM (word_mode, addr);
   MEM_VOLATILE_P (mem) = 1;
   emit_insn (gen_probe_stack (mem));
 }
@@ -11669,7 +11795,7 @@ s390_output_split_stack_data (rtx parm_block, rtx call_done,
   rtx ops[] = { parm_block, call_done };
 
   switch_to_section (targetm.asm_out.function_rodata_section
-		     (current_function_decl));
+		     (current_function_decl, false));
 
   if (TARGET_64BIT)
     output_asm_insn (".align\t8", NULL);
@@ -14660,6 +14786,7 @@ s390_get_sched_attrmask (rtx_insn *insn)
 	mask |= S390_SCHED_ATTR_MASK_GROUPOFTWO;
       break;
     case PROCESSOR_8561_Z15:
+    case PROCESSOR_ARCH14:
       if (get_attr_z15_cracked (insn))
 	mask |= S390_SCHED_ATTR_MASK_CRACKED;
       if (get_attr_z15_expanded (insn))
@@ -14707,6 +14834,7 @@ s390_get_unit_mask (rtx_insn *insn, int *units)
 	mask |= 1 << 3;
       break;
     case PROCESSOR_8561_Z15:
+    case PROCESSOR_ARCH14:
       *units = 4;
       if (get_attr_z15_unit_lsu (insn))
 	mask |= 1 << 0;
@@ -15433,13 +15561,6 @@ s390_option_override_internal (struct gcc_options *opts,
   SET_OPTION_IF_UNSET (opts, opts_set, param_sched_pressure_algorithm, 2);
   SET_OPTION_IF_UNSET (opts, opts_set, param_min_vect_loop_bound, 2);
 
-  /* Use aggressive inlining parameters.  */
-  if (opts->x_s390_tune >= PROCESSOR_2964_Z13)
-    {
-      SET_OPTION_IF_UNSET (opts, opts_set, param_inline_min_speedup, 2);
-      SET_OPTION_IF_UNSET (opts, opts_set, param_max_inline_insns_auto, 80);
-    }
-
   /* Set the default alignment.  */
   s390_default_align (opts);
 
@@ -16082,12 +16203,13 @@ s390_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
 
      fenv_var = __builtin_s390_efpc ();
      __builtin_s390_sfpc (fenv_var & mask) */
-  tree old_fpc = build2 (MODIFY_EXPR, unsigned_type_node, fenv_var, call_efpc);
-  tree new_fpc =
-    build2 (BIT_AND_EXPR, unsigned_type_node, fenv_var,
-	    build_int_cst (unsigned_type_node,
-			   ~(FPC_DXC_MASK | FPC_FLAGS_MASK |
-			     FPC_EXCEPTION_MASK)));
+  tree old_fpc = build4 (TARGET_EXPR, unsigned_type_node, fenv_var, call_efpc,
+			 NULL_TREE, NULL_TREE);
+  tree new_fpc
+    = build2 (BIT_AND_EXPR, unsigned_type_node, fenv_var,
+	      build_int_cst (unsigned_type_node,
+			     ~(FPC_DXC_MASK | FPC_FLAGS_MASK
+			       | FPC_EXCEPTION_MASK)));
   tree set_new_fpc = build_call_expr (sfpc, 1, new_fpc);
   *hold = build2 (COMPOUND_EXPR, void_type_node, old_fpc, set_new_fpc);
 
@@ -16106,8 +16228,8 @@ s390_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
   __atomic_feraiseexcept ((old_fpc & FPC_FLAGS_MASK) >> FPC_FLAGS_SHIFT);  */
 
   old_fpc = create_tmp_var_raw (unsigned_type_node);
-  tree store_old_fpc = build2 (MODIFY_EXPR, void_type_node,
-			       old_fpc, call_efpc);
+  tree store_old_fpc = build4 (TARGET_EXPR, void_type_node, old_fpc, call_efpc,
+			       NULL_TREE, NULL_TREE);
 
   set_new_fpc = build_call_expr (sfpc, 1, fenv_var);
 
@@ -16305,20 +16427,28 @@ s390_invalid_binary_op (int op ATTRIBUTE_UNUSED, const_tree type1, const_tree ty
   return NULL;
 }
 
-/* Implement TARGET_C_EXCESS_PRECISION.
+#if ENABLE_S390_EXCESS_FLOAT_PRECISION == 1
+/* Implement TARGET_C_EXCESS_PRECISION to maintain historic behavior with older
+   glibc versions
 
-   FIXME: For historical reasons, float_t and double_t are typedef'ed to
+   For historical reasons, float_t and double_t had been typedef'ed to
    double on s390, causing operations on float_t to operate in a higher
    precision than is necessary.  However, it is not the case that SFmode
    operations have implicit excess precision, and we generate more optimal
    code if we let the compiler know no implicit extra precision is added.
 
-   That means when we are compiling with -fexcess-precision=fast, the value
-   we set for FLT_EVAL_METHOD will be out of line with the actual precision of
-   float_t (though they would be correct for -fexcess-precision=standard).
+   With a glibc with that "historic" definition, configure will enable this hook
+   to set FLT_EVAL_METHOD to 1 for -fexcess-precision=standard (e.g., as implied
+   by -std=cXY).  That means when we are compiling with -fexcess-precision=fast,
+   the value we set for FLT_EVAL_METHOD will be out of line with the actual
+   precision of float_t.
 
-   A complete fix would modify glibc to remove the unnecessary typedef
-   of float_t to double.  */
+   Newer versions of glibc will be modified to derive the definition of float_t
+   from FLT_EVAL_METHOD on s390x, as on many other architectures.  There,
+   configure will disable this hook by default, so that we defer to the default
+   of FLT_EVAL_METHOD_PROMOTE_TO_FLOAT and a resulting typedef of float_t to
+   float.  Note that in that scenario, float_t and FLT_EVAL_METHOD will be in
+   line independent of -fexcess-precision. */
 
 static enum flt_eval_method
 s390_excess_precision (enum excess_precision_type type)
@@ -16341,6 +16471,7 @@ s390_excess_precision (enum excess_precision_type type)
     }
   return FLT_EVAL_METHOD_UNPREDICTABLE;
 }
+#endif
 
 /* Implement the TARGET_ASAN_SHADOW_OFFSET hook.  */
 
@@ -16577,6 +16708,97 @@ s390_shift_truncation_mask (machine_mode mode)
   return mode == DImode || mode == SImode ? 63 : 0;
 }
 
+/* Return TRUE iff CONSTRAINT is an "f" constraint, possibly with additional
+   modifiers.  */
+
+static bool
+f_constraint_p (const char *constraint)
+{
+  bool seen_f_p = false;
+  bool seen_v_p = false;
+
+  for (size_t i = 0, c_len = strlen (constraint); i < c_len;
+       i += CONSTRAINT_LEN (constraint[i], constraint + i))
+    {
+      if (constraint[i] == 'f')
+	seen_f_p = true;
+      if (constraint[i] == 'v')
+	seen_v_p = true;
+    }
+
+  /* Treat "fv" constraints as "v", because LRA will choose the widest register
+   * class.  */
+  return seen_f_p && !seen_v_p;
+}
+
+/* Implement TARGET_MD_ASM_ADJUST hook in order to fix up "f"
+   constraints when long doubles are stored in vector registers.  */
+
+static rtx_insn *
+s390_md_asm_adjust (vec<rtx> &outputs, vec<rtx> &inputs,
+		    vec<machine_mode> &input_modes,
+		    vec<const char *> &constraints, vec<rtx> & /*clobbers*/,
+		    HARD_REG_SET & /*clobbered_regs*/)
+{
+  if (!TARGET_VXE)
+    /* Long doubles are stored in FPR pairs - nothing to do.  */
+    return NULL;
+
+  rtx_insn *after_md_seq = NULL, *after_md_end = NULL;
+
+  unsigned ninputs = inputs.length ();
+  unsigned noutputs = outputs.length ();
+  for (unsigned i = 0; i < noutputs; i++)
+    {
+      if (GET_MODE (outputs[i]) != TFmode)
+	/* Not a long double - nothing to do.  */
+	continue;
+      const char *constraint = constraints[i];
+      bool allows_mem, allows_reg, is_inout;
+      bool ok = parse_output_constraint (&constraint, i, ninputs, noutputs,
+					 &allows_mem, &allows_reg, &is_inout);
+      gcc_assert (ok);
+      if (!f_constraint_p (constraint))
+	/* Long double with a constraint other than "=f" - nothing to do.  */
+	continue;
+      gcc_assert (allows_reg);
+      gcc_assert (!is_inout);
+      /* Copy output value from a FPR pair into a vector register.  */
+      rtx fprx2 = gen_reg_rtx (FPRX2mode);
+      push_to_sequence2 (after_md_seq, after_md_end);
+      emit_insn (gen_fprx2_to_tf (outputs[i], fprx2));
+      after_md_seq = get_insns ();
+      after_md_end = get_last_insn ();
+      end_sequence ();
+      outputs[i] = fprx2;
+    }
+
+  for (unsigned i = 0; i < ninputs; i++)
+    {
+      if (GET_MODE (inputs[i]) != TFmode)
+	/* Not a long double - nothing to do.  */
+	continue;
+      const char *constraint = constraints[noutputs + i];
+      bool allows_mem, allows_reg;
+      bool ok = parse_input_constraint (&constraint, i, ninputs, noutputs, 0,
+					constraints.address (), &allows_mem,
+					&allows_reg);
+      gcc_assert (ok);
+      if (!f_constraint_p (constraint))
+	/* Long double with a constraint other than "f" (or "=f" for inout
+	   operands) - nothing to do.  */
+	continue;
+      gcc_assert (allows_reg);
+      /* Copy input value from a vector register into a FPR pair.  */
+      rtx fprx2 = gen_reg_rtx (FPRX2mode);
+      emit_insn (gen_tf_to_fprx2 (fprx2, inputs[i]));
+      inputs[i] = fprx2;
+      input_modes[i] = FPRX2mode;
+    }
+
+  return after_md_seq;
+}
+
 /* Initialize GCC target structure.  */
 
 #undef  TARGET_ASM_ALIGNED_HI_OP
@@ -16637,8 +16859,12 @@ s390_shift_truncation_mask (machine_mode mode)
 #undef TARGET_ASM_CAN_OUTPUT_MI_THUNK
 #define TARGET_ASM_CAN_OUTPUT_MI_THUNK hook_bool_const_tree_hwi_hwi_const_tree_true
 
+#if ENABLE_S390_EXCESS_FLOAT_PRECISION == 1
+/* This hook is only needed to maintain the historic behavior with glibc
+   versions that typedef float_t to double. */
 #undef TARGET_C_EXCESS_PRECISION
 #define TARGET_C_EXCESS_PRECISION s390_excess_precision
+#endif
 
 #undef  TARGET_SCHED_ADJUST_PRIORITY
 #define TARGET_SCHED_ADJUST_PRIORITY s390_adjust_priority
@@ -16879,6 +17105,9 @@ s390_shift_truncation_mask (machine_mode mode)
    the floating point instructions.  */
 #undef TARGET_MAX_ANCHOR_OFFSET
 #define TARGET_MAX_ANCHOR_OFFSET 0xfff
+
+#undef TARGET_MD_ASM_ADJUST
+#define TARGET_MD_ASM_ADJUST s390_md_asm_adjust
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

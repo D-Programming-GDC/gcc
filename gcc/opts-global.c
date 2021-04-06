@@ -1,6 +1,6 @@
 /* Command line option handling.  Code involving global state that
    should not be shared with the driver.
-   Copyright (C) 2002-2020 Free Software Foundation, Inc.
+   Copyright (C) 2002-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -376,10 +376,6 @@ handle_common_deferred_options (void)
 
 	case OPT_fdbg_cnt_:
 	  dbg_cnt_process_opt (opt->arg);
-	  break;
-
-	case OPT_fdbg_cnt_list:
-	  dbg_cnt_list_all_counters ();
 	  break;
 
 	case OPT_fdebug_prefix_map_:

@@ -1,5 +1,5 @@
 /* Implementation of subroutines for the GNU C++ pretty-printer.
-   Copyright (C) 2003-2020 Free Software Foundation, Inc.
+   Copyright (C) 2003-2021 Free Software Foundation, Inc.
    Contributed by Gabriel Dos Reis <gdr@integrable-solutions.net>
 
 This file is part of GCC.
@@ -651,6 +651,15 @@ cxx_pretty_printer::postfix_expression (tree t)
       type_id (TREE_TYPE (t));
       pp_cxx_end_template_argument_list (this);
       pp_left_paren (this);
+      expression (TREE_OPERAND (t, 0));
+      pp_right_paren (this);
+      break;
+
+    case BIT_CAST_EXPR:
+      pp_cxx_ws_string (this, "__builtin_bit_cast");
+      pp_left_paren (this);
+      type_id (TREE_TYPE (t));
+      pp_comma (this);
       expression (TREE_OPERAND (t, 0));
       pp_right_paren (this);
       break;
@@ -1372,6 +1381,10 @@ cxx_pretty_printer::simple_type_specifier (tree t)
       pp_cxx_right_paren (this);
       break;
 
+    case NULLPTR_TYPE:
+      pp_cxx_ws_string (this, "std::nullptr_t");
+      break;
+
     default:
       c_pretty_printer::simple_type_specifier (t);
       break;
@@ -1399,6 +1412,7 @@ pp_cxx_type_specifier_seq (cxx_pretty_printer *pp, tree t)
     case TYPE_DECL:
     case BOUND_TEMPLATE_TEMPLATE_PARM:
     case DECLTYPE_TYPE:
+    case NULLPTR_TYPE:
       pp_cxx_cv_qualifier_seq (pp, t);
       pp->simple_type_specifier (t);
       break;
@@ -1414,6 +1428,16 @@ pp_cxx_type_specifier_seq (cxx_pretty_printer *pp, tree t)
 	{
 	  tree pfm = TYPE_PTRMEMFUNC_FN_TYPE (t);
 	  pp->declaration_specifiers (TREE_TYPE (TREE_TYPE (pfm)));
+	  pp_cxx_whitespace (pp);
+	  pp_cxx_ptr_operator (pp, t);
+	  break;
+	}
+      /* fall through */
+
+    case OFFSET_TYPE:
+      if (TYPE_PTRDATAMEM_P (t))
+	{
+	  pp_cxx_type_specifier_seq (pp, TREE_TYPE (t));
 	  pp_cxx_whitespace (pp);
 	  pp_cxx_ptr_operator (pp, t);
 	  break;
@@ -1753,7 +1777,20 @@ pp_cxx_function_definition (cxx_pretty_printer *pp, tree t)
 void
 cxx_pretty_printer::abstract_declarator (tree t)
 {
-  if (TYPE_PTRMEM_P (t))
+  /* pp_cxx_ptr_operator prints '(' for a pointer-to-member function,
+     or a pointer-to-data-member of array type:
+
+       void (X::*)()
+       int (X::*)[5]
+
+     but not for a pointer-to-data-member of non-array type:
+
+       int X::*
+
+     so be mindful of that.  */
+  if (TYPE_PTRMEMFUNC_P (t)
+      || (TYPE_PTRDATAMEM_P (t)
+	  && TREE_CODE (TREE_TYPE (t)) == ARRAY_TYPE))
     pp_cxx_right_paren (this);
   else if (INDIRECT_TYPE_P (t))
     {
@@ -1783,6 +1820,11 @@ cxx_pretty_printer::direct_abstract_declarator (tree t)
     case RECORD_TYPE:
       if (TYPE_PTRMEMFUNC_P (t))
 	direct_abstract_declarator (TYPE_PTRMEMFUNC_FN_TYPE (t));
+      break;
+
+    case OFFSET_TYPE:
+      if (TYPE_PTRDATAMEM_P (t))
+	direct_abstract_declarator (TREE_TYPE (t));
       break;
 
     case METHOD_TYPE:
@@ -1836,8 +1878,12 @@ cxx_pretty_printer::type_id (tree t)
     case TYPEOF_TYPE:
     case UNDERLYING_TYPE:
     case DECLTYPE_TYPE:
+    case NULLPTR_TYPE:
     case TEMPLATE_ID_EXPR:
+    case OFFSET_TYPE:
       pp_cxx_type_specifier_seq (this, t);
+      if (TYPE_PTRMEM_P (t))
+	abstract_declarator (t);
       break;
 
     case TYPE_PACK_EXPANSION:
@@ -1910,6 +1956,8 @@ pp_cxx_template_argument_list (cxx_pretty_printer *pp, tree t)
 	  if (TYPE_P (arg) || (TREE_CODE (arg) == TEMPLATE_DECL
 			       && TYPE_P (DECL_TEMPLATE_RESULT (arg))))
 	    pp->type_id (arg);
+	  else if (template_parm_object_p (arg))
+	    pp->expression (DECL_INITIAL (arg));
 	  else
 	    pp->expression (arg);
 	}
@@ -2632,6 +2680,12 @@ pp_cxx_trait_expression (cxx_pretty_printer *pp, tree t)
       break;
     case CPTK_IS_CONSTRUCTIBLE:
       pp_cxx_ws_string (pp, "__is_constructible");
+      break;
+    case CPTK_IS_NOTHROW_ASSIGNABLE:
+      pp_cxx_ws_string (pp, "__is_nothrow_assignable");
+      break;
+    case CPTK_IS_NOTHROW_CONSTRUCTIBLE:
+      pp_cxx_ws_string (pp, "__is_nothrow_constructible");
       break;
 
     default:

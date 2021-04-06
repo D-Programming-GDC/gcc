@@ -1,5 +1,5 @@
 /* Backend support for Fortran 95 basic types and derived types.
-   Copyright (C) 2002-2020 Free Software Foundation, Inc.
+   Copyright (C) 2002-2021 Free Software Foundation, Inc.
    Contributed by Paul Brook <paul@nowt.org>
    and Steven Bosscher <s.bosscher@student.tudelft.nl>
 
@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "trans-array.h"
 #include "dwarf2out.h"	/* For struct array_descr_info.  */
 #include "attribs.h"
+#include "alias.h"
 
 
 #if (GFC_MAX_DIMENSIONS < 10)
@@ -113,6 +114,7 @@ int gfc_default_character_kind;
 int gfc_default_logical_kind;
 int gfc_default_complex_kind;
 int gfc_c_int_kind;
+int gfc_c_intptr_kind;
 int gfc_atomic_int_kind;
 int gfc_atomic_logical_kind;
 
@@ -690,6 +692,8 @@ gfc_init_kinds (void)
   /* Choose atomic kinds to match C's int.  */
   gfc_atomic_int_kind = gfc_c_int_kind;
   gfc_atomic_logical_kind = gfc_c_int_kind;
+
+  gfc_c_intptr_kind = POINTER_SIZE / 8;
 }
 
 
@@ -1903,6 +1907,10 @@ gfc_get_array_type_bounds (tree etype, int dimen, int codimen, tree * lbound,
   base_type = gfc_get_array_descriptor_base (dimen, codimen, false);
   TYPE_CANONICAL (fat_type) = base_type;
   TYPE_STUB_DECL (fat_type) = TYPE_STUB_DECL (base_type);
+  /* Arrays of unknown type must alias with all array descriptors.  */
+  TYPE_TYPELESS_STORAGE (base_type) = 1;
+  TYPE_TYPELESS_STORAGE (fat_type) = 1;
+  gcc_checking_assert (!get_alias_set (base_type) && !get_alias_set (fat_type));
 
   tmp = TYPE_NAME (etype);
   if (tmp && TREE_CODE (tmp) == TYPE_DECL)
@@ -2246,7 +2254,8 @@ gfc_sym_type (gfc_symbol * sym)
   else
     type = gfc_typenode_for_spec (&sym->ts, sym->attr.codimension);
 
-  if (sym->attr.dummy && !sym->attr.function && !sym->attr.value)
+  if (sym->attr.dummy && !sym->attr.function && !sym->attr.value
+      && !sym->pass_as_value)
     byref = 1;
   else
     byref = 0;
@@ -2940,20 +2949,33 @@ create_fn_spec (gfc_symbol *sym, tree fntype)
 
   memset (&spec, 0, sizeof (spec));
   spec[0] = '.';
-  spec_len = 1;
+  spec[1] = ' ';
+  spec_len = 2;
 
   if (sym->attr.entry_master)
-    spec[spec_len++] = 'R';
+    {
+      spec[spec_len++] = 'R';
+      spec[spec_len++] = ' ';
+    }
   if (gfc_return_by_reference (sym))
     {
       gfc_symbol *result = sym->result ? sym->result : sym;
 
       if (result->attr.pointer || sym->attr.proc_pointer)
-	spec[spec_len++] = '.';
+	{
+	  spec[spec_len++] = '.';
+	  spec[spec_len++] = ' ';
+	}
       else
-	spec[spec_len++] = 'w';
+	{
+	  spec[spec_len++] = 'w';
+	  spec[spec_len++] = ' ';
+	}
       if (sym->ts.type == BT_CHARACTER)
-	spec[spec_len++] = 'R';
+	{
+	  spec[spec_len++] = 'R';
+	  spec[spec_len++] = ' ';
+	}
     }
 
   for (f = gfc_sym_get_dummy_args (sym); f; f = f->next)
@@ -2968,11 +2990,20 @@ create_fn_spec (gfc_symbol *sym, tree fntype)
 		&& (CLASS_DATA (f->sym)->ts.u.derived->attr.proc_pointer_comp
 		    || CLASS_DATA (f->sym)->ts.u.derived->attr.pointer_comp))
 	    || (f->sym->ts.type == BT_INTEGER && f->sym->ts.is_c_interop))
-	  spec[spec_len++] = '.';
+	  {
+	    spec[spec_len++] = '.';
+	    spec[spec_len++] = ' ';
+	  }
 	else if (f->sym->attr.intent == INTENT_IN)
-	  spec[spec_len++] = 'r';
+	  {
+	    spec[spec_len++] = 'r';
+	    spec[spec_len++] = ' ';
+	  }
 	else if (f->sym)
-	  spec[spec_len++] = 'w';
+	  {
+	    spec[spec_len++] = 'w';
+	    spec[spec_len++] = ' ';
+	  }
       }
 
   tmp = build_tree_list (NULL_TREE, build_string (spec_len, spec));
@@ -2981,7 +3012,8 @@ create_fn_spec (gfc_symbol *sym, tree fntype)
 }
 
 tree
-gfc_get_function_type (gfc_symbol * sym, gfc_actual_arglist *actual_args)
+gfc_get_function_type (gfc_symbol * sym, gfc_actual_arglist *actual_args,
+		       const char *fnspec)
 {
   tree type;
   vec<tree, va_gc> *typelist = NULL;
@@ -3165,7 +3197,19 @@ arg_type_list_done:
     type = build_varargs_function_type_vec (type, typelist);
   else
     type = build_function_type_vec (type, typelist);
-  type = create_fn_spec (sym, type);
+
+  /* If we were passed an fn spec, add it here, otherwise determine it from
+     the formal arguments.  */
+  if (fnspec)
+    {
+      tree tmp;
+      int spec_len = strlen (fnspec);
+      tmp = build_tree_list (NULL_TREE, build_string (spec_len, fnspec));
+      tmp = tree_cons (get_identifier ("fn spec"), tmp, TYPE_ATTRIBUTES (type));
+      type = build_type_attribute_variant (type, tmp);
+    }
+  else
+    type = create_fn_spec (sym, type);
 
   return type;
 }

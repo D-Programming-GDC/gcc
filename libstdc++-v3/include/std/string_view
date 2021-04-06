@@ -1,6 +1,6 @@
 // Components for manipulating non-owning sequences of characters -*- C++ -*-
 
-// Copyright (C) 2013-2020 Free Software Foundation, Inc.
+// Copyright (C) 2013-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -352,6 +352,21 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       { return this->ends_with(basic_string_view(__x)); }
 #endif // C++20
 
+#if __cplusplus > 202002L
+#define __cpp_lib_string_contains 202011L
+      constexpr bool
+      contains(basic_string_view __x) const noexcept
+      { return this->find(__x) != npos; }
+
+      constexpr bool
+      contains(_CharT __x) const noexcept
+      { return this->find(__x) != npos; }
+
+      constexpr bool
+      contains(const _CharT* __x) const noexcept
+      { return this->find(__x) != npos; }
+#endif // C++23
+
       // [string.view.find], searching
 
       constexpr size_type
@@ -459,11 +474,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       static constexpr int
       _S_compare(size_type __n1, size_type __n2) noexcept
       {
+	using __limits = __gnu_cxx::__int_traits<int>;
 	const difference_type __diff = __n1 - __n2;
-	if (__diff > __gnu_cxx::__int_traits<int>::__max)
-	  return __gnu_cxx::__int_traits<int>::__max;
-	if (__diff < __gnu_cxx::__int_traits<int>::__min)
-	  return __gnu_cxx::__int_traits<int>::__min;
+	if (__diff > __limits::__max)
+	  return __limits::__max;
+	if (__diff < __limits::__min)
+	  return __limits::__min;
 	return static_cast<int>(__diff);
       }
 

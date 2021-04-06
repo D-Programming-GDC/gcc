@@ -1,5 +1,5 @@
 /* Tree based alias analysis and alias oracle.
-   Copyright (C) 2008-2020 Free Software Foundation, Inc.
+   Copyright (C) 2008-2021 Free Software Foundation, Inc.
    Contributed by Richard Guenther  <rguenther@suse.de>
 
    This file is part of GCC.
@@ -114,6 +114,8 @@ extern void ao_ref_init_from_ptr_and_size (ao_ref *, tree, tree);
 extern tree ao_ref_base (ao_ref *);
 extern alias_set_type ao_ref_alias_set (ao_ref *);
 extern alias_set_type ao_ref_base_alias_set (ao_ref *);
+extern tree ao_ref_alias_ptr_type (ao_ref *);
+extern tree ao_ref_base_alias_ptr_type (ao_ref *);
 extern bool ptr_deref_may_alias_global_p (tree);
 extern bool ptr_derefs_may_alias_p (tree, tree);
 extern bool ptrs_compare_unequal (tree, tree);
@@ -128,7 +130,7 @@ extern bool ref_maybe_used_by_stmt_p (gimple *, ao_ref *, bool = true);
 extern bool stmt_may_clobber_global_p (gimple *);
 extern bool stmt_may_clobber_ref_p (gimple *, tree, bool = true);
 extern bool stmt_may_clobber_ref_p_1 (gimple *, ao_ref *, bool = true);
-extern bool call_may_clobber_ref_p (gcall *, tree);
+extern bool call_may_clobber_ref_p (gcall *, tree, bool = true);
 extern bool call_may_clobber_ref_p_1 (gcall *, ao_ref *, bool = true);
 extern bool stmt_kills_ref_p (gimple *, tree);
 extern bool stmt_kills_ref_p (gimple *, ao_ref *);

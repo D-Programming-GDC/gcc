@@ -1,6 +1,6 @@
 /* Communication between the Integrated Register Allocator (IRA) and
    the rest of the compiler.
-   Copyright (C) 2006-2020 Free Software Foundation, Inc.
+   Copyright (C) 2006-2021 Free Software Foundation, Inc.
    Contributed by Vladimir Makarov <vmakarov@redhat.com>.
 
 This file is part of GCC.
@@ -206,6 +206,14 @@ extern bool ira_better_spill_reload_regno_p (int *, int *, rtx, rtx, rtx_insn *)
 extern bool ira_bad_reload_regno (int, rtx, rtx);
 
 extern void ira_adjust_equiv_reg_cost (unsigned, int);
+
+extern bool ira_former_scratch_p (int regno);
+extern bool ira_former_scratch_operand_p (rtx_insn *insn, int nop);
+extern void ira_register_new_scratch_op (rtx_insn *insn, int nop, int icode);
+extern bool ira_remove_insn_scratches (rtx_insn *insn, bool all_p, FILE *dump_file,
+				       rtx (*get_reg) (rtx original));
+extern void ira_restore_scratches (FILE *dump_file);
+extern void ira_nullify_asm_goto (rtx_insn *insn);
 
 /* ira-costs.c */
 extern void ira_costs_c_finalize (void);

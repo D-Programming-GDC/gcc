@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Free Software Foundation, Inc.
+// Copyright (C) 2019-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -23,13 +23,12 @@
 
 constexpr std::array<int, 6> cae{{0, 2, 4, 6, 8, 10}};
 
-constexpr auto out2 = std::all_of(cae.begin(), cae.end(),
+constexpr auto out1 = std::all_of(cae.begin(), cae.end(),
 			          [](int i){ return i % 2 == 0; });
 
-constexpr bool
-test()
-{
-  return true;
-}
+static_assert(out1);
 
-static_assert(test());
+constexpr auto out2 = std::all_of(cae.begin(), cae.end(),
+			          [](int i){ return i != 8; });
+
+static_assert(!out2);

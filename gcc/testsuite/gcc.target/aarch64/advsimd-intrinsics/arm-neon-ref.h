@@ -11,6 +11,8 @@ typedef uint16_t hfloat16_t;
 typedef uint32_t hfloat32_t;
 typedef uint64_t hfloat64_t;
 
+typedef uint16_t hbfloat16_t;
+
 extern void abort(void);
 extern void *memset(void *, int, size_t);
 extern void *memcpy(void *, const void *, size_t);
@@ -107,7 +109,7 @@ extern size_t strlen(const char *);
       {									\
 	union fp_operand {						\
 	  uint##W##_t i;						\
-	  float##W##_t f;						\
+	  T##W##_t f;							\
 	} tmp_res, tmp_exp;						\
 	tmp_res.f = VECT_VAR(result, T, W, N)[i];			\
 	tmp_exp.i = VECT_VAR(EXPECTED, h##T, W, N)[i];			\
@@ -353,73 +355,6 @@ static volatile int __read_neon_cumulative_sat (void) {
     asm volatile ("vmsr fpscr,%1" : "=X" (depend) : "r" (_afpscr_for_qc)); \
   }
 #endif
-
-/* Declare expected cumulative saturation results, one for each
-   size. They are defined and initialized in relevant test files.  */
-extern int VECT_VAR(expected_cumulative_sat, int, 8, 8);
-extern int VECT_VAR(expected_cumulative_sat, int, 16, 4);
-extern int VECT_VAR(expected_cumulative_sat, int, 32, 2);
-extern int VECT_VAR(expected_cumulative_sat, int, 64, 1);
-extern int VECT_VAR(expected_cumulative_sat, uint, 8, 8);
-extern int VECT_VAR(expected_cumulative_sat, uint, 16, 4);
-extern int VECT_VAR(expected_cumulative_sat, uint, 32, 2);
-extern int VECT_VAR(expected_cumulative_sat, uint, 64, 1);
-extern int VECT_VAR(expected_cumulative_sat, int, 8, 16);
-extern int VECT_VAR(expected_cumulative_sat, int, 16, 8);
-extern int VECT_VAR(expected_cumulative_sat, int, 32, 4);
-extern int VECT_VAR(expected_cumulative_sat, int, 64, 2);
-extern int VECT_VAR(expected_cumulative_sat, uint, 8, 16);
-extern int VECT_VAR(expected_cumulative_sat, uint, 16, 8);
-extern int VECT_VAR(expected_cumulative_sat, uint, 32, 4);
-extern int VECT_VAR(expected_cumulative_sat, uint, 64, 2);
-
-/* Check cumulative saturation flag vs expected value.  */
-#define CHECK_CUMULATIVE_SAT(MSG,T,W,N,EXPECTED,COMMENT)		\
-  {									\
-    if (Neon_Cumulative_Sat !=						\
-	VECT_VAR(EXPECTED, T, W, N)) {					\
-      fprintf(stderr,							\
-	      "ERROR in %s (%s line %d in cumulative_sat '%s') at type %s: " \
-	      "got %d expected %d%s\n",					\
-	      MSG, __FILE__, __LINE__,					\
-	      STR(EXPECTED),						\
-	      STR(VECT_NAME(T, W, N)),					\
-	      Neon_Cumulative_Sat,					\
-	      VECT_VAR(EXPECTED, T, W, N),				\
-	      strlen(COMMENT) > 0 ? " " COMMENT : "");			\
-      abort();								\
-    }									\
-    fprintf(stderr, "CHECKED CUMULATIVE SAT %s %s\n",			\
-	    STR(VECT_TYPE(T, W, N)), MSG);				\
-  }
-
-#define CHECK_CUMULATIVE_SAT_NAMED(test_name,EXPECTED,comment)		\
-  {									\
-    CHECK_CUMULATIVE_SAT(test_name, int, 8, 8, PRIx8, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, int, 16, 4, PRIx16, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, int, 32, 2, PRIx32, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, int, 64, 1, PRIx64, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, uint, 8, 8, PRIx8, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, uint, 16, 4, PRIx16, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, uint, 32, 2, PRIx32, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, uint, 64, 1, PRIx64, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, poly, 8, 8, PRIx8, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, poly, 16, 4, PRIx16, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT_FP(test_name, float, 32, 2, PRIx32, EXPECTED, comment); \
-									\
-    CHECK_CUMULATIVE_SAT(test_name, int, 8, 16, PRIx8, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, int, 16, 8, PRIx16, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, int, 32, 4, PRIx32, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, int, 64, 2, PRIx64, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, uint, 8, 16, PRIx8, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, uint, 16, 8, PRIx16, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, uint, 32, 4, PRIx32, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, uint, 64, 2, PRIx64, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, poly, 8, 16, PRIx8, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT(test_name, poly, 16, 8, PRIx16, EXPECTED, comment); \
-    CHECK_CUMULATIVE_SAT_FP(test_name, float, 32, 4, PRIx32, EXPECTED, comment); \
-  }									\
-
 
 /* Clean output buffers before execution.  */
 static void clean_results (void)

@@ -9,9 +9,6 @@
  * Source: $(DRUNTIMESRC src/rt/_dmain2.d)
  */
 
-/* NOTE: This file has been patched from the original DMD distribution to
- * work with the GDC compiler.
- */
 module rt.dmain2;
 
 private
@@ -71,70 +68,6 @@ version (OSX)
 version (CRuntime_Microsoft)
 {
     extern(C) void init_msvc();
-}
-
-/***********************************
- * These are a temporary means of providing a GC hook for DLL use.  They may be
- * replaced with some other similar functionality later.
- */
-extern (C)
-{
-    void* gc_getProxy();
-    void  gc_setProxy(void* p);
-    void  gc_clrProxy();
-
-    alias void* function()      gcGetFn;
-    alias void  function(void*) gcSetFn;
-    alias void  function()      gcClrFn;
-}
-
-version (Windows)
-{
-    /*******************************************
-     * Loads a DLL written in D with the name 'name'.
-     * Returns:
-     *      opaque handle to the DLL if successfully loaded
-     *      null if failure
-     */
-    extern (C) void* rt_loadLibrary(const char* name)
-    {
-        return initLibrary(.LoadLibraryA(name));
-    }
-
-    extern (C) void* rt_loadLibraryW(const wchar_t* name)
-    {
-        return initLibrary(.LoadLibraryW(name));
-    }
-
-    void* initLibrary(void* mod)
-    {
-        // BUG: LoadLibrary() call calls rt_init(), which fails if proxy is not set!
-        // (What? LoadLibrary() is a Windows API call, it shouldn't call rt_init().)
-        if (mod is null)
-            return mod;
-        gcSetFn gcSet = cast(gcSetFn) GetProcAddress(mod, "gc_setProxy");
-        if (gcSet !is null)
-        {   // BUG: Set proxy, but too late
-            gcSet(gc_getProxy());
-        }
-        return mod;
-    }
-
-    /*************************************
-     * Unloads DLL that was previously loaded by rt_loadLibrary().
-     * Input:
-     *      ptr     the handle returned by rt_loadLibrary()
-     * Returns:
-     *      1   succeeded
-     *      0   some failure happened
-     */
-    extern (C) int rt_unloadLibrary(void* ptr)
-    {
-        gcClrFn gcClr  = cast(gcClrFn) GetProcAddress(ptr, "gc_clrProxy");
-        if (gcClr !is null)
-            gcClr();
-        return FreeLibrary(ptr) != 0;
-    }
 }
 
 /* To get out-of-band access to the args[] passed to main().
@@ -340,15 +273,8 @@ extern (C) int _d_run_main(int argc, char **argv, MainFunc mainFunc)
     version (CRuntime_Microsoft)
     {
         // enable full precision for reals
-        version (GNU)
+        version (D_InlineAsm_X86_64)
         {
-            size_t fpu_cw;
-            asm { "fstcw %0" : "=m" (fpu_cw); }
-            fpu_cw |= 0b11_00_111111;  // 11: use 64 bit extended-precision
-                                       // 111111: mask all FP exceptions
-            asm { "fldcw %0" : "=m" (fpu_cw); }
-        }
-        else version (Win64)
             asm
             {
                 push    RAX;
@@ -358,7 +284,8 @@ extern (C) int _d_run_main(int argc, char **argv, MainFunc mainFunc)
                 fldcw   word ptr [RSP];
                 pop     RAX;
             }
-        else version (Win32)
+        }
+        else version (D_InlineAsm_X86)
         {
             asm
             {
@@ -455,12 +382,6 @@ extern (C) int _d_run_main(int argc, char **argv, MainFunc mainFunc)
     {
         if (IsDebuggerPresent())
             trapExceptions = false;
-        version (GNU)
-        {
-            /* IsDebuggerPresent doesn't detect GDC.  Would be nice to have
-               some way of detecting valid console output */
-            trapExceptions = true;
-        }
     }
 
     void tryExec(scope void delegate() dg)

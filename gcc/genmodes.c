@@ -1,5 +1,5 @@
 /* Generate the machine mode enumeration and associated tables.
-   Copyright (C) 2003-2020 Free Software Foundation, Inc.
+   Copyright (C) 2003-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -358,6 +358,14 @@ complete_mode (struct mode_data *m)
       m->component = 0;
       break;
 
+    case MODE_OPAQUE:
+      /* Opaque modes have size and precision.  */
+      validate_mode (m, OPTIONAL, SET, UNSET, UNSET, UNSET);
+
+      m->ncomponents = 1;
+      m->component = 0;
+      break;
+
     case MODE_PARTIAL_INT:
       /* A partial integer mode uses ->component to say what the
 	 corresponding full-size integer mode is, and may also
@@ -584,6 +592,20 @@ make_int_mode (const char *name,
 	       const char *file, unsigned int line)
 {
   struct mode_data *m = new_mode (MODE_INT, name, file, line);
+  m->bytesize = bytesize;
+  m->precision = precision;
+}
+
+#define OPAQUE_MODE(N, B)			\
+  make_opaque_mode (#N, -1U, B, __FILE__, __LINE__)
+
+static void ATTRIBUTE_UNUSED
+make_opaque_mode (const char *name,
+		  unsigned int precision,
+		  unsigned int bytesize,
+		  const char *file, unsigned int line)
+{
+  struct mode_data *m = new_mode (MODE_OPAQUE, name, file, line);
   m->bytesize = bytesize;
   m->precision = precision;
 }
@@ -1302,6 +1324,7 @@ enum machine_mode\n{");
 #endif
   printf ("#define CONST_MODE_IBIT%s\n", adj_ibit ? "" : " const");
   printf ("#define CONST_MODE_FBIT%s\n", adj_fbit ? "" : " const");
+  printf ("#define CONST_MODE_MASK%s\n", adj_nunits ? "" : " const");
   emit_max_int ();
 
   for_all_modes (c, m)
@@ -1539,8 +1562,8 @@ emit_mode_mask (void)
   int c;
   struct mode_data *m;
 
-  print_decl ("unsigned HOST_WIDE_INT", "mode_mask_array",
-	      "NUM_MACHINE_MODES");
+  print_maybe_const_decl ("%sunsigned HOST_WIDE_INT", "mode_mask_array",
+			  "NUM_MACHINE_MODES", adj_nunits);
   puts ("\
 #define MODE_MASK(m)                          \\\n\
   ((m) >= HOST_BITS_PER_WIDE_INT)             \\\n\
@@ -1697,6 +1720,20 @@ emit_mode_adjustments (void)
   struct mode_adjust *a;
   struct mode_data *m;
 
+  if (adj_nunits)
+    printf ("\n"
+	    "void\n"
+	    "adjust_mode_mask (machine_mode mode)\n"
+	    "{\n"
+	    "  unsigned int precision;\n"
+	    "  if (GET_MODE_PRECISION (mode).is_constant (&precision)\n"
+	    "      && precision < HOST_BITS_PER_WIDE_INT)\n"
+	    "    mode_mask_array[mode] = (HOST_WIDE_INT_1U << precision) - 1;"
+	    "\n"
+	    "  else\n"
+	    "    mode_mask_array[mode] = HOST_WIDE_INT_M1U;\n"
+	    "}\n");
+
   puts ("\
 \nvoid\
 \ninit_adjust_machine_modes (void)\
@@ -1714,10 +1751,11 @@ emit_mode_adjustments (void)
       printf ("    int old_factor = vector_element_size"
 	      " (mode_precision[E_%smode], mode_nunits[E_%smode]);\n",
 	      m->name, m->name);
-      printf ("    mode_precision[E_%smode] = ps * old_factor;\n",  m->name);
+      printf ("    mode_precision[E_%smode] = ps * old_factor;\n", m->name);
       printf ("    mode_size[E_%smode] = exact_div (mode_precision[E_%smode],"
 	      " BITS_PER_UNIT);\n", m->name, m->name);
       printf ("    mode_nunits[E_%smode] = ps;\n", m->name);
+      printf ("    adjust_mode_mask (E_%smode);\n", m->name);
       printf ("  }\n");
     }
 

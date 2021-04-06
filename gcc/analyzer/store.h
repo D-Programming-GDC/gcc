@@ -1,5 +1,5 @@
 /* Classes for modeling the state of memory.
-   Copyright (C) 2020 Free Software Foundation, Inc.
+   Copyright (C) 2020-2021 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -237,6 +237,8 @@ public:
 
   bool overlaps_p (const concrete_binding &other) const;
 
+  static int cmp_ptr_ptr (const void *, const void *);
+
 private:
   bit_offset_t m_start_bit_offset;
   bit_size_t m_size_in_bits;
@@ -269,7 +271,7 @@ public:
 
   hashval_t hash () const
   {
-    return (binding_key::impl_hash () ^ (long)m_region);
+    return (binding_key::impl_hash () ^ (intptr_t)m_region);
   }
   bool operator== (const symbolic_binding &other) const
   {
@@ -281,6 +283,8 @@ public:
   void dump_to_pp (pretty_printer *pp, bool simple) const FINAL OVERRIDE;
 
   const region *get_region () const { return m_region; }
+
+  static int cmp_ptr_ptr (const void *, const void *);
 
 private:
   const region *m_region;
@@ -345,6 +349,8 @@ public:
 
   bool apply_ctor_to_region (const region *parent_reg, tree ctor,
 			     region_model_manager *mgr);
+
+  static int cmp (const binding_map &map1, const binding_map &map2);
 
 private:
   bool apply_ctor_val_to_range (const region *parent_reg,
@@ -419,7 +425,7 @@ public:
 
   template <typename T>
   void for_each_value (void (*cb) (const svalue *sval, T user_data),
-		       T user_data)
+		       T user_data) const
   {
     for (map_t::iterator iter = m_map.begin (); iter != m_map.end (); ++iter)
       cb ((*iter).second, user_data);
@@ -428,9 +434,11 @@ public:
   static bool can_merge_p (const binding_cluster *cluster_a,
 			   const binding_cluster *cluster_b,
 			   binding_cluster *out_cluster,
+			   store *out_store,
 			   store_manager *mgr,
 			   model_merger *merger);
   void make_unknown_relative_to (const binding_cluster *other_cluster,
+				 store *out_store,
 				 store_manager *mgr);
 
   void mark_as_escaped ();
@@ -451,7 +459,7 @@ public:
   const svalue *maybe_get_simple_value (store_manager *mgr) const;
 
   template <typename BindingVisitor>
-  void for_each_binding (BindingVisitor &v)
+  void for_each_binding (BindingVisitor &v) const
   {
     for (map_t::iterator iter = m_map.begin (); iter != m_map.end (); ++iter)
       {

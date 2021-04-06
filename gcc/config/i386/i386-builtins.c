@@ -1,4 +1,4 @@
-/* Copyright (C) 1988-2020 Free Software Foundation, Inc.
+/* Copyright (C) 1988-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -274,6 +274,10 @@ def_builtin (HOST_WIDE_INT mask, HOST_WIDE_INT mask2,
       if (((mask2 == 0 || (mask2 & ix86_isa_flags2) != 0)
 	   && (mask == 0 || (mask & ix86_isa_flags) != 0))
 	  || ((mask & OPTION_MASK_ISA_MMX) != 0 && TARGET_MMX_WITH_SSE)
+	  /* "Unified" builtin used by either AVXVNNI intrinsics or AVX512VNNIVL
+	     non-mask intrinsics should be defined whenever avxvnni
+	     or avx512vnni && avx512vl exist.  */
+	  || (mask2 == OPTION_MASK_ISA2_AVXVNNI)
 	  || (lang_hooks.builtin_function
 	      == lang_hooks.builtin_function_ext_scope))
 	{
@@ -1194,6 +1198,11 @@ ix86_init_mmx_sse_builtins (void)
   def_builtin (0, OPTION_MASK_ISA2_WAITPKG, "__builtin_ia32_tpause",
 	       UINT8_FTYPE_UNSIGNED_UINT64, IX86_BUILTIN_TPAUSE);
 
+  /* UINTR.  */
+  def_builtin (OPTION_MASK_ISA_64BIT, OPTION_MASK_ISA2_UINTR,
+	       "__builtin_ia32_testui",
+	       UINT8_FTYPE_VOID, IX86_BUILTIN_TESTUI);
+
   /* CLDEMOTE.  */
   def_builtin (0, OPTION_MASK_ISA2_CLDEMOTE, "__builtin_ia32_cldemote",
 	       VOID_FTYPE_PCVOID, IX86_BUILTIN_CLDEMOTE);
@@ -1879,7 +1888,7 @@ get_builtin_code_for_version (tree decl, tree *predicate_list)
       gcc_assert (new_target);
       
       if (new_target->arch_specified && new_target->arch > 0)
-	for (i = 0; i < (unsigned int) pta_size; i++)
+	for (i = 0; i < pta_size; i++)
 	  if (processor_alias_table[i].processor == new_target->arch)
 	    {
 	      const pta *arch_info = &processor_alias_table[i];

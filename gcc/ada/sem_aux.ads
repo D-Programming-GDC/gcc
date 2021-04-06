@@ -18,13 +18,6 @@
 -- Public License  distributed with GNAT; see file COPYING3.  If not, go to --
 -- http://www.gnu.org/licenses for a complete copy of the license.          --
 --                                                                          --
--- As a special exception,  if other files  instantiate  generics from this --
--- unit, or you link  this unit with other files  to produce an executable, --
--- this  unit  does not  by itself cause  the resulting  executable  to  be --
--- covered  by the  GNU  General  Public  License.  This exception does not --
--- however invalidate  any other reasons why  the executable file  might be --
--- covered by the  GNU Public License.                                      --
---                                                                          --
 -- GNAT was originally developed  by the GNAT team at  New York University. --
 -- Extensive contributions were provided by Ada Core Technologies Inc.      --
 --                                                                          --
@@ -41,7 +34,6 @@ with Alloc;
 with Namet; use Namet;
 with Table;
 with Types; use Types;
-with Sinfo; use Sinfo;
 
 package Sem_Aux is
 
@@ -155,21 +147,9 @@ package Sem_Aux is
    --  Typ must be a tagged record type. This function returns the Entity for
    --  the first _Tag field in the record type.
 
-   function Get_Binary_Nkind (Op : Entity_Id) return Node_Kind;
-   --  Op must be an entity with an Ekind of E_Operator. This function returns
-   --  the Nkind value that would be used to construct a binary operator node
-   --  referencing this entity. It is an error to call this function if Ekind
-   --  (Op) /= E_Operator.
-
    function Get_Called_Entity (Call : Node_Id) return Entity_Id;
    --  Obtain the entity of the entry, operator, or subprogram being invoked
    --  by call Call.
-
-   function Get_Unary_Nkind (Op : Entity_Id) return Node_Kind;
-   --  Op must be an entity with an Ekind of E_Operator. This function returns
-   --  the Nkind value that would be used to construct a unary operator node
-   --  referencing this entity. It is an error to call this function if Ekind
-   --  (Op) /= E_Operator.
 
    function Get_Rep_Item
      (E             : Entity_Id;
@@ -246,10 +226,6 @@ package Sem_Aux is
    --  only checks for a rep item that has been directly specified for E (and
    --  not inherited from its parents, if any). If found then True is returned,
    --  otherwise False indicates that no matching entry was found.
-
-   function Has_Rep_Item (E : Entity_Id; N : Node_Id) return Boolean;
-   --  Determine whether the Rep_Item chain of arbitrary entity E contains item
-   --  N. N must denote a valid rep item.
 
    function Has_Rep_Pragma
      (E             : Entity_Id;
@@ -358,10 +334,6 @@ package Sem_Aux is
    --  these types). This older routine overlaps with the previous one, this
    --  should be cleaned up???
 
-   function Is_Protected_Operation (E : Entity_Id) return Boolean;
-   --  Given a subprogram or entry, determines whether E is a protected entry
-   --  or subprogram.
-
    function Is_Record_Or_Limited_Type (Typ : Entity_Id) return Boolean;
    --  Return True if Typ requires is a record or limited type.
 
@@ -393,10 +365,6 @@ package Sem_Aux is
    --  The result returned is the next _Tag field in this record, or Empty
    --  if this is the last such field.
 
-   function Number_Components (Typ : Entity_Id) return Nat;
-   --  Typ is a record type, yields number of components (including
-   --  discriminants) in type.
-
    function Number_Discriminants (Typ : Entity_Id) return Pos;
    --  Typ is a type with discriminants, yields number of discriminants in type
 
@@ -408,10 +376,6 @@ package Sem_Aux is
    --  of the object is a descendant of an untagged generic formal private or
    --  derived type, and the subtype is not an unconstrained array subtype
    --  (RM 3.3(23.10/3)).
-
-   function Package_Body (E : Entity_Id) return Node_Id;
-   --  Given an entity for a package (spec or body), return the corresponding
-   --  package body if any, or else Empty.
 
    function Package_Spec (E : Entity_Id) return Node_Id;
    --  Given an entity for a package spec, return the corresponding package

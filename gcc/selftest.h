@@ -1,5 +1,5 @@
 /* A self-testing framework, for use by -fself-test.
-   Copyright (C) 2015-2020 Free Software Foundation, Inc.
+   Copyright (C) 2015-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -248,6 +248,7 @@ extern void ordered_hash_map_tests_cc_tests ();
 extern void predict_c_tests ();
 extern void pretty_print_c_tests ();
 extern void range_tests ();
+extern void range_op_tests ();
 extern void read_rtl_function_c_tests ();
 extern void rtl_tests_c_tests ();
 extern void sbitmap_c_tests ();
@@ -255,6 +256,7 @@ extern void selftest_c_tests ();
 extern void simplify_rtx_c_tests ();
 extern void spellcheck_c_tests ();
 extern void spellcheck_tree_c_tests ();
+extern void splay_tree_cc_tests ();
 extern void sreal_c_tests ();
 extern void store_merging_c_tests ();
 extern void tree_c_tests ();

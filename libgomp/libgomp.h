@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2021 Free Software Foundation, Inc.
    Contributed by Richard Henderson <rth@redhat.com>.
 
    This file is part of the GNU Offloading and Multi Processing Library
@@ -428,18 +428,27 @@ struct gomp_task_icv
   int default_device_var;
   unsigned int thread_limit_var;
   bool dyn_var;
-  bool nest_var;
+  unsigned char max_active_levels_var;
   char bind_var;
   /* Internal ICV.  */
   struct target_mem_desc *target_data;
 };
 
+enum gomp_target_offload_t
+{
+  GOMP_TARGET_OFFLOAD_DEFAULT,
+  GOMP_TARGET_OFFLOAD_MANDATORY,
+  GOMP_TARGET_OFFLOAD_DISABLED
+};
+
+#define gomp_supported_active_levels UCHAR_MAX
+
 extern struct gomp_task_icv gomp_global_icv;
 #ifndef HAVE_SYNC_BUILTINS
 extern gomp_mutex_t gomp_managed_threads_lock;
 #endif
-extern unsigned long gomp_max_active_levels_var;
 extern bool gomp_cancel_var;
+extern enum gomp_target_offload_t gomp_target_offload_var;
 extern int gomp_max_task_priority_var;
 extern unsigned long long gomp_spin_count_var, gomp_throttled_spin_count_var;
 extern unsigned long gomp_available_cpus, gomp_managed_threads;
@@ -472,7 +481,10 @@ enum gomp_task_kind
      but not yet completed.  Once that completes, they will be readded
      into the queues as GOMP_TASK_WAITING in order to perform the var
      unmapping.  */
-  GOMP_TASK_ASYNC_RUNNING
+  GOMP_TASK_ASYNC_RUNNING,
+  /* Task that has finished executing but is waiting for its
+     completion event to be fulfilled.  */
+  GOMP_TASK_DETACHED
 };
 
 struct gomp_task_depend_entry
@@ -527,6 +539,16 @@ struct gomp_task
      0, we have no unsatisfied dependencies, and this task can be put
      into the various queues to be scheduled.  */
   size_t num_dependees;
+
+  union {
+      /* Valid only if deferred_p is false.  */
+      gomp_sem_t *completion_sem;
+      /* Valid only if deferred_p is true.  Set to the team that executes the
+	 task if the task is detached and the completion event has yet to be
+	 fulfilled.  */
+      struct gomp_team *detach_team;
+    };
+  bool deferred_p;
 
   /* Priority of this task.  */
   int priority;
@@ -675,6 +697,9 @@ struct gomp_team
   unsigned int task_running_count;
   int work_share_cancelled;
   int team_cancelled;
+
+  /* Number of tasks waiting for their completion event to be fulfilled.  */
+  unsigned int task_detach_count;
 
   /* This array contains structures for implicit tasks.  */
   struct gomp_task implicit_task[];
@@ -1152,10 +1177,10 @@ struct gomp_device_descr
 /* Kind of the pragma, for which gomp_map_vars () is called.  */
 enum gomp_map_vars_kind
 {
-  GOMP_MAP_VARS_OPENACC,
-  GOMP_MAP_VARS_TARGET,
-  GOMP_MAP_VARS_DATA,
-  GOMP_MAP_VARS_ENTER_DATA
+  GOMP_MAP_VARS_OPENACC    = 1,
+  GOMP_MAP_VARS_TARGET     = 2,
+  GOMP_MAP_VARS_DATA       = 4,
+  GOMP_MAP_VARS_ENTER_DATA = 8
 };
 
 extern void gomp_acc_declare_allocate (bool, size_t, void **, size_t *,

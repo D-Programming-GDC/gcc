@@ -402,6 +402,20 @@ package body Tchk is
       Check_Token (Tok_Record, AP);
    end T_Record;
 
+   ---------------------
+   -- T_Right_Bracket --
+   ---------------------
+
+   procedure T_Right_Bracket is
+   begin
+      if Token = Tok_Right_Bracket then
+         Scan;
+      else
+         Error_Msg_AP -- CODEFIX
+           ("|missing ""']'""");
+      end if;
+   end T_Right_Bracket;
+
    -------------------
    -- T_Right_Paren --
    -------------------
@@ -422,7 +436,6 @@ package body Tchk is
 
    procedure T_Semicolon is
    begin
-
       if Token = Tok_Semicolon then
          Scan;
 

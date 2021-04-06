@@ -1,6 +1,6 @@
 /* Read the GIMPLE representation from a file stream.
 
-   Copyright (C) 2009-2020 Free Software Foundation, Inc.
+   Copyright (C) 2009-2021 Free Software Foundation, Inc.
    Contributed by Kenneth Zadeck <zadeck@naturalbridge.com>
    Re-implemented by Diego Novillo <dnovillo@google.com>
 
@@ -1017,7 +1017,6 @@ input_cfg (class lto_input_block *ib, class data_in *data_in,
   int index;
 
   init_empty_tree_cfg_for_function (fn);
-  init_ssa_operands (fn);
 
   profile_status_for_fn (fn) = streamer_read_enum (ib, profile_status_d,
 						   PROFILE_LAST);
@@ -1144,7 +1143,9 @@ input_ssa_names (class lto_input_block *ib, class data_in *data_in,
   unsigned int i, size;
 
   size = streamer_read_uhwi (ib);
-  init_ssanames (fn, size);
+  init_tree_ssa (fn, size);
+  cfun->gimple_df->in_ssa_p = true;
+  init_ssa_operands (fn);
 
   i = streamer_read_uhwi (ib);
   while (i)
@@ -1232,12 +1233,12 @@ fixup_call_stmt_edges (struct cgraph_node *orig, gimple **stmts)
     orig = orig->clone_of;
   fn = DECL_STRUCT_FUNCTION (orig->decl);
 
-  if (!orig->thunk.thunk_p)
+  if (!orig->thunk)
     fixup_call_stmt_edges_1 (orig, stmts, fn);
   if (orig->clones)
     for (node = orig->clones; node != orig;)
       {
-	if (!node->thunk.thunk_p)
+	if (!node->thunk)
 	  fixup_call_stmt_edges_1 (node, stmts, fn);
 	if (node->clones)
 	  node = node->clones;
@@ -1384,9 +1385,6 @@ input_function (tree fn_decl, class data_in *data_in,
 
   push_struct_function (fn_decl);
   fn = DECL_STRUCT_FUNCTION (fn_decl);
-  init_tree_ssa (fn);
-  /* We input IL in SSA form.  */
-  cfun->gimple_df->in_ssa_p = true;
 
   gimple_register_cfg_hooks ();
 

@@ -1,5 +1,5 @@
 /* Library interface to C front end
-   Copyright (C) 2014-2020 Free Software Foundation, Inc.
+   Copyright (C) 2014-2021 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -300,7 +300,7 @@ address_rewriter (tree *in, int *walk_subtrees, void *arg)
   decl_addr_value *found_value = ctx->address_map.find (&value);
   if (found_value != NULL)
     ;
-  else if (DECL_IS_BUILTIN (*in))
+  else if (DECL_IS_UNDECLARED_BUILTIN (*in))
     {
       gcc_address address;
 

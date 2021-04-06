@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Free Software Foundation, Inc.
+// Copyright (C) 2019-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -32,7 +32,8 @@ test()
 					 out0.begin(), out1.begin(),
 					 [](int i){ return i % 2 == 0; });
 
-  return true;
+  return outii.first == (out0.begin() + 6) && out0[1] == 2
+    && outii.second == (out1.begin() + 6) && out1[1] == 3;
 }
 
 static_assert(test());

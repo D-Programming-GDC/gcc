@@ -1,4 +1,4 @@
-/* Copyright (C) 1998-2020 Free Software Foundation, Inc.
+/* Copyright (C) 1998-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -31,8 +31,13 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #ifndef __cplusplus
 
 #define bool	_Bool
+#if defined __STDC_VERSION__ && __STDC_VERSION__ > 201710L
+#define true	((_Bool)+1u)
+#define false	((_Bool)+0u)
+#else
 #define true	1
 #define false	0
+#endif
 
 #else /* __cplusplus */
 

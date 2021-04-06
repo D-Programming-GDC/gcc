@@ -1,4 +1,4 @@
-// Copyright (C) 2001-2020 Free Software Foundation, Inc.
+// Copyright (C) 2001-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -52,6 +52,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
   void
   __throw_bad_alloc()
   { _GLIBCXX_THROW_OR_ABORT(bad_alloc()); }
+
+  void
+  __throw_bad_array_new_length()
+  { _GLIBCXX_THROW_OR_ABORT(bad_array_new_length()); }
 
   void
   __throw_bad_cast()

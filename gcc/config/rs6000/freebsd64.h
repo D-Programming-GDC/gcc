@@ -1,5 +1,5 @@
 /* Definitions for 64-bit PowerPC running FreeBSD using the ELF format
-   Copyright (C) 2012-2020 Free Software Foundation, Inc.
+   Copyright (C) 2012-2021 Free Software Foundation, Inc.
 
    This file is part of GCC.
 
@@ -51,11 +51,10 @@ extern int dot_symbols;
 #define SET_CMODEL(opt) do {} while (0)
 #endif
 
-/* Until now the 970 is the only Processor where FreeBSD 64-bit runs on.  */
 #undef  PROCESSOR_DEFAULT
-#define PROCESSOR_DEFAULT PROCESSOR_POWER4
+#define PROCESSOR_DEFAULT PROCESSOR_PPC7450
 #undef  PROCESSOR_DEFAULT64
-#define PROCESSOR_DEFAULT64 PROCESSOR_POWER4
+#define PROCESSOR_DEFAULT64 PROCESSOR_POWER8
 
 /* We don't need to generate entries in .fixup, except when
    -mrelocatable or -mrelocatable-lib is given.  */
@@ -78,65 +77,7 @@ extern int dot_symbols;
 
 #undef  SUBSUBTARGET_OVERRIDE_OPTIONS
 #define SUBSUBTARGET_OVERRIDE_OPTIONS				\
-  do								\
-    {								\
-      if (!global_options_set.x_rs6000_alignment_flags)		\
-	rs6000_alignment_flags = MASK_ALIGN_NATURAL;		\
-      if (TARGET_64BIT)						\
-	{							\
-	  if (DEFAULT_ABI != ABI_AIX)				\
-	    {							\
-	      rs6000_current_abi = ABI_AIX;			\
-	      error (INVALID_64BIT, "call");			\
-	    }							\
-	  dot_symbols = !strcmp (rs6000_abi_name, "aixdesc");	\
-	  if (rs6000_isa_flags & OPTION_MASK_RELOCATABLE)	\
-	    {							\
-	      rs6000_isa_flags &= ~OPTION_MASK_RELOCATABLE;	\
-	      error (INVALID_64BIT, "relocatable");		\
-	    }							\
-	  if (ELFv2_ABI_CHECK)					\
-	    {							\
-	      rs6000_current_abi = ABI_ELFv2;			\
-	      if (dot_symbols)					\
-		error ("%<-mcall-aixdesc%> incompatible with %<-mabi=elfv2%>"); \
-	    }							\
-	  if (rs6000_isa_flags & OPTION_MASK_EABI)		\
-	    {							\
-	      rs6000_isa_flags &= ~OPTION_MASK_EABI;		\
-	      error (INVALID_64BIT, "eabi");			\
-	    }							\
-	  if (TARGET_PROTOTYPE)					\
-	    {							\
-	      target_prototype = 0;				\
-	      error (INVALID_64BIT, "prototype");		\
-	    }							\
-	  if ((rs6000_isa_flags & OPTION_MASK_POWERPC64) == 0)	\
-	    {							\
-	      rs6000_isa_flags |= OPTION_MASK_POWERPC64;	\
-	      error ("%<-m64%> requires a PowerPC64 cpu");		\
-	    }							\
-	   if ((rs6000_isa_flags_explicit			\
-		& OPTION_MASK_MINIMAL_TOC) != 0)		\
-	    {							\
-	      if (global_options_set.x_rs6000_current_cmodel	\
-		  && rs6000_current_cmodel != CMODEL_SMALL)	\
-		error ("%<-mcmodel%> incompatible with other toc options"); \
-	      SET_CMODEL (CMODEL_SMALL);			\
-	    }							\
-	  else							\
-	    {							\
-	      if (!global_options_set.x_rs6000_current_cmodel)	\
-		SET_CMODEL (CMODEL_MEDIUM);			\
-	      if (rs6000_current_cmodel != CMODEL_SMALL)	\
-		{						\
-		  TARGET_NO_FP_IN_TOC = 0;			\
-		  TARGET_NO_SUM_IN_TOC = 0;			\
-		}						\
-	    }							\
-	}							\
-    }								\
-  while (0)
+  do rs6000_linux64_override_options (); while (0)
 
 #undef	ASM_SPEC
 #undef	LINK_OS_FREEBSD_SPEC
@@ -158,8 +99,8 @@ extern int dot_symbols;
 #define ASM_SPEC64 "-a64"
 
 #define ASM_SPEC_COMMON "%(asm_cpu) \
-%{,assembler|,assembler-with-cpp: %{mregnames} %{mno-regnames}} \
-%{mlittle} %{mlittle-endian} %{mbig} %{mbig-endian}"
+%{,assembler|,assembler-with-cpp: %{mregnames} %{mno-regnames}}" \
+  ENDIAN_SELECT(" -mbig", " -mlittle", DEFAULT_ASM_ENDIAN)
 
 #undef	SUBSUBTARGET_EXTRA_SPECS
 #define SUBSUBTARGET_EXTRA_SPECS					\
@@ -181,9 +122,15 @@ extern int dot_symbols;
     %{static:-Bstatic}} \
   %{symbolic:-Bsymbolic}"
 
+#undef  DEFAULT_ASM_ENDIAN
 #define LINK_OS_FREEBSD_SPEC32 "-melf32ppc_fbsd " LINK_OS_FREEBSD_SPEC_DEF
-  
+#if (TARGET_DEFAULT & MASK_LITTLE_ENDIAN)
+#define DEFAULT_ASM_ENDIAN " -mlittle"
+#define LINK_OS_FREEBSD_SPEC64 "-melf64lppc_fbsd " LINK_OS_FREEBSD_SPEC_DEF
+#else
+#define DEFAULT_ASM_ENDIAN " -mbig"
 #define LINK_OS_FREEBSD_SPEC64 "-melf64ppc_fbsd " LINK_OS_FREEBSD_SPEC_DEF
+#endif
 
 #undef	MULTILIB_DEFAULTS
 #define MULTILIB_DEFAULTS { "m64" }

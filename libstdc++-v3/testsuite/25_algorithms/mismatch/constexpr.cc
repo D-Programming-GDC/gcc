@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Free Software Foundation, Inc.
+// Copyright (C) 2019-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -32,7 +32,8 @@ test()
   const auto outgg = std::mismatch(ca0.begin(), ca0.end(), cax.begin(),
 				   std::equal_to<int>());
 
-  return true;
+  return outff.first == (ca0.begin() + 6) && outff.second == (cax.begin() + 6)
+    && outgg == outff;
 }
 
 static_assert(test());

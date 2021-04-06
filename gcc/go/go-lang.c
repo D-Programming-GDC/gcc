@@ -1,5 +1,5 @@
 /* go-lang.c -- Go frontend gcc interface.
-   Copyright (C) 2009-2020 Free Software Foundation, Inc.
+   Copyright (C) 2009-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -89,6 +89,7 @@ static const char *go_pkgpath = NULL;
 static const char *go_prefix = NULL;
 static const char *go_relative_import_path = NULL;
 static const char *go_c_header = NULL;
+static const char *go_embedcfg = NULL;
 
 /* Language hooks.  */
 
@@ -112,6 +113,7 @@ go_langhook_init (void)
   args.prefix = go_prefix;
   args.relative_import_path = go_relative_import_path;
   args.c_header = go_c_header;
+  args.embedcfg = go_embedcfg;
   args.check_divide_by_zero = go_check_divide_zero;
   args.check_divide_overflow = go_check_divide_overflow;
   args.compiling_runtime = go_compiling_runtime;
@@ -130,6 +132,16 @@ go_langhook_init (void)
      for floating point constants with abstract type.  This may
      eventually be controllable by a command line option.  */
   mpfr_set_default_prec (256);
+
+  /* If necessary, override GCC's choice of minimum and maximum
+     exponents.  This should only affect GCC middle-end
+     compilation-time, not correctness.  */
+  mpfr_exp_t exp = mpfr_get_emax ();
+  if (exp < (1 << 16) - 1)
+    mpfr_set_emax ((1 << 16) - 1);
+  exp = mpfr_get_emin ();
+  if (exp > - ((1 << 16) - 1))
+    mpfr_set_emin (- ((1 << 16) - 1));
 
   /* Go uses exceptions.  */
   using_eh_for_cleanups ();
@@ -272,6 +284,10 @@ go_langhook_handle_option (
       go_c_header = arg;
       break;
 
+    case OPT_fgo_embedcfg_:
+      go_embedcfg = arg;
+      break;
+
     default:
       /* Just return 1 to indicate that the option is valid.  */
       break;
@@ -305,6 +321,12 @@ go_langhook_post_options (const char **pfilename ATTRIBUTE_UNUSED)
      See https://gcc.gnu.org/PR91663.  */
   SET_OPTION_IF_UNSET (&global_options, &global_options_set,
 		       flag_partial_inlining, 0);
+
+  /* Go programs expect runtime.Callers to give the right answers,
+     which means that we can't combine functions even if they look the
+     same.  */
+  SET_OPTION_IF_UNSET (&global_options, &global_options_set,
+		       flag_ipa_icf_functions, 0);
 
   /* If the debug info level is still 1, as set in init_options, make
      sure that some debugging type is selected.  */

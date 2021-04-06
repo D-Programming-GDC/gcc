@@ -1,12 +1,12 @@
 /* { dg-require-effective-target sigsetjmp } */
 
-#include <setjmp.h>
+#include "test-setjmp.h"
 #include <stddef.h>
 #include <stdlib.h>
 
 extern int foo (int) __attribute__ ((__pure__));
 
-static jmp_buf env;
+static sigjmp_buf env;
 
 static void inner (void)
 {

@@ -1,5 +1,5 @@
 /* "Supergraph" classes that combine CFGs and callgraph into one digraph.
-   Copyright (C) 2019-2020 Free Software Foundation, Inc.
+   Copyright (C) 2019-2021 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -90,7 +90,8 @@ supergraph_call_edge (function *fun, gimple *stmt)
 /* supergraph's ctor.  Walk the callgraph, building supernodes for each
    CFG basic block, splitting the basic blocks at callsites.  Join
    together the supernodes with interprocedural and intraprocedural
-   superedges as appropriate.  */
+   superedges as appropriate.
+   Assign UIDs to the gimple stmts.  */
 
 supergraph::supergraph (logger *logger)
 {
@@ -98,8 +99,10 @@ supergraph::supergraph (logger *logger)
 
   LOG_FUNC (logger);
 
-  /* First pass: make supernodes.  */
+  /* First pass: make supernodes (and assign UIDs to the gimple stmts).  */
   {
+    unsigned next_uid = 0;
+
     /* Sort the cgraph_nodes?  */
     cgraph_node *node;
     FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
@@ -124,6 +127,7 @@ supergraph::supergraph (logger *logger)
 	    {
 	      gimple *stmt = gsi_stmt (gpi);
 	      m_stmt_to_node_t.put (stmt, node_for_stmts);
+	      stmt->uid = next_uid++;
 	    }
 
 	  /* Append statements from BB to the current supernode, splitting
@@ -135,6 +139,7 @@ supergraph::supergraph (logger *logger)
 	      gimple *stmt = gsi_stmt (gsi);
 	      node_for_stmts->m_stmts.safe_push (stmt);
 	      m_stmt_to_node_t.put (stmt, node_for_stmts);
+	      stmt->uid = next_uid++;
 	      if (cgraph_edge *edge = supergraph_call_edge (fun, stmt))
 		{
 		  m_cgraph_edge_to_caller_prev_node.put(edge, node_for_stmts);
@@ -629,8 +634,9 @@ supernode::dump_dot_id (pretty_printer *pp) const
 
 /* Return a new json::object of the form
    {"idx": int,
+    "fun": optional str
     "bb_idx": int,
-    "m_returning_call": optional str,
+    "returning_call": optional str,
     "phis": [str],
     "stmts" : [str]}.  */
 
@@ -641,6 +647,8 @@ supernode::to_json () const
 
   snode_obj->set ("idx", new json::integer_number (m_index));
   snode_obj->set ("bb_idx", new json::integer_number (m_bb->index));
+  if (function *fun = get_function ())
+    snode_obj->set ("fun", new json::string (function_name (fun)));
 
   if (m_returning_call)
     {
@@ -748,6 +756,26 @@ supernode::get_stmt_index (const gimple *stmt) const
   gcc_unreachable ();
 }
 
+/* Get a string for PK.  */
+
+static const char *
+edge_kind_to_string (enum edge_kind kind)
+{
+  switch (kind)
+    {
+    default:
+      gcc_unreachable ();
+    case SUPEREDGE_CFG_EDGE:
+      return "SUPEREDGE_CFG_EDGE";
+    case SUPEREDGE_CALL:
+      return "SUPEREDGE_CALL";
+    case SUPEREDGE_RETURN:
+      return "SUPEREDGE_RETURN";
+    case SUPEREDGE_INTRAPROCEDURAL_CALL:
+      return "SUPEREDGE_INTRAPROCEDURAL_CALL";
+    }
+};
+
 /* Dump this superedge to PP.  */
 
 void
@@ -850,7 +878,8 @@ superedge::dump_dot (graphviz_out *gv, const dump_args_t &) const
 }
 
 /* Return a new json::object of the form
-   {"src_idx": int, the index of the source supernode,
+   {"kind"   : str,
+    "src_idx": int, the index of the source supernode,
     "dst_idx": int, the index of the destination supernode,
     "desc"   : str.  */
 
@@ -858,6 +887,7 @@ json::object *
 superedge::to_json () const
 {
   json::object *sedge_obj = new json::object ();
+  sedge_obj->set ("kind", new json::string (edge_kind_to_string (m_kind)));
   sedge_obj->set ("src_idx", new json::integer_number (m_src->m_index));
   sedge_obj->set ("dst_idx", new json::integer_number (m_dest->m_index));
 

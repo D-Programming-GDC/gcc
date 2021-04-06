@@ -7,7 +7,7 @@
 
 
 @copying
-Copyright @copyright{} 2006-2020 Free Software Foundation, Inc.
+Copyright @copyright{} 2006-2021 Free Software Foundation, Inc.
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or
@@ -68,7 +68,7 @@ Boston, MA 02110-1301, USA@*
 @page
 
 
-@node Top
+@node Top, Enabling OpenMP
 @top Introduction
 @cindex Introduction
 
@@ -166,8 +166,9 @@ linkage, and do not throw exceptions.
 * omp_get_cancellation::        Whether cancellation support is enabled
 * omp_get_default_device::      Get the default device for target regions
 * omp_get_dynamic::             Dynamic teams setting
+* omp_get_initial_device::      Device number of host device
 * omp_get_level::               Number of parallel regions
-* omp_get_max_active_levels::   Maximum number of active regions
+* omp_get_max_active_levels::   Current maximum number of active regions
 * omp_get_max_task_priority::   Maximum task priority value that can be set
 * omp_get_max_threads::         Maximum number of threads of parallel region
 * omp_get_nested::              Nested parallel regions
@@ -177,6 +178,7 @@ linkage, and do not throw exceptions.
 * omp_get_num_threads::         Size of the active team
 * omp_get_proc_bind::           Whether theads may be moved between CPUs
 * omp_get_schedule::            Obtain the runtime scheduling method
+* omp_get_supported_active_levels:: Maximum number of active regions supported
 * omp_get_team_num::            Get team number
 * omp_get_team_size::           Number of threads in a team
 * omp_get_thread_limit::        Maximum number of threads
@@ -208,6 +210,10 @@ Portable, thread-based, wall clock timer.
 
 * omp_get_wtick::            Get timer precision.
 * omp_get_wtime::            Elapsed wall clock time.
+
+Support for event objects.
+
+* omp_fulfill_event::        Fulfill and destroy an OpenMP event.
 @end menu
 
 
@@ -352,6 +358,33 @@ disabled by default.
 
 
 
+@node omp_get_initial_device
+@section @code{omp_get_initial_device} -- Return device number of initial device
+@table @asis
+@item @emph{Description}:
+This function returns a device number that represents the host device.
+For OpenMP 5.1, this must be equal to the value returned by the
+@code{omp_get_num_devices} function.
+
+@item @emph{C/C++}
+@multitable @columnfractions .20 .80
+@item @emph{Prototype}: @tab @code{int omp_get_initial_device(void);}
+@end multitable
+
+@item @emph{Fortran}:
+@multitable @columnfractions .20 .80
+@item @emph{Interface}: @tab @code{integer function omp_get_initial_device()}
+@end multitable
+
+@item @emph{See also}:
+@ref{omp_get_num_devices}
+
+@item @emph{Reference}:
+@uref{https://www.openmp.org, OpenMP specification v4.5}, Section 3.2.35.
+@end table
+
+
+
 @node omp_get_level
 @section @code{omp_get_level} -- Obtain the current nesting level
 @table @asis
@@ -379,7 +412,7 @@ which enclose the calling call.
 
 
 @node omp_get_max_active_levels
-@section @code{omp_get_max_active_levels} -- Maximum number of active regions
+@section @code{omp_get_max_active_levels} -- Current maximum number of active regions
 @table @asis
 @item @emph{Description}:
 This function obtains the maximum allowed number of nested, active parallel regions.
@@ -458,10 +491,20 @@ This function returns @code{true} if nested parallel regions are
 enabled, @code{false} otherwise.  Here, @code{true} and @code{false}
 represent their language-specific counterparts.
 
-Nested parallel regions may be initialized at startup by the 
-@env{OMP_NESTED} environment variable or at runtime using
-@code{omp_set_nested}.  If undefined, nested parallel regions are
-disabled by default.
+The state of nested parallel regions at startup depends on several
+environment variables.  If @env{OMP_MAX_ACTIVE_LEVELS} is defined
+and is set to greater than one, then nested parallel regions will be
+enabled.  If not defined, then the value of the @env{OMP_NESTED}
+environment variable will be followed if defined.  If neither are
+defined, then if either @env{OMP_NUM_THREADS} or @env{OMP_PROC_BIND}
+are defined with a list of more than one value, then nested parallel
+regions are enabled.  If none of these are defined, then nested parallel
+regions are disabled by default.
+
+Nested parallel regions can be enabled or disabled at runtime using
+@code{omp_set_nested}, or by setting the maximum number of nested
+regions with @code{omp_set_max_active_levels} to one to disable, or
+above one to enable.
 
 @item @emph{C/C++}:
 @multitable @columnfractions .20 .80
@@ -474,7 +517,8 @@ disabled by default.
 @end multitable
 
 @item @emph{See also}:
-@ref{omp_set_nested}, @ref{OMP_NESTED}
+@ref{omp_set_max_active_levels}, @ref{omp_set_nested},
+@ref{OMP_MAX_ACTIVE_LEVELS}, @ref{OMP_NESTED}
 
 @item @emph{Reference}:
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 3.2.11.
@@ -635,6 +679,31 @@ set to the value @code{omp_sched_static}, @code{omp_sched_dynamic},
 
 @item @emph{Reference}:
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 3.2.13.
+@end table
+
+
+@node omp_get_supported_active_levels
+@section @code{omp_get_supported_active_levels} -- Maximum number of active regions supported
+@table @asis
+@item @emph{Description}:
+This function returns the maximum number of nested, active parallel regions
+supported by this implementation.
+
+@item @emph{C/C++}
+@multitable @columnfractions .20 .80
+@item @emph{Prototype}: @tab @code{int omp_get_supported_active_levels(void);}
+@end multitable
+
+@item @emph{Fortran}:
+@multitable @columnfractions .20 .80
+@item @emph{Interface}: @tab @code{integer function omp_get_supported_active_levels()}
+@end multitable
+
+@item @emph{See also}:
+@ref{omp_get_max_active_levels}, @ref{omp_set_max_active_levels}
+
+@item @emph{Reference}:
+@uref{https://www.openmp.org, OpenMP specification v5.0}, Section 3.2.15.
 @end table
 
 
@@ -877,7 +946,8 @@ adjustment of team sizes and @code{false} disables it.
 @table @asis
 @item @emph{Description}:
 This function limits the maximum allowed number of nested, active
-parallel regions.
+parallel regions.  @var{max_levels} must be less or equal to
+the value returned by @code{omp_get_supported_active_levels}.
 
 @item @emph{C/C++}
 @multitable @columnfractions .20 .80
@@ -891,7 +961,8 @@ parallel regions.
 @end multitable
 
 @item @emph{See also}:
-@ref{omp_get_max_active_levels}, @ref{omp_get_active_level}
+@ref{omp_get_max_active_levels}, @ref{omp_get_active_level},
+@ref{omp_get_supported_active_levels}
 
 @item @emph{Reference}:
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 3.2.15.
@@ -908,6 +979,10 @@ are allowed to create new teams.  The function takes the language-specific
 equivalent of @code{true} and @code{false}, where @code{true} enables 
 dynamic adjustment of team sizes and @code{false} disables it.
 
+Enabling nested parallel regions will also set the maximum number of
+active nested regions to the maximum supported.  Disabling nested parallel
+regions will set the maximum number of active nested regions to one.
+
 @item @emph{C/C++}:
 @multitable @columnfractions .20 .80
 @item @emph{Prototype}: @tab @code{void omp_set_nested(int nested);}
@@ -920,7 +995,8 @@ dynamic adjustment of team sizes and @code{false} disables it.
 @end multitable
 
 @item @emph{See also}:
-@ref{OMP_NESTED}, @ref{omp_get_nested}
+@ref{omp_get_nested}, @ref{omp_set_max_active_levels},
+@ref{OMP_MAX_ACTIVE_LEVELS}, @ref{OMP_NESTED}
 
 @item @emph{Reference}:
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 3.2.10.
@@ -1329,6 +1405,36 @@ guaranteed not to change during the execution of the program.
 
 
 
+@node omp_fulfill_event
+@section @code{omp_fulfill_event} -- Fulfill and destroy an OpenMP event
+@table @asis
+@item @emph{Description}:
+Fulfill the event associated with the event handle argument.  Currently, it
+is only used to fulfill events generated by detach clauses on task
+constructs - the effect of fulfilling the event is to allow the task to
+complete.
+
+The result of calling @code{omp_fulfill_event} with an event handle other
+than that generated by a detach clause is undefined.  Calling it with an
+event handle that has already been fulfilled is also undefined.
+
+@item @emph{C/C++}:
+@multitable @columnfractions .20 .80
+@item @emph{Prototype}: @tab @code{void omp_fulfill_event(omp_event_handle_t event);}
+@end multitable
+
+@item @emph{Fortran}:
+@multitable @columnfractions .20 .80
+@item @emph{Interface}: @tab @code{subroutine omp_fulfill_event(event)}
+@item                   @tab @code{integer (kind=omp_event_handle_kind) :: event}
+@end multitable
+
+@item @emph{Reference}:
+@uref{https://www.openmp.org, OpenMP specification v5.0}, Section 3.5.1.
+@end table
+
+
+
 @c ---------------------------------------------------------------------
 @c OpenMP Environment Variables
 @c ---------------------------------------------------------------------
@@ -1353,6 +1459,7 @@ beginning with @env{GOMP_} are GNU extensions.
 * OMP_PLACES::              Specifies on which CPUs the theads should be placed
 * OMP_STACKSIZE::           Set default thread stack size
 * OMP_SCHEDULE::            How threads are scheduled
+* OMP_TARGET_OFFLOAD::      Controls offloading behaviour
 * OMP_THREAD_LIMIT::        Set the maximum number of threads
 * OMP_WAIT_POLICY::         How waiting threads are handled
 * GOMP_CPU_AFFINITY::       Bind threads to specific CPUs
@@ -1445,10 +1552,14 @@ disabled by default.
 @item @emph{Description}:
 Specifies the initial value for the maximum number of nested parallel
 regions.  The value of this variable shall be a positive integer.
-If undefined, the number of active levels is unlimited.
+If undefined, then if @env{OMP_NESTED} is defined and set to true, or
+if @env{OMP_NUM_THREADS} or @env{OMP_PROC_BIND} are defined and set to
+a list with more than one item, the maximum number of nested parallel
+regions will be initialized to the largest number supported, otherwise
+it will be set to one.
 
 @item @emph{See also}:
-@ref{omp_set_max_active_levels}
+@ref{omp_set_max_active_levels}, @ref{OMP_NESTED}
 
 @item @emph{Reference}: 
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 4.9
@@ -1484,11 +1595,16 @@ integer, and zero is allowed.  If undefined, the default priority is
 @item @emph{Description}:
 Enable or disable nested parallel regions, i.e., whether team members
 are allowed to create new teams.  The value of this environment variable 
-shall be @code{TRUE} or @code{FALSE}.  If undefined, nested parallel 
-regions are disabled by default.
+shall be @code{TRUE} or @code{FALSE}.  If set to @code{TRUE}, the number
+of maximum active nested regions supported will by default be set to the
+maximum supported, otherwise it will be set to one.  If
+@env{OMP_MAX_ACTIVE_LEVELS} is defined, its setting will override this
+setting.  If both are undefined, nested parallel regions are enabled if
+@env{OMP_NUM_THREADS} or @env{OMP_PROC_BINDS} are defined to a list with
+more than one item, otherwise they are disabled by default.
 
 @item @emph{See also}:
-@ref{omp_set_nested}
+@ref{omp_set_max_active_levels}, @ref{omp_set_nested}
 
 @item @emph{Reference}: 
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 4.6
@@ -1504,11 +1620,12 @@ regions are disabled by default.
 @item @emph{Description}:
 Specifies the default number of threads to use in parallel regions.  The 
 value of this variable shall be a comma-separated list of positive integers;
-the value specified the number of threads to use for the corresponding nested
-level.  If undefined one thread per CPU is used.
+the value specifies the number of threads to use for the corresponding nested
+level.  Specifying more than one item in the list will automatically enable
+nesting by default.  If undefined one thread per CPU is used.
 
 @item @emph{See also}:
-@ref{omp_set_num_threads}
+@ref{omp_set_num_threads}, @ref{OMP_NESTED}
 
 @item @emph{Reference}: 
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 4.2
@@ -1529,13 +1646,15 @@ the thread affinity policy for the corresponding nesting level.  With
 @code{MASTER} the worker threads are in the same place partition as the
 master thread.  With @code{CLOSE} those are kept close to the master thread
 in contiguous place partitions.  And with @code{SPREAD} a sparse distribution
-across the place partitions is used.
+across the place partitions is used.  Specifying more than one item in the
+list will automatically enable nesting by default.
 
 When undefined, @env{OMP_PROC_BIND} defaults to @code{TRUE} when
 @env{OMP_PLACES} or @env{GOMP_CPU_AFFINITY} is set and @code{FALSE} otherwise.
 
 @item @emph{See also}:
-@ref{OMP_PLACES}, @ref{GOMP_CPU_AFFINITY}, @ref{omp_get_proc_bind}
+@ref{omp_get_proc_bind}, @ref{GOMP_CPU_AFFINITY},
+@ref{OMP_NESTED}, @ref{OMP_PLACES}
 
 @item @emph{Reference}:
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Section 4.4
@@ -1622,6 +1741,30 @@ dynamic scheduling and a chunk size of 1 is used.
 
 @item @emph{Reference}: 
 @uref{https://www.openmp.org, OpenMP specification v4.5}, Sections 2.7.1.1 and 4.1
+@end table
+
+
+
+@node OMP_TARGET_OFFLOAD
+@section @env{OMP_TARGET_OFFLOAD} -- Controls offloading behaviour
+@cindex Environment Variable
+@cindex Implementation specific setting
+@table @asis
+@item @emph{Description}:
+Specifies the behaviour with regard to offloading code to a device.  This
+variable can be set to one of three values - @code{MANDATORY}, @code{DISABLED}
+or @code{DEFAULT}.
+
+If set to @code{MANDATORY}, the program will terminate with an error if
+the offload device is not present or is not supported.  If set to
+@code{DISABLED}, then offloading is disabled and all code will run on the
+host. If set to @code{DEFAULT}, the program will try offloading to the
+device first, then fall back to running code on the host if it cannot.
+
+If undefined, then the program will behave as if @code{DEFAULT} was set.
+
+@item @emph{Reference}:
+@uref{https://www.openmp.org, OpenMP specification v5.0}, Section 6.17
 @end table
 
 

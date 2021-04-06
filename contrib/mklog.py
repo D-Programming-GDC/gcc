@@ -27,8 +27,10 @@
 # Author: Martin Liska <mliska@suse.cz>
 
 import argparse
+import datetime
 import os
 import re
+import subprocess
 import sys
 from itertools import takewhile
 
@@ -47,10 +49,14 @@ macro_regex = re.compile(r'#\s*(define|undef)\s+([a-zA-Z0-9_]+)')
 super_macro_regex = re.compile(r'^DEF[A-Z0-9_]+\s*\(([a-zA-Z0-9_]+)')
 fn_regex = re.compile(r'([a-zA-Z_][^()\s]*)\s*\([^*]')
 template_and_param_regex = re.compile(r'<[^<>]*>')
+md_def_regex = re.compile(r'\(define.*\s+"(.*)"')
 bugzilla_url = 'https://gcc.gnu.org/bugzilla/rest.cgi/bug?id=%s&' \
                'include_fields=summary'
 
-function_extensions = set(['.c', '.cpp', '.C', '.cc', '.h', '.inc', '.def'])
+function_extensions = {'.c', '.cpp', '.C', '.cc', '.h', '.inc', '.def', '.md'}
+
+# NB: Makefile.in isn't listed as it's not always generated.
+generated_files = {'aclocal.m4', 'config.h.in', 'configure'}
 
 help_message = """\
 Generate ChangeLog template for PATCH.
@@ -111,8 +117,8 @@ def sort_changelog_files(changed_file):
 def get_pr_titles(prs):
     output = ''
     for pr in prs:
-        id = pr.split('/')[-1]
-        r = requests.get(bugzilla_url % id)
+        pr_id = pr.split('/')[-1]
+        r = requests.get(bugzilla_url % pr_id)
         bugs = r.json()['bugs']
         if len(bugs) == 1:
             output += '%s - %s\n' % (pr, bugs[0]['summary'])
@@ -130,6 +136,9 @@ def generate_changelog(data, no_functions=False, fill_pr_titles=False):
     diff = PatchSet(data)
 
     for file in diff:
+        # skip files that can't be parsed
+        if file.path == '/dev/null':
+            continue
         changelog = find_changelog(file.path)
         if changelog not in changelogs:
             changelogs[changelog] = []
@@ -186,6 +195,8 @@ def generate_changelog(data, no_functions=False, fill_pr_titles=False):
                 if new_path.startswith(changelog):
                     new_path = new_path[len(changelog):].lstrip('/')
                 out += '\t* %s: ...here.\n' % (new_path)
+            elif os.path.basename(file.path) in generated_files:
+                out += '\t* %s: Regenerate.\n' % (relative_path)
             else:
                 if not no_functions:
                     for hunk in file:
@@ -198,6 +209,15 @@ def generate_changelog(data, no_functions=False, fill_pr_titles=False):
                             for line in hunk:
                                 m = identifier_regex.match(line.value)
                                 if line.is_added or line.is_removed:
+                                    # special-case definition in .md files
+                                    m2 = md_def_regex.match(line.value)
+                                    if extension == '.md' and m2:
+                                        fn = m2.group(1)
+                                        if fn not in functions:
+                                            functions.append(fn)
+                                            last_fn = None
+                                            success = True
+
                                     if not line.value.strip():
                                         continue
                                     modified_visited = True
@@ -227,6 +247,28 @@ def generate_changelog(data, no_functions=False, fill_pr_titles=False):
     return out
 
 
+def update_copyright(data):
+    current_timestamp = datetime.datetime.now().strftime('%Y-%m-%d')
+    username = subprocess.check_output('git config user.name', shell=True,
+                                       encoding='utf8').strip()
+    email = subprocess.check_output('git config user.email', shell=True,
+                                    encoding='utf8').strip()
+
+    changelogs = set()
+    diff = PatchSet(data)
+
+    for file in diff:
+        changelog = os.path.join(find_changelog(file.path), 'ChangeLog')
+        if changelog not in changelogs:
+            changelogs.add(changelog)
+            with open(changelog) as f:
+                content = f.read()
+            with open(changelog, 'w+') as f:
+                f.write(f'{current_timestamp}  {username}  <{email}>\n\n')
+                f.write('\tUpdate copyright years.\n\n')
+                f.write(content)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=help_message)
     parser.add_argument('input', nargs='?',
@@ -238,29 +280,33 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--changelog',
                         help='Append the ChangeLog to a git commit message '
                              'file')
+    parser.add_argument('--update-copyright', action='store_true',
+                        help='Update copyright in ChangeLog files')
     args = parser.parse_args()
     if args.input == '-':
         args.input = None
 
-    input = open(args.input) if args.input else sys.stdin
-    data = input.read()
-    output = generate_changelog(data, args.no_functions,
-                                args.fill_up_bug_titles)
-    if args.changelog:
-        lines = open(args.changelog).read().split('\n')
-        start = list(takewhile(lambda l: not l.startswith('#'), lines))
-        end = lines[len(start):]
-        with open(args.changelog, 'w') as f:
-            if start:
-                # appent empty line
-                if start[-1] != '':
-                    start.append('')
-            else:
-                # append 2 empty lines
-                start = 2 * ['']
-            f.write('\n'.join(start))
-            f.write('\n')
-            f.write(output)
-            f.write('\n'.join(end))
+    data = open(args.input) if args.input else sys.stdin
+    if args.update_copyright:
+        update_copyright(data)
     else:
-        print(output, end='')
+        output = generate_changelog(data, args.no_functions,
+                                    args.fill_up_bug_titles)
+        if args.changelog:
+            lines = open(args.changelog).read().split('\n')
+            start = list(takewhile(lambda l: not l.startswith('#'), lines))
+            end = lines[len(start):]
+            with open(args.changelog, 'w') as f:
+                if start:
+                    # appent empty line
+                    if start[-1] != '':
+                        start.append('')
+                else:
+                    # append 2 empty lines
+                    start = 2 * ['']
+                f.write('\n'.join(start))
+                f.write('\n')
+                f.write(output)
+                f.write('\n'.join(end))
+        else:
+            print(output, end='')

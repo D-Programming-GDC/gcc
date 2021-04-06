@@ -130,6 +130,7 @@ toolexeclibgo_DATA = \
 	bytes.gox \
 	context.gox \
 	crypto.gox \
+	embed.gox \
 	encoding.gox \
 	errors.gox \
 	expvar.gox \
@@ -256,6 +257,11 @@ toolexeclibgogo_DATA = \
 	go/token.gox \
 	go/types.gox
 
+toolexeclibgogobuilddir = $(toolexeclibgogodir)/build
+
+toolexeclibgogobuild_DATA = \
+	go/build/constraint.gox
+
 toolexeclibgohashdir = $(toolexeclibgodir)/hash
 
 toolexeclibgohash_DATA = \
@@ -292,6 +298,7 @@ toolexeclibgoindex_DATA = \
 toolexeclibgoiodir = $(toolexeclibgodir)/io
 
 toolexeclibgoio_DATA = \
+	io/fs.gox \
 	io/ioutil.gox
 
 toolexeclibgologdir = $(toolexeclibgodir)/log
@@ -360,6 +367,7 @@ toolexeclibgoruntimedir = $(toolexeclibgodir)/runtime
 
 toolexeclibgoruntime_DATA = \
 	runtime/debug.gox \
+	runtime/metrics.gox \
 	runtime/pprof.gox \
 	runtime/trace.gox
 
@@ -371,6 +379,7 @@ toolexeclibgosync_DATA = \
 toolexeclibgotestingdir = $(toolexeclibgodir)/testing
 
 toolexeclibgotesting_DATA = \
+	testing/fstest.gox \
 	testing/iotest.gox \
 	testing/quick.gox
 
@@ -439,13 +448,13 @@ runtime_files = \
 	runtime/go-assert.c \
 	runtime/go-caller.c \
 	runtime/go-callers.c \
-	runtime/go-cdiv.c \
 	runtime/go-cgo.c \
 	runtime/go-construct-map.c \
 	runtime/go-ffi.c \
 	runtime/go-fieldtrack.c \
 	runtime/go-matherr.c \
 	runtime/go-memclr.c \
+	runtime/go-memmove.c \
 	runtime/go-memequal.c \
 	runtime/go-nanotime.c \
 	runtime/go-now.c \
@@ -574,6 +583,48 @@ s-gccgosizes: Makefile goarch.sh
 	$(SHELL) $(srcdir)/mvifdiff.sh gccgosizes.go.tmp gccgosizes.go
 	$(STAMP) $@
 
+os_linknames.go: s-os_linknames; @true
+s-os_linknames: os-list gen-sysinfo.go $(srcdir)/mklinknames.awk $(srcdir)/go/os/*.go
+	rm -f os_linknames.go.tmp
+	$(AWK) -f $(srcdir)/mklinknames.awk -v package=os `cat os-list` > os_linknames.go.tmp
+	$(SHELL) $(srcdir)/mvifdiff.sh os_linknames.go.tmp os_linknames.go
+	$(STAMP) $@
+
+os-list: s-os-list; @true
+s-os-list: Makefile $(srcdir)/go/os/*.go
+	rm -f os-list.tmp
+	$(SHELL) $(srcdir)/match.sh --goarch=$(GOARCH) --goos=$(GOOS) --srcdir=$(srcdir)/go/os > os-list.tmp
+	$(SHELL) $(srcdir)/mvifdiff.sh os-list.tmp os-list
+	$(STAMP) $@
+
+os_user_linknames.go: s-os_user_linknames; @true
+s-os_user_linknames: os-user-list gen-sysinfo.go $(srcdir)/mklinknames.awk $(srcdir)/go/os/user/*.go
+	rm -f os_user_linknames.go.tmp
+	$(AWK) -f $(srcdir)/mklinknames.awk -v package=user `cat os-user-list` > os_user_linknames.go.tmp
+	$(SHELL) $(srcdir)/mvifdiff.sh os_user_linknames.go.tmp os_user_linknames.go
+	$(STAMP) $@
+
+os-user-list: s-os-user-list; @true
+s-os-user-list: Makefile $(srcdir)/go/os/user/*.go
+	rm -f os-user-list.tmp
+	$(SHELL) $(srcdir)/match.sh --goarch=$(GOARCH) --goos=$(GOOS) --srcdir=$(srcdir)/go/os/user > os-user-list.tmp
+	$(SHELL) $(srcdir)/mvifdiff.sh os-user-list.tmp os-user-list
+	$(STAMP) $@
+
+runtime_linknames.go: s-runtime_linknames; @true
+s-runtime_linknames: runtime-list gen-sysinfo.go $(srcdir)/mklinknames.awk $(srcdir)/go/runtime/*.go
+	rm -f runtime_linknames.go.tmp
+	$(AWK) -f $(srcdir)/mklinknames.awk -v package=runtime `cat runtime-list` > runtime_linknames.go.tmp
+	$(SHELL) $(srcdir)/mvifdiff.sh runtime_linknames.go.tmp runtime_linknames.go
+	$(STAMP) $@
+
+runtime-list: s-runtime-list; @true
+s-runtime-list: Makefile $(srcdir)/go/runtime/*.go
+	rm -f runtime-list.tmp
+	$(SHELL) $(srcdir)/match.sh --goarch=$(GOARCH) --goos=$(GOOS) --srcdir=$(srcdir)/go/runtime > runtime-list.tmp
+	$(SHELL) $(srcdir)/mvifdiff.sh runtime-list.tmp runtime-list
+	$(STAMP) $@
+
 runtime_sysinfo.go: s-runtime_sysinfo; @true
 s-runtime_sysinfo: $(srcdir)/mkrsysinfo.sh gen-sysinfo.go
 	GOARCH=$(GOARCH) GOOS=$(GOOS) $(SHELL) $(srcdir)/mkrsysinfo.sh
@@ -615,7 +666,7 @@ noinst_DATA += zdefaultcc.go
 
 # Generate the list of go std packages that were included in libgo
 zstdpkglist.go: s-zstdpkglist; @true
-s-zstdpkglist: Makefile
+s-zstdpkglist: Makefile libgo-packages.txt
 	rm -f zstdpkglist.go.tmp
 	echo 'package goroot' > zstdpkglist.go.tmp
 	echo "" >> zstdpkglist.go.tmp
@@ -652,6 +703,13 @@ s-syscall_arch: Makefile
 	echo 'const ARCH = "'$(GOARCH)'"' >> syscall_arch.go.tmp
 	echo 'const OS = "'$(GOOS)'"' >> syscall_arch.go.tmp
 	$(SHELL) $(srcdir)/mvifdiff.sh syscall_arch.go.tmp syscall_arch.go
+	$(STAMP) $@
+
+syscall_linknames.go: s-syscall_linknames; @true
+s-syscall_linknames: libcalls.go gen-sysinfo.go $(srcdir)/mklinknames.awk
+	rm -f syscall_linknames.go.tmp
+	$(AWK) -v package=syscall -f $(srcdir)/mklinknames.awk libcalls.go > syscall_linknames.go.tmp
+	$(SHELL) $(srcdir)/mvifdiff.sh syscall_linknames.go.tmp syscall_linknames.go
 	$(STAMP) $@
 
 SYSINFO_FLAGS = \
@@ -727,6 +785,7 @@ libgo_go_objs = \
 	syscall/errno.lo \
 	syscall/signame.lo \
 	syscall/wait.lo \
+	os/dir_gccgo_c.lo \
 	$(golangorg_x_net_lif_lo) \
 	$(golangorg_x_net_route_lo) \
 	log/syslog/syslog_c.lo \
@@ -832,7 +891,7 @@ GOBENCH =
 CHECK = \
 	GC="$(GOC) $(GOCFLAGS) $($(subst /,_,$@)_GOCFLAGS) -L `${PWD_COMMAND}` -L `${PWD_COMMAND}`/.libs"; \
 	export GC; \
-	GOLIBS="$(extra_check_libs_$(subst .,_,$(subst /,_,$(@D)))) $(MATH_LIBS) $(NET_LIBS) $(LIBS)"; \
+	GOLIBS="$(extra_check_libs_$(subst .,_,$(subst /,_,$(@D)))) $(PTHREAD_LIBS) $(MATH_LIBS) $(NET_LIBS) $(LIBS)"; \
 	export GOLIBS; \
 	RUNTESTFLAGS="$(RUNTESTFLAGS)"; \
 	export RUNTESTFLAGS; \
@@ -940,8 +999,8 @@ $(foreach package,$(GOTOOL_PACKAGES),$(eval $(call PACKAGE_template,$(package)))
 math_lo_GOCFLAGS = $(MATH_FLAG)
 math_check_GOCFLAGS = $(MATH_FLAG)
 
-# Add the generated file runtime_sysinfo.go to the runtime package.
-extra_go_files_runtime = runtime_sysinfo.go sigtab.go
+# Add generated files to the runtime package.
+extra_go_files_runtime = runtime_linknames.go runtime_sysinfo.go sigtab.go
 runtime.lo.dep: $(extra_go_files_runtime)
 
 # Add generated files to the syscall package.
@@ -949,6 +1008,7 @@ extra_go_files_syscall = \
 	libcalls.go \
 	sysinfo.go \
 	syscall_arch.go \
+	syscall_linknames.go \
 	$(syscall_epoll_file)
 syscall.lo.dep: $(extra_go_files_syscall)
 
@@ -972,6 +1032,12 @@ endif
 # otherwise we can't get the line numbers.
 # Also use -fno-inline to get better results from the memory profiler.
 runtime_pprof_check_GOCFLAGS = -static-libgo -fno-inline
+
+if LIBGO_IS_AIX
+# reflect tests must be done with -static-libgo. Otherwize,
+# there will be a duplication of the canonicalization map.
+reflect_check_GOCFLAGS = -static-libgo -Wl,-bbigtoc
+endif
 
 if HAVE_STATIC_LINK
 # Use -static for the syscall tests if possible, because otherwise when
@@ -1000,7 +1066,14 @@ cmd/internal/objabi.lo.dep: $(extra_go_files_cmd_internal_objabi)
 extra_go_files_cmd_go_internal_cfg = zdefaultcc.go
 cmd/go/internal/cfg.lo.dep: $(extra_go_files_cmd_go_internal_cfg)
 
+extra_go_files_os = os_linknames.go
+os.lo.dep: $(extra_go_files_os)
+
+extra_go_files_os_user = os_user_linknames.go
+os/user.lo.dep: $(extra_go_files_os_user)
+
 extra_check_libs_cmd_go_internal_cache = $(abs_builddir)/libgotool.a
+extra_check_libs_cmd_go_internal_fsys = $(abs_builddir)/libgotool.a
 extra_check_libs_cmd_go_internal_generate = $(abs_builddir)/libgotool.a
 extra_check_libs_cmd_go_internal_get = $(abs_builddir)/libgotool.a
 extra_check_libs_cmd_go_internal_load = $(abs_builddir)/libgotool.a
@@ -1014,9 +1087,13 @@ extra_check_libs_cmd_go_internal_modload = $(abs_builddir)/libgotool.a
 extra_check_libs_cmd_go_internal_module = $(abs_builddir)/libgotool.a
 extra_check_libs_cmd_go_internal_mvs = $(abs_builddir)/libgotool.a
 extra_check_libs_cmd_go_internal_search = $(abs_builddir)/libgotool.a
+extra_check_libs_cmd_go_internal_str = $(abs_builddir)/libgotool.a
 extra_check_libs_cmd_go_internal_test = $(abs_builddir)/libgotool.a
+extra_check_libs_cmd_go_internal_vcs = $(abs_builddir)/libgotool.a
 extra_check_libs_cmd_go_internal_web2 = $(abs_builddir)/libgotool.a
 extra_check_libs_cmd_go_internal_work = $(abs_builddir)/libgotool.a
+
+extra_check_libs_cmd_internal_buildid = $(abs_builddir)/libgotool.a
 
 extra_check_libs_cmd_vet_internal_cfg = $(abs_builddir)/libgotool.a
 
@@ -1061,6 +1138,11 @@ syscall/wait.lo: go/syscall/wait.c runtime.inc
 	@$(MKDIR_P) syscall
 	$(LTCOMPILE) -c -o $@ $(srcdir)/go/syscall/wait.c
 
+# An os function is written in C.
+os/dir_gccgo_c.lo: go/os/dir_gccgo_c.c runtime.inc
+	@$(MKDIR_P) os
+	$(LTCOMPILE) -c -o $@ $(srcdir)/go/os/dir_gccgo_c.c
+
 # internal/cpu needs some C code.
 internal/cpu/cpu_gccgo.lo: go/internal/cpu/cpu_gccgo.c runtime.inc
 	@$(MKDIR_P) internal/cpu
@@ -1090,7 +1172,7 @@ if LIBGO_IS_BSD
 $(eval $(call PACKAGE_template,golang.org/x/net/route))
 
 golangorg_x_net_route_lo = \
-	golang.org/net/route.lo
+	golang.org/x/net/route.lo
 
 endif
 

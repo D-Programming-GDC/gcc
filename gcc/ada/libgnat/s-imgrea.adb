@@ -29,10 +29,9 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
-with System.Img_LLU;        use System.Img_LLU;
-with System.Img_Uns;        use System.Img_Uns;
-with System.Powten_Table;   use System.Powten_Table;
-with System.Unsigned_Types; use System.Unsigned_Types;
+with System.Img_LLU;    use System.Img_LLU;
+with System.Img_Uns;    use System.Img_Uns;
+with System.Powten_LLF; use System.Powten_LLF;
 with System.Float_Control;
 
 package body System.Img_Real is
@@ -48,10 +47,10 @@ package body System.Img_Real is
    --  in very high precision floating-point output.
 
    --  Note that in the following, the "-2" accounts for the sign and one
-   --  extra digits, since we need the maximum number of 9's that can be
-   --  supported, e.g. for the normal 64 bit case, Long_Long_Integer'Width
-   --  is 21, since the maximum value (approx 1.6 * 10**19) has 20 digits,
-   --  but the maximum number of 9's that can be supported is 19.
+   --  extra digit, since we need the maximum number of 9's that can be
+   --  represented, e.g. for the 64-bit case, Long_Long_Unsigned'Width is
+   --  21, since the maximum value (approx 1.8E+19) has 20 digits, but the
+   --  maximum number of 9's that can be represented is only 19.
 
    Maxdigs : constant :=
                Natural'Min
@@ -59,7 +58,6 @@ package body System.Img_Real is
 
    Unsdigs : constant := Unsigned'Width - 2;
    --  Number of digits that can be converted using type Unsigned
-   --  See above for the explanation of the -2.
 
    Maxscaling : constant := 5000;
    --  Max decimal scaling required during conversion of floating-point
@@ -89,16 +87,18 @@ package body System.Img_Real is
       --  Decide whether a blank should be prepended before the call to
       --  Set_Image_Real. We generate a blank for positive values, and
       --  also for positive zeroes. For negative zeroes, we generate a
-      --  space only if Signed_Zeroes is True (the RM only permits the
-      --  output of -0.0 on targets where this is the case). We can of
-      --  course still see a -0.0 on a target where Signed_Zeroes is
-      --  False (since this attribute refers to the proper handling of
-      --  negative zeroes, not to their existence). We do not generate
+      --  blank only if Signed_Zeros is False (the RM only permits the
+      --  output of -0.0 when Signed_Zeros is True). We do not generate
       --  a blank for positive infinity, since we output an explicit +.
 
       if (not Is_Negative (V) and then V <= Long_Long_Float'Last)
         or else (not Long_Long_Float'Signed_Zeros and then V = -0.0)
       then
+         pragma Annotate (CodePeer, False_Positive, "condition predetermined",
+                          "CodePeer analysis ignores NaN and Inf values");
+         pragma Assert (S'Last > 1);
+         --  The caller is responsible for S to be large enough for all
+         --  Image_Floating_Point operation.
          S (1) := ' ';
          P := 1;
       else
@@ -146,7 +146,7 @@ package body System.Img_Real is
       Exp  : Natural)
    is
       NFrac : constant Natural := Natural'Max (Aft, 1);
-      Sign  : Character;
+      Minus : Boolean;
       X     : Long_Long_Float;
       Scale : Integer;
       Expon : Integer;
@@ -372,6 +372,7 @@ package body System.Img_Real is
          --  be significantly more efficient than the Long_Long_Unsigned one.
 
          if X < Powten (Unsdigs) then
+            pragma Assert (X in 0.0 .. Long_Long_Float (Unsigned'Last));
             Ndigs := 0;
             Set_Image_Unsigned
               (Unsigned (Long_Long_Float'Truncation (X)),
@@ -381,6 +382,10 @@ package body System.Img_Real is
          --  the Long_Long_Unsigned routine after all.
 
          else
+            pragma Assert (X < Powten (Maxdigs));
+            pragma Assert
+              (X in 0.0 .. Long_Long_Float (Long_Long_Unsigned'Last));
+
             Ndigs := 0;
             Set_Image_Long_Long_Unsigned
               (Long_Long_Unsigned (Long_Long_Float'Truncation (X)),
@@ -394,6 +399,12 @@ package body System.Img_Real is
 
       procedure Set (C : Character) is
       begin
+         pragma Assert (P in S'First - 1 .. S'Last - 1);
+         --  No check is done as documented in the header: updating P to point
+         --  to the last character stored, the caller promises that the buffer
+         --  is large enough and no check is made for this. Constraint_Error
+         --  will not necessarily be raised if this requirement is violated,
+         --  since it is perfectly valid to compile this unit with checks off.
          P := P + 1;
          S (P) := C;
       end Set;
@@ -404,7 +415,7 @@ package body System.Img_Real is
 
       procedure Set_Blanks_And_Sign (N : Integer) is
       begin
-         if Sign = '-' then
+         if Minus then
             for J in 1 .. N - 1 loop
                Set (' ');
             end loop;
@@ -424,6 +435,8 @@ package body System.Img_Real is
 
       procedure Set_Digs (S, E : Natural) is
       begin
+         pragma Assert (S >= Digs'First and E <= Digs'Last);
+         --  S and E should be in the Digs array range
          for J in S .. E loop
             Set (Digs (J));
          end loop;
@@ -437,9 +450,13 @@ package body System.Img_Real is
          F : Natural;
 
       begin
+         pragma Assert ((Fore + Aft - N + 1) in Natural);
+         --  Fore + Aft - N + 1 should be in the Natural range
          F := Fore + 1 + Aft - N;
 
          if Exp /= 0 then
+            pragma Assert (F + Exp + 1 <= Natural'Last);
+            --  F + Exp + 1 should be in the Natural range
             F := F + Exp + 1;
          end if;
 
@@ -462,10 +479,10 @@ package body System.Img_Real is
    --  Start of processing for Set_Image_Real
 
    begin
-      --  We call the floating-point processor reset routine so that we can
-      --  be sure the floating-point processor is properly set for conversion
-      --  calls. This is notably need on Windows, where calls to the operating
-      --  system randomly reset the processor into 64-bit mode.
+      --  We call the floating-point processor reset routine so we can be sure
+      --  that the processor is properly set for conversions. This is notably
+      --  needed on Windows, where calls to the operating system randomly reset
+      --  the processor into 64-bit mode.
 
       System.Float_Control.Reset;
 
@@ -487,15 +504,15 @@ package body System.Img_Real is
          --  an infinite value, so we print Inf.
 
          if V > Long_Long_Float'Last then
-            pragma Annotate
-              (CodePeer, Intentional, "test always true", "test for infinity");
-
+            pragma Annotate (CodePeer, False_Positive, "dead code",
+                             "CodePeer analysis ignores NaN and Inf values");
+            pragma Annotate (CodePeer, False_Positive, "test always true",
+                             "CodePeer analysis ignores NaN and Inf values");
             Set ('+');
             Set ('I');
             Set ('n');
             Set ('f');
             Set_Special_Fill (4);
-
          --  In all other cases we print NaN
 
          elsif V < Long_Long_Float'First then
@@ -504,7 +521,6 @@ package body System.Img_Real is
             Set ('n');
             Set ('f');
             Set_Special_Fill (4);
-
          else
             Set ('N');
             Set ('a');
@@ -519,21 +535,21 @@ package body System.Img_Real is
 
       if V > 0.0 then
          X := V;
-         Sign := '+';
+         Minus := False;
 
       --  Negative values
 
       elsif V < 0.0 then
          X := -V;
-         Sign := '-';
+         Minus := True;
 
       --  Zero values
 
       elsif V = 0.0 then
          if Long_Long_Float'Signed_Zeros and then Is_Negative (V) then
-            Sign := '-';
+            Minus := True;
          else
-            Sign := '+';
+            Minus := False;
          end if;
 
          Set_Blanks_And_Sign (Fore - 1);
@@ -558,7 +574,7 @@ package body System.Img_Real is
          raise Constraint_Error;
       end if;
 
-      --  X and Sign are set here, and X is known to be a valid,
+      --  X and Minus are set here, and X is known to be a valid,
       --  non-zero floating-point number.
 
       --  Case of non-zero value with Exp = 0
@@ -597,6 +613,7 @@ package body System.Img_Real is
 
                   for J in 1 .. Scale + NF loop
                      Ndigs := Ndigs + 1;
+                     pragma Assert (Ndigs <= Digs'Last);
                      Digs (Ndigs) := '0';
                   end loop;
 
@@ -663,6 +680,7 @@ package body System.Img_Real is
 
             for J in 1 .. NFrac - Maxdigs + 1 loop
                Ndigs := Ndigs + 1;
+               pragma Assert (Ndigs <= Digs'Last);
                Digs (Ndigs) := '0';
                Scale := Scale - 1;
             end loop;

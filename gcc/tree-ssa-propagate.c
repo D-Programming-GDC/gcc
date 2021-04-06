@@ -1,5 +1,5 @@
 /* Generic SSA value propagation engine.
-   Copyright (C) 2004-2020 Free Software Foundation, Inc.
+   Copyright (C) 2004-2021 Free Software Foundation, Inc.
    Contributed by Diego Novillo <dnovillo@redhat.com>
 
    This file is part of GCC.
@@ -868,7 +868,7 @@ substitute_and_fold_engine::replace_uses_in (gimple *stmt)
   FOR_EACH_SSA_USE_OPERAND (use, stmt, iter, SSA_OP_USE)
     {
       tree tuse = USE_FROM_PTR (use);
-      tree val = get_value (tuse, stmt);
+      tree val = value_of_expr (tuse, stmt);
 
       if (val == tuse || val == NULL_TREE)
 	continue;
@@ -909,12 +909,11 @@ substitute_and_fold_engine::replace_phi_args_in (gphi *phi)
 
       if (TREE_CODE (arg) == SSA_NAME)
 	{
-	  tree val = get_value (arg, phi);
+	  edge e = gimple_phi_arg_edge (phi, i);
+	  tree val = value_on_edge (e, arg);
 
 	  if (val && val != arg && may_propagate_copy (arg, val))
 	    {
-	      edge e = gimple_phi_arg_edge (phi, i);
-
 	      if (TREE_CODE (val) != SSA_NAME)
 		prop_stats.num_const_prop++;
 	      else
@@ -1036,7 +1035,7 @@ substitute_and_fold_engine::propagate_into_phi_args (basic_block bb)
 	  if (TREE_CODE (arg) != SSA_NAME
 	      || virtual_operand_p (arg))
 	    continue;
-	  tree val = get_value (arg, phi);
+	  tree val = value_on_edge (e, arg);
 	  if (val
 	      && is_gimple_min_invariant (val)
 	      && may_propagate_copy (arg, val))
@@ -1070,7 +1069,7 @@ substitute_and_fold_dom_walker::before_dom_children (basic_block bb)
 	}
       if (res && TREE_CODE (res) == SSA_NAME)
 	{
-	  tree sprime = substitute_and_fold_engine->get_value (res, phi);
+	  tree sprime = substitute_and_fold_engine->value_of_expr (res, phi);
 	  if (sprime
 	      && sprime != res
 	      && may_propagate_copy (res, sprime))
@@ -1110,7 +1109,7 @@ substitute_and_fold_dom_walker::before_dom_children (basic_block bb)
       tree lhs = gimple_get_lhs (stmt);
       if (lhs && TREE_CODE (lhs) == SSA_NAME)
 	{
-	  tree sprime = substitute_and_fold_engine->get_value (lhs, stmt);
+	  tree sprime = substitute_and_fold_engine->value_of_expr (lhs, stmt);
 	  if (sprime
 	      && sprime != lhs
 	      && may_propagate_copy (lhs, sprime)
@@ -1549,4 +1548,64 @@ propagate_tree_value_into_stmt (gimple_stmt_iterator *gsi, tree val)
     propagate_tree_value (gimple_switch_index_ptr (swtch_stmt), val);
   else
     gcc_unreachable ();
+}
+
+/* Check exits of each loop in FUN, walk over loop closed PHIs in
+   each exit basic block and propagate degenerate PHIs.  */
+
+unsigned
+clean_up_loop_closed_phi (function *fun)
+{
+  unsigned i;
+  edge e;
+  gphi *phi;
+  tree rhs;
+  tree lhs;
+  gphi_iterator gsi;
+  struct loop *loop;
+
+  /* Avoid possibly quadratic work when scanning for loop exits across
+   all loops of a nest.  */
+  if (!loops_state_satisfies_p (LOOPS_HAVE_RECORDED_EXITS))
+    return 0;
+
+  /* replace_uses_by might purge dead EH edges and we want it to also
+     remove dominated blocks.  */
+  calculate_dominance_info  (CDI_DOMINATORS);
+
+  /* Walk over loop in function.  */
+  FOR_EACH_LOOP_FN (fun, loop, 0)
+    {
+      /* Check each exit edege of loop.  */
+      auto_vec<edge> exits = get_loop_exit_edges (loop);
+      FOR_EACH_VEC_ELT (exits, i, e)
+	if (single_pred_p (e->dest))
+	  /* Walk over loop-closed PHIs.  */
+	  for (gsi = gsi_start_phis (e->dest); !gsi_end_p (gsi);)
+	    {
+	      phi = gsi.phi ();
+	      rhs = gimple_phi_arg_def (phi, 0);
+	      lhs = gimple_phi_result (phi);
+
+	      if (rhs && may_propagate_copy (lhs, rhs))
+		{
+		  /* Dump details.  */
+		  if (dump_file && (dump_flags & TDF_DETAILS))
+		    {
+		      fprintf (dump_file, "  Replacing '");
+		      print_generic_expr (dump_file, lhs, dump_flags);
+		      fprintf (dump_file, "' with '");
+		      print_generic_expr (dump_file, rhs, dump_flags);
+		      fprintf (dump_file, "'\n");
+		    }
+
+		  replace_uses_by (lhs, rhs);
+		  remove_phi_node (&gsi, true);
+		}
+	      else
+		gsi_next (&gsi);
+	    }
+    }
+
+  return 0;
 }

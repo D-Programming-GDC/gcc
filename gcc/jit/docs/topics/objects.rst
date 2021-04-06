@@ -1,4 +1,4 @@
-.. Copyright (C) 2014-2020 Free Software Foundation, Inc.
+.. Copyright (C) 2014-2021 Free Software Foundation, Inc.
    Originally contributed by David Malcolm <dmalcolm@redhat.com>
 
    This is free software: you can redistribute it and/or modify it
@@ -48,6 +48,7 @@ looks like this::
           +- gcc_jit_lvalue
              +- gcc_jit_param
       +- gcc_jit_case
+      +- gcc_jit_extended_asm
 
 There are casting methods for upcasting from subclasses to parent classes.
 For example, :c:func:`gcc_jit_type_as_object`:

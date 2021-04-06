@@ -1,5 +1,5 @@
 ;; Machine description for AArch64 architecture.
-;; Copyright (C) 2009-2020 Free Software Foundation, Inc.
+;; Copyright (C) 2009-2021 Free Software Foundation, Inc.
 ;; Contributed by ARM Ltd.
 ;;
 ;; This file is part of GCC.
@@ -215,6 +215,9 @@
 ;; Advanced SIMD modes for Integer reduction across lanes (zero/sign extended).
 (define_mode_iterator VDQV_E [V8QI V16QI V4HI V8HI])
 
+;; Advanced SIMD modes for Integer widening reduction across lanes.
+(define_mode_iterator VDQV_L [V8QI V16QI V4HI V8HI V4SI V2SI])
+
 ;; All double integer narrow-able modes.
 (define_mode_iterator VDN [V4HI V2SI DI])
 
@@ -400,7 +403,7 @@
 (define_mode_iterator SVE_ALL [VNx16QI VNx8QI VNx4QI VNx2QI
 			       VNx8HI VNx4HI VNx2HI
 			       VNx8HF VNx4HF VNx2HF
-			       VNx8BF
+			       VNx8BF VNx4BF VNx2BF
 			       VNx4SI VNx2SI
 			       VNx4SF VNx2SF
 			       VNx2DI
@@ -418,11 +421,17 @@
 				VNx2DI])
 
 ;; SVE modes with 2 or 4 elements.
-(define_mode_iterator SVE_24 [VNx2QI VNx2HI VNx2HF VNx2SI VNx2SF VNx2DI VNx2DF
-			      VNx4QI VNx4HI VNx4HF VNx4SI VNx4SF])
+(define_mode_iterator SVE_24 [VNx2QI VNx2HI VNx2HF VNx2BF VNx2SI VNx2SF
+			      VNx2DI VNx2DF
+			      VNx4QI VNx4HI VNx4HF VNx4BF VNx4SI VNx4SF])
+
+;; SVE integer modes with 2 or 4 elements.
+(define_mode_iterator SVE_24I [VNx2QI VNx2HI VNx2SI VNx2DI
+			       VNx4QI VNx4HI VNx4SI])
 
 ;; SVE modes with 2 elements.
-(define_mode_iterator SVE_2 [VNx2QI VNx2HI VNx2HF VNx2SI VNx2SF VNx2DI VNx2DF])
+(define_mode_iterator SVE_2 [VNx2QI VNx2HI VNx2HF VNx2BF
+			     VNx2SI VNx2SF VNx2DI VNx2DF])
 
 ;; SVE integer modes with 2 elements, excluding the widest element.
 (define_mode_iterator SVE_2BHSI [VNx2QI VNx2HI VNx2SI])
@@ -431,7 +440,7 @@
 (define_mode_iterator SVE_2HSDI [VNx2HI VNx2SI VNx2DI])
 
 ;; SVE modes with 4 elements.
-(define_mode_iterator SVE_4 [VNx4QI VNx4HI VNx4HF VNx4SI VNx4SF])
+(define_mode_iterator SVE_4 [VNx4QI VNx4HI VNx4HF VNx4BF VNx4SI VNx4SF])
 
 ;; SVE integer modes with 4 elements, excluding the widest element.
 (define_mode_iterator SVE_4BHI [VNx4QI VNx4HI])
@@ -486,6 +495,8 @@
     UNSPEC_FMINV	; Used in aarch64-simd.md.
     UNSPEC_FADDV	; Used in aarch64-simd.md.
     UNSPEC_ADDV		; Used in aarch64-simd.md.
+    UNSPEC_SADDLV	; Used in aarch64-simd.md.
+    UNSPEC_UADDLV	; Used in aarch64-simd.md.
     UNSPEC_SMAXV	; Used in aarch64-simd.md.
     UNSPEC_SMINV	; Used in aarch64-simd.md.
     UNSPEC_UMAXV	; Used in aarch64-simd.md.
@@ -511,6 +522,7 @@
     UNSPEC_USQADD	; Used in aarch64-simd.md.
     UNSPEC_SUQADD	; Used in aarch64-simd.md.
     UNSPEC_SQXTUN	; Used in aarch64-simd.md.
+    UNSPEC_SQXTUN2	; Used in aarch64-simd.md.
     UNSPEC_SQXTN	; Used in aarch64-simd.md.
     UNSPEC_UQXTN	; Used in aarch64-simd.md.
     UNSPEC_SSRA		; Used in aarch64-simd.md.
@@ -621,6 +633,7 @@
     UNSPEC_REVB		; Used in aarch64-sve.md.
     UNSPEC_REVH		; Used in aarch64-sve.md.
     UNSPEC_REVW		; Used in aarch64-sve.md.
+    UNSPEC_REVBHW	; Used in aarch64-sve.md.
     UNSPEC_SMUL_HIGHPART ; Used in aarch64-sve.md.
     UNSPEC_UMUL_HIGHPART ; Used in aarch64-sve.md.
     UNSPEC_FMLA		; Used in aarch64-sve.md.
@@ -705,6 +718,10 @@
     UNSPEC_FCMLA90	; Used in aarch64-simd.md.
     UNSPEC_FCMLA180	; Used in aarch64-simd.md.
     UNSPEC_FCMLA270	; Used in aarch64-simd.md.
+    UNSPEC_FCMUL	; Used in aarch64-simd.md.
+    UNSPEC_FCMUL_CONJ	; Used in aarch64-simd.md.
+    UNSPEC_FCMLA_CONJ	; Used in aarch64-simd.md.
+    UNSPEC_FCMLA180_CONJ	; Used in aarch64-simd.md.
     UNSPEC_ASRD		; Used in aarch64-sve.md.
     UNSPEC_ADCLB	; Used in aarch64-sve2.md.
     UNSPEC_ADCLT	; Used in aarch64-sve2.md.
@@ -723,6 +740,10 @@
     UNSPEC_CMLA180	; Used in aarch64-sve2.md.
     UNSPEC_CMLA270	; Used in aarch64-sve2.md.
     UNSPEC_CMLA90	; Used in aarch64-sve2.md.
+    UNSPEC_CMLA_CONJ	; Used in aarch64-sve2.md.
+    UNSPEC_CMLA180_CONJ	; Used in aarch64-sve2.md.
+    UNSPEC_CMUL		; Used in aarch64-sve2.md.
+    UNSPEC_CMUL_CONJ	; Used in aarch64-sve2.md.
     UNSPEC_COND_FCVTLT	; Used in aarch64-sve2.md.
     UNSPEC_COND_FCVTNT	; Used in aarch64-sve2.md.
     UNSPEC_COND_FCVTX	; Used in aarch64-sve2.md.
@@ -968,6 +989,16 @@
 			     (VNx4SI "32") (VNx2DI "64")
 			     (VNx8HF "16") (VNx4SF "32") (VNx2DF "64")])
 
+;; The number of bits in a vector container.
+(define_mode_attr container_bits [(VNx16QI "8")
+				  (VNx8HI "16") (VNx8QI "16") (VNx8HF "16")
+				  (VNx8BF "16")
+				  (VNx4SI "32") (VNx4HI "32") (VNx4QI "32")
+				  (VNx4SF "32") (VNx4HF "32") (VNx4BF "32")
+				  (VNx2DI "64") (VNx2SI "64") (VNx2HI "64")
+				  (VNx2QI "64") (VNx2DF "64") (VNx2SF "64")
+				  (VNx2HF "64") (VNx2BF "64")])
+
 ;; Attribute to describe constants acceptable in logical operations
 (define_mode_attr lconst [(SI "K") (DI "L")])
 
@@ -1029,7 +1060,7 @@
 			  (VNx16QI "b") (VNx8QI "b") (VNx4QI "b") (VNx2QI "b")
 			  (VNx8HI "h") (VNx4HI "h") (VNx2HI "h")
 			  (VNx8HF "h") (VNx4HF "h") (VNx2HF "h")
-			  (VNx8BF "h")
+			  (VNx8BF "h") (VNx4BF "h") (VNx2BF "h")
 			  (VNx4SI "s") (VNx2SI "s")
 			  (VNx4SF "s") (VNx2SF "s")
 			  (VNx2DI "d")
@@ -1047,7 +1078,7 @@
 (define_mode_attr Vesize [(VNx16QI "b") (VNx8QI "b") (VNx4QI "b") (VNx2QI "b")
 			  (VNx8HI "h") (VNx4HI "h") (VNx2HI "h")
 			  (VNx8HF "h") (VNx4HF "h") (VNx2HF "h")
-			  (VNx8BF "h")
+			  (VNx8BF "h") (VNx4BF "h") (VNx2BF "h")
 			  (VNx4SI "w") (VNx2SI "w")
 			  (VNx4SF "w") (VNx2SF "w")
 			  (VNx2DI "d")
@@ -1066,11 +1097,22 @@
 (define_mode_attr Vctype [(VNx16QI "b") (VNx8QI "h") (VNx4QI "s") (VNx2QI "d")
 			  (VNx8HI "h") (VNx4HI "s") (VNx2HI "d")
 			  (VNx8HF "h") (VNx4HF "s") (VNx2HF "d")
-			  (VNx8BF "h")
+			  (VNx8BF "h") (VNx4BF "s") (VNx2BF "d")
 			  (VNx4SI "s") (VNx2SI "d")
 			  (VNx4SF "s") (VNx2SF "d")
 			  (VNx2DI "d")
 			  (VNx2DF "d")])
+
+;; The instruction mnemonic suffix for an SVE mode's element container,
+;; i.e. the Vewtype of full SVE modes that have the same number of elements.
+(define_mode_attr Vcwtype [(VNx16QI "b") (VNx8QI "h") (VNx4QI "w") (VNx2QI "d")
+			   (VNx8HI "h") (VNx4HI "w") (VNx2HI "d")
+			   (VNx8HF "h") (VNx4HF "w") (VNx2HF "d")
+			   (VNx8BF "h") (VNx4BF "w") (VNx2BF "d")
+			   (VNx4SI "w") (VNx2SI "d")
+			   (VNx4SF "w") (VNx2SF "d")
+			   (VNx2DI "d")
+			   (VNx2DF "d")])
 
 ;; Vetype is used everywhere in scheduling type and assembly output,
 ;; sometimes they are not the same, for example HF modes on some
@@ -1107,7 +1149,7 @@
 		       (VNx16QI "QI") (VNx8QI "QI") (VNx4QI "QI") (VNx2QI "QI")
 		       (VNx8HI "HI") (VNx4HI "HI") (VNx2HI "HI")
 		       (VNx8HF "HF") (VNx4HF "HF") (VNx2HF "HF")
-		       (VNx8BF "BF")
+		       (VNx8BF "BF") (VNx4BF "BF") (VNx2BF "BF")
 		       (VNx4SI "SI") (VNx2SI "SI")
 		       (VNx4SF "SF") (VNx2SF "SF")
 		       (VNx2DI "DI")
@@ -1127,7 +1169,7 @@
 		       (VNx16QI "qi") (VNx8QI "qi") (VNx4QI "qi") (VNx2QI "qi")
 		       (VNx8HI "hi") (VNx4HI "hi") (VNx2HI "hi")
 		       (VNx8HF "hf") (VNx4HF "hf") (VNx2HF "hf")
-		       (VNx8BF "bf")
+		       (VNx8BF "bf") (VNx4BF "bf") (VNx2BF "bf")
 		       (VNx4SI "si") (VNx2SI "si")
 		       (VNx4SF "sf") (VNx2SF "sf")
 		       (VNx2DI "di")
@@ -1263,9 +1305,28 @@
 
 ;; Widened mode register suffixes for VD_BHSI/VQW/VQ_HSF.
 (define_mode_attr Vwtype [(V8QI "8h") (V4HI "4s")
-			  (V2SI "2d") (V16QI "8h") 
+			  (V2SI "2d") (V16QI "8h")
 			  (V8HI "4s") (V4SI "2d")
 			  (V8HF "4s") (V4SF "2d")])
+
+;; Widened scalar register suffixes.
+(define_mode_attr Vwstype [(V8QI "h") (V4HI "s")
+			  (V2SI "") (V16QI "h")
+			  (V8HI "s") (V4SI "d")])
+;; Add a .1d for V2SI.
+(define_mode_attr Vwsuf [(V8QI "") (V4HI "")
+			  (V2SI ".1d") (V16QI "")
+			  (V8HI "") (V4SI "")])
+
+;; Scalar mode of widened vector reduction.
+(define_mode_attr VWIDE_S [(V8QI "HI") (V4HI "SI")
+			  (V2SI "DI") (V16QI "HI")
+			  (V8HI "SI") (V4SI "DI")])
+
+;; Widened mode with half the element register suffixes for VD_BHSI/VQW/VQ_HSF.
+(define_mode_attr Vwhalf [(V8QI "4h") (V4HI "2s")
+			  (V2SI "1d") (V16QI "8h")
+			  (V8HI "4s") (V4SI "2d")])
 
 ;; SVE vector after narrowing.
 (define_mode_attr Ventype [(VNx8HI "b")
@@ -1280,7 +1341,7 @@
 
 ;; Widened mode register suffixes for VDW/VQW.
 (define_mode_attr Vmwtype [(V8QI ".8h") (V4HI ".4s")
-			   (V2SI ".2d") (V16QI ".8h") 
+			   (V2SI ".2d") (V16QI ".8h")
 			   (V8HI ".4s") (V4SI ".2d")
 			   (V4HF ".4s") (V2SF ".2d")
 			   (SI   "")    (HI   "")])
@@ -1310,7 +1371,7 @@
 			  (VNx16QI "w") (VNx8QI "w") (VNx4QI "w") (VNx2QI "w")
 			  (VNx8HI "w") (VNx4HI "w") (VNx2HI "w")
 			  (VNx8HF "w") (VNx4HF "w") (VNx2HF "w")
-			  (VNx8BF "w")
+			  (VNx8BF "w") (VNx4BF "w") (VNx2BF "w")
 			  (VNx4SI "w") (VNx2SI "w")
 			  (VNx4SF "w") (VNx2SF "w")
 			  (VNx2DI "x")
@@ -1380,6 +1441,8 @@
 				   (VNx2DI "VNx2DI")
 				   (VNx8HF "VNx8HI") (VNx4HF "VNx4SI")
 				   (VNx2HF "VNx2DI")
+				   (VNx8BF "VNx8HI") (VNx4BF "VNx4SI")
+				   (VNx2BF "VNx2DI")
 				   (VNx4SF "VNx4SI") (VNx2SF "VNx2DI")
 				   (VNx2DF "VNx2DI")])
 
@@ -1392,6 +1455,8 @@
 				   (VNx2DI "vnx2di")
 				   (VNx8HF "vnx8hi") (VNx4HF "vnx4si")
 				   (VNx2HF "vnx2di")
+				   (VNx8BF "vnx8hi") (VNx4BF "vnx4si")
+				   (VNx2BF "vnx2di")
 				   (VNx4SF "vnx4si") (VNx2SF "vnx2di")
 				   (VNx2DF "vnx2di")])
 
@@ -1412,6 +1477,9 @@
 			   (DI   "di") (V2DI  "di")
 			   (QI   "qi") (HI    "hi")
 			   (SI   "si")])
+
+;; Like ve_mode but for the half-width modes.
+(define_mode_attr vn_mode [(V8HI  "qi") (V4SI  "hi") (V2DI  "si")])
 
 ;; Vm for lane instructions is restricted to FP_LO_REGS.
 (define_mode_attr vwx [(V4HI "x") (V8HI "x") (HI "x")
@@ -1617,7 +1685,7 @@
 			 (VNx4QI "VNx4BI") (VNx2QI "VNx2BI")
 			 (VNx8HI "VNx8BI") (VNx4HI "VNx4BI") (VNx2HI "VNx2BI")
 			 (VNx8HF "VNx8BI") (VNx4HF "VNx4BI") (VNx2HF "VNx2BI")
-			 (VNx8BF "VNx8BI")
+			 (VNx8BF "VNx8BI") (VNx4BF "VNx4BI") (VNx2BF "VNx2BI")
 			 (VNx4SI "VNx4BI") (VNx2SI "VNx2BI")
 			 (VNx4SF "VNx4BI") (VNx2SF "VNx2BI")
 			 (VNx2DI "VNx2BI")
@@ -1643,7 +1711,7 @@
 			 (VNx4QI "vnx4bi") (VNx2QI "vnx2bi")
 			 (VNx8HI "vnx8bi") (VNx4HI "vnx4bi") (VNx2HI "vnx2bi")
 			 (VNx8HF "vnx8bi") (VNx4HF "vnx4bi") (VNx2HF "vnx2bi")
-			 (VNx8BF "vnx8bi")
+			 (VNx8BF "vnx8bi") (VNx4BF "vnx4bi") (VNx2BF "vnx2bi")
 			 (VNx4SI "vnx4bi") (VNx2SI "vnx2bi")
 			 (VNx4SF "vnx4bi") (VNx2SF "vnx2bi")
 			 (VNx2DI "vnx2bi")
@@ -1796,6 +1864,9 @@
 
 ;; Unsigned comparison operators.
 (define_code_iterator FAC_COMPARISONS [lt le ge gt])
+
+;; Signed and unsigned saturating truncations.
+(define_code_iterator SAT_TRUNC [ss_truncate us_truncate])
 
 ;; SVE integer unary operations.
 (define_code_iterator SVE_INT_UNARY [abs neg not clrsb clz popcount
@@ -1950,7 +2021,8 @@
 		      (fix "s") (unsigned_fix "u")
 		      (div "s") (udiv "u")
 		      (smax "s") (umax "u")
-		      (smin "s") (umin "u")])
+		      (smin "s") (umin "u")
+		      (ss_truncate "s") (us_truncate "u")])
 
 ;; "s" for signed ops, empty for unsigned ones.
 (define_code_attr s [(sign_extend "s") (zero_extend "")])
@@ -2118,6 +2190,12 @@
 ;; The unspec codes for the SABAL, UABAL AdvancedSIMD instructions.
 (define_int_iterator ABAL [UNSPEC_SABAL UNSPEC_UABAL])
 
+;; The unspec codes for the SABDL, UABDL AdvancedSIMD instructions.
+(define_int_iterator ABDL [UNSPEC_SABDL UNSPEC_UABDL])
+
+;; The unspec codes for the SABAL2, UABAL2 AdvancedSIMD instructions.
+(define_int_iterator ABAL2 [UNSPEC_SABAL2 UNSPEC_UABAL2])
+
 ;; The unspec codes for the SABDL2, UABDL2 AdvancedSIMD instructions.
 (define_int_iterator ABDL2 [UNSPEC_SABDL2 UNSPEC_UABDL2])
 
@@ -2131,6 +2209,8 @@
 			       UNSPEC_FMAXNMV UNSPEC_FMINNMV])
 
 (define_int_iterator SVE_INT_ADDV [UNSPEC_SADDV UNSPEC_UADDV])
+
+(define_int_iterator USADDLV [UNSPEC_SADDLV UNSPEC_UADDLV])
 
 (define_int_iterator LOGICALF [UNSPEC_ANDF UNSPEC_IORF UNSPEC_XORF])
 
@@ -2570,6 +2650,24 @@
 				    UNSPEC_SQRDCMLAH180
 				    UNSPEC_SQRDCMLAH270])
 
+;; Unlike the normal CMLA instructions these represent the actual operation
+;; to be performed.  They will always need to be expanded into multiple
+;; sequences consisting of CMLA.
+(define_int_iterator SVE2_INT_CMLA_OP [UNSPEC_CMLA
+				       UNSPEC_CMLA_CONJ
+				       UNSPEC_CMLA180
+				       UNSPEC_CMLA180_CONJ])
+
+;; Unlike the normal CMLA instructions these represent the actual operation
+;; to be performed.  They will always need to be expanded into multiple
+;; sequences consisting of CMLA.
+(define_int_iterator SVE2_INT_CMUL_OP [UNSPEC_CMUL
+				       UNSPEC_CMUL_CONJ])
+
+;; Same as SVE2_INT_CADD but exclude the saturating instructions
+(define_int_iterator SVE2_INT_CADD_OP [UNSPEC_CADD90
+				       UNSPEC_CADD270])
+
 (define_int_iterator SVE2_INT_CDOT [UNSPEC_CDOT
 				    UNSPEC_CDOT90
 				    UNSPEC_CDOT180
@@ -2679,6 +2777,14 @@
 
 (define_int_iterator BF_MLA [UNSPEC_BFMLALB
 			     UNSPEC_BFMLALT])
+
+(define_int_iterator FCMLA_OP [UNSPEC_FCMLA
+			       UNSPEC_FCMLA180
+			       UNSPEC_FCMLA_CONJ
+			       UNSPEC_FCMLA180_CONJ])
+
+(define_int_iterator FCMUL_OP [UNSPEC_FCMUL
+			       UNSPEC_FCMUL_CONJ])
 
 ;; Iterators for atomic operations.
 
@@ -2856,6 +2962,8 @@
 ;; "s" for signed operations and "u" for unsigned ones.
 (define_int_attr su [(UNSPEC_SADDV "s")
 		     (UNSPEC_UADDV "u")
+		     (UNSPEC_SADDLV "s")
+		     (UNSPEC_UADDLV "u")
 		     (UNSPEC_UNPACKSHI "s")
 		     (UNSPEC_UNPACKUHI "u")
 		     (UNSPEC_UNPACKSLO "s")
@@ -2874,6 +2982,8 @@
 		      (UNSPEC_SHSUB "s") (UNSPEC_UHSUB "u")
 		      (UNSPEC_ADDHN "") (UNSPEC_RADDHN "r")
 		      (UNSPEC_SABAL "s") (UNSPEC_UABAL "u")
+		      (UNSPEC_SABAL2 "s") (UNSPEC_UABAL2 "u")
+		      (UNSPEC_SABDL "s") (UNSPEC_UABDL "u")
 		      (UNSPEC_SABDL2 "s") (UNSPEC_UABDL2 "u")
 		      (UNSPEC_SADALP "s") (UNSPEC_UADALP "u")
 		      (UNSPEC_SUBHN "") (UNSPEC_RSUBHN "r")
@@ -3390,7 +3500,80 @@
 		      (UNSPEC_COND_FCMLA "0")
 		      (UNSPEC_COND_FCMLA90 "90")
 		      (UNSPEC_COND_FCMLA180 "180")
-		      (UNSPEC_COND_FCMLA270 "270")])
+		      (UNSPEC_COND_FCMLA270 "270")
+		      (UNSPEC_FCMUL "0")
+		      (UNSPEC_FCMUL_CONJ "180")])
+
+;; A conjucate is a negation of the imaginary component
+;; The number in the unspecs are the rotation component of the instruction, e.g
+;; FCMLA180 means use the instruction with #180.
+;; The iterator is used to produce the right name mangling for the function.
+(define_int_attr conj_op [(UNSPEC_FCMLA180 "")
+			  (UNSPEC_FCMLA180_CONJ "_conj")
+			  (UNSPEC_FCMLA "")
+			  (UNSPEC_FCMLA_CONJ "_conj")
+			  (UNSPEC_FCMUL "")
+			  (UNSPEC_FCMUL_CONJ "_conj")
+			  (UNSPEC_CMLA "")
+			  (UNSPEC_CMLA180 "")
+			  (UNSPEC_CMLA180_CONJ "_conj")
+			  (UNSPEC_CMLA_CONJ "_conj")
+			  (UNSPEC_CMUL "")
+			  (UNSPEC_CMUL_CONJ "_conj")])
+
+;; The complex operations when performed on a real complex number require two
+;; instructions to perform the operation. e.g. complex multiplication requires
+;; two FCMUL with a particular rotation value.
+;;
+;; These values can be looked up in rotsplit1 and rotsplit2.  as an example
+;; FCMUL needs the first instruction to use #0 and the second #90.
+(define_int_attr rotsplit1 [(UNSPEC_FCMLA "0")
+			    (UNSPEC_FCMLA_CONJ "0")
+			    (UNSPEC_FCMUL "0")
+			    (UNSPEC_FCMUL_CONJ "0")
+			    (UNSPEC_FCMLA180 "180")
+			    (UNSPEC_FCMLA180_CONJ "180")])
+
+(define_int_attr rotsplit2 [(UNSPEC_FCMLA "90")
+			    (UNSPEC_FCMLA_CONJ "270")
+			    (UNSPEC_FCMUL "90")
+			    (UNSPEC_FCMUL_CONJ "270")
+			    (UNSPEC_FCMLA180 "270")
+			    (UNSPEC_FCMLA180_CONJ "90")])
+
+;; SVE has slightly different namings from NEON so we have to split these
+;; iterators.
+(define_int_attr sve_rot1 [(UNSPEC_FCMLA "")
+			   (UNSPEC_FCMLA_CONJ "")
+			   (UNSPEC_FCMUL "")
+			   (UNSPEC_FCMUL_CONJ "")
+			   (UNSPEC_FCMLA180 "180")
+			   (UNSPEC_FCMLA180_CONJ "180")
+			   (UNSPEC_CMLA "")
+			   (UNSPEC_CMLA_CONJ "")
+			   (UNSPEC_CMUL "")
+			   (UNSPEC_CMUL_CONJ "")
+			   (UNSPEC_CMLA180 "180")
+			   (UNSPEC_CMLA180_CONJ "180")])
+
+(define_int_attr sve_rot2 [(UNSPEC_FCMLA "90")
+			   (UNSPEC_FCMLA_CONJ "270")
+			   (UNSPEC_FCMUL "90")
+			   (UNSPEC_FCMUL_CONJ "270")
+			   (UNSPEC_FCMLA180 "270")
+			   (UNSPEC_FCMLA180_CONJ "90")
+			   (UNSPEC_CMLA "90")
+			   (UNSPEC_CMLA_CONJ "270")
+			   (UNSPEC_CMUL "90")
+			   (UNSPEC_CMUL_CONJ "270")
+			   (UNSPEC_CMLA180 "270")
+			   (UNSPEC_CMLA180_CONJ "90")])
+
+
+(define_int_attr fcmac1 [(UNSPEC_FCMLA "a") (UNSPEC_FCMLA_CONJ "a")
+			 (UNSPEC_FCMLA180 "s") (UNSPEC_FCMLA180_CONJ "s")
+			 (UNSPEC_CMLA "a") (UNSPEC_CMLA_CONJ "a")
+			 (UNSPEC_CMLA180 "s") (UNSPEC_CMLA180_CONJ "s")])
 
 (define_int_attr sve_fmla_op [(UNSPEC_COND_FMLA "fmla")
 			      (UNSPEC_COND_FMLS "fmls")

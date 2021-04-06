@@ -1,5 +1,5 @@
 /* Machine description for AArch64 architecture.
-   Copyright (C) 2009-2020 Free Software Foundation, Inc.
+   Copyright (C) 2009-2021 Free Software Foundation, Inc.
    Contributed by ARM Ltd.
 
    This file is part of GCC.
@@ -192,6 +192,29 @@ struct cpu_regmove_cost
   const int FP2FP;
 };
 
+struct simd_vec_cost
+{
+  const int int_stmt_cost;		/* Cost of any int vector operation,
+					   excluding load, store, permute,
+					   vector-to-scalar and
+					   scalar-to-vector operation.  */
+  const int fp_stmt_cost;		 /* Cost of any fp vector operation,
+					    excluding load, store, permute,
+					    vector-to-scalar and
+					    scalar-to-vector operation.  */
+  const int permute_cost;		 /* Cost of permute operation.  */
+  const int vec_to_scalar_cost;		 /* Cost of vec-to-scalar operation.  */
+  const int scalar_to_vec_cost;		 /* Cost of scalar-to-vector
+					    operation.  */
+  const int align_load_cost;	 /* Cost of aligned vector load.  */
+  const int unalign_load_cost;	 /* Cost of unaligned vector load.  */
+  const int unalign_store_cost;	 /* Cost of unaligned vector store.  */
+  const int store_cost;		 /* Cost of vector store.  */
+};
+
+typedef struct simd_vec_cost advsimd_vec_cost;
+typedef struct simd_vec_cost sve_vec_cost;
+
 /* Cost for vector insn classes.  */
 struct cpu_vector_cost
 {
@@ -201,24 +224,10 @@ struct cpu_vector_cost
 					    excluding load and store.  */
   const int scalar_load_cost;		 /* Cost of scalar load.  */
   const int scalar_store_cost;		 /* Cost of scalar store.  */
-  const int vec_int_stmt_cost;		 /* Cost of any int vector operation,
-					    excluding load, store, permute,
-					    vector-to-scalar and
-					    scalar-to-vector operation.  */
-  const int vec_fp_stmt_cost;		 /* Cost of any fp vector operation,
-					    excluding load, store, permute,
-					    vector-to-scalar and
-					    scalar-to-vector operation.  */
-  const int vec_permute_cost;		 /* Cost of permute operation.  */
-  const int vec_to_scalar_cost;		 /* Cost of vec-to-scalar operation.  */
-  const int scalar_to_vec_cost;		 /* Cost of scalar-to-vector
-					    operation.  */
-  const int vec_align_load_cost;	 /* Cost of aligned vector load.  */
-  const int vec_unalign_load_cost;	 /* Cost of unaligned vector load.  */
-  const int vec_unalign_store_cost;	 /* Cost of unaligned vector store.  */
-  const int vec_store_cost;		 /* Cost of vector store.  */
   const int cond_taken_branch_cost;	 /* Cost of taken branch.  */
   const int cond_not_taken_branch_cost;  /* Cost of not taken branch.  */
+  const advsimd_vec_cost *advsimd;	 /* Cost of Advanced SIMD operations.  */
+  const sve_vec_cost *sve;		 /* Cost of SVE operations.  */
 };
 
 /* Branch costs.  */
@@ -510,6 +519,7 @@ bool aarch64_emit_approx_div (rtx, rtx, rtx);
 bool aarch64_emit_approx_sqrt (rtx, rtx, bool);
 void aarch64_expand_call (rtx, rtx, rtx, bool);
 bool aarch64_expand_cpymem (rtx *);
+bool aarch64_expand_setmem (rtx *);
 bool aarch64_float_const_zero_rtx_p (rtx);
 bool aarch64_float_const_rtx_p (rtx);
 bool aarch64_function_arg_regno_p (unsigned);
@@ -630,7 +640,6 @@ void aarch64_expand_mov_immediate (rtx, rtx);
 rtx aarch64_stack_protect_canary_mem (machine_mode, rtx, aarch64_salt_type);
 rtx aarch64_ptrue_reg (machine_mode);
 rtx aarch64_pfalse_reg (machine_mode);
-bool aarch64_sve_pred_dominates_p (rtx *, rtx);
 bool aarch64_sve_same_pred_for_ptest_p (rtx *, rtx *);
 void aarch64_emit_sve_pred_move (rtx, rtx, rtx);
 void aarch64_expand_sve_mem_move (rtx, rtx, machine_mode);
@@ -781,6 +790,7 @@ rtl_opt_pass *make_pass_fma_steering (gcc::context *);
 rtl_opt_pass *make_pass_track_speculation (gcc::context *);
 rtl_opt_pass *make_pass_tag_collision_avoidance (gcc::context *);
 rtl_opt_pass *make_pass_insert_bti (gcc::context *ctxt);
+rtl_opt_pass *make_pass_cc_fusion (gcc::context *ctxt);
 
 poly_uint64 aarch64_regmode_natural_size (machine_mode);
 

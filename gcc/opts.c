@@ -1,5 +1,5 @@
 /* Command line option handling.
-   Copyright (C) 2002-2020 Free Software Foundation, Inc.
+   Copyright (C) 2002-2021 Free Software Foundation, Inc.
    Contributed by Neil Booth.
 
 This file is part of GCC.
@@ -32,6 +32,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "spellcheck.h"
 #include "opt-suggestions.h"
 #include "diagnostic-color.h"
+#include "version.h"
 #include "selftest.h"
 
 static void set_Wstrict_aliasing (struct gcc_options *opts, int onoff);
@@ -688,30 +689,26 @@ control_options_for_live_patching (struct gcc_options *opts,
     {
     case LIVE_PATCHING_INLINE_ONLY_STATIC:
       if (opts_set->x_flag_ipa_cp_clone && opts->x_flag_ipa_cp_clone)
-	error_at (loc,
-		  "%<-fipa-cp-clone%> is incompatible with "
-		  "%<-flive-patching=inline-only-static%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-cp-clone", "-flive-patching=inline-only-static");
       else
 	opts->x_flag_ipa_cp_clone = 0;
 
       if (opts_set->x_flag_ipa_sra && opts->x_flag_ipa_sra)
-	error_at (loc,
-		  "%<-fipa-sra%> is incompatible with "
-		  "%<-flive-patching=inline-only-static%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-sra", "-flive-patching=inline-only-static");
       else
 	opts->x_flag_ipa_sra = 0;
 
       if (opts_set->x_flag_partial_inlining && opts->x_flag_partial_inlining)
-	error_at (loc,
-		  "%<-fpartial-inlining%> is incompatible with "
-		  "%<-flive-patching=inline-only-static%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fpartial-inlining", "-flive-patching=inline-only-static");
       else
 	opts->x_flag_partial_inlining = 0;
 
       if (opts_set->x_flag_ipa_cp && opts->x_flag_ipa_cp)
-	error_at (loc,
-		  "%<-fipa-cp%> is incompatible with "
-		  "%<-flive-patching=inline-only-static%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-cp", "-flive-patching=inline-only-static");
       else
 	opts->x_flag_ipa_cp = 0;
 
@@ -719,9 +716,9 @@ control_options_for_live_patching (struct gcc_options *opts,
     case LIVE_PATCHING_INLINE_CLONE:
       /* live patching should disable whole-program optimization.  */
       if (opts_set->x_flag_whole_program && opts->x_flag_whole_program)
-	error_at (loc,
-		  "%<-fwhole-program%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fwhole-program",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_whole_program = 0;
 
@@ -730,65 +727,65 @@ control_options_for_live_patching (struct gcc_options *opts,
 	 && !flag_partial_inlining.  */
 
       if (opts_set->x_flag_ipa_pta && opts->x_flag_ipa_pta)
-	error_at (loc,
-		  "%<-fipa-pta%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-pta",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_ipa_pta = 0;
 
       if (opts_set->x_flag_ipa_reference && opts->x_flag_ipa_reference)
-	error_at (loc,
-		  "%<-fipa-reference%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-reference",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_ipa_reference = 0;
 
       if (opts_set->x_flag_ipa_ra && opts->x_flag_ipa_ra)
-	error_at (loc,
-		  "%<-fipa-ra%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-ra",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_ipa_ra = 0;
 
       if (opts_set->x_flag_ipa_icf && opts->x_flag_ipa_icf)
-	error_at (loc,
-		  "%<-fipa-icf%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-icf",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_ipa_icf = 0;
 
       if (opts_set->x_flag_ipa_icf_functions && opts->x_flag_ipa_icf_functions)
-	error_at (loc,
-		  "%<-fipa-icf-functions%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-icf-functions",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_ipa_icf_functions = 0;
 
       if (opts_set->x_flag_ipa_icf_variables && opts->x_flag_ipa_icf_variables)
-	error_at (loc,
-		  "%<-fipa-icf-variables%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-icf-variables",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_ipa_icf_variables = 0;
 
       if (opts_set->x_flag_ipa_bit_cp && opts->x_flag_ipa_bit_cp)
-	error_at (loc,
-		  "%<-fipa-bit-cp%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-bit-cp",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_ipa_bit_cp = 0;
 
       if (opts_set->x_flag_ipa_vrp && opts->x_flag_ipa_vrp)
-	error_at (loc,
-		  "%<-fipa-vrp%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-vrp",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_ipa_vrp = 0;
 
       if (opts_set->x_flag_ipa_pure_const && opts->x_flag_ipa_pure_const)
-	error_at (loc,
-		  "%<-fipa-pure-const%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-pure-const",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_ipa_pure_const = 0;
 
@@ -804,18 +801,18 @@ control_options_for_live_patching (struct gcc_options *opts,
       /* discovery of functions/variables with no address taken.  */
       if (opts_set->x_flag_ipa_reference_addressable
 	  && opts->x_flag_ipa_reference_addressable)
-	error_at (loc,
-		  "%<-fipa-reference-addressable%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-reference-addressable",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_ipa_reference_addressable = 0;
 
       /* ipa stack alignment propagation.  */
       if (opts_set->x_flag_ipa_stack_alignment
 	  && opts->x_flag_ipa_stack_alignment)
-	error_at (loc,
-		  "%<-fipa-stack-alignment%> is incompatible with "
-		  "%<-flive-patching=inline-only-static|inline-clone%>");
+	error_at (loc, "%qs is incompatible with %qs",
+		  "-fipa-stack-alignment",
+		  "-flive-patching=inline-only-static|inline-clone");
       else
 	opts->x_flag_ipa_stack_alignment = 0;
       break;
@@ -827,6 +824,57 @@ control_options_for_live_patching (struct gcc_options *opts,
 /* --help option argument if set.  */
 vec<const char *> help_option_arguments;
 
+/* Return the string name describing a sanitizer argument which has been
+   provided on the command line and has set this particular flag.  */
+const char *
+find_sanitizer_argument (struct gcc_options *opts, unsigned int flags)
+{
+  for (int i = 0; sanitizer_opts[i].name != NULL; ++i)
+    {
+      /* Need to find the sanitizer_opts element which:
+	 a) Could have set the flags requested.
+	 b) Has been set on the command line.
+
+	 Can have (a) without (b) if the flag requested is e.g.
+	 SANITIZE_ADDRESS, since both -fsanitize=address and
+	 -fsanitize=kernel-address set this flag.
+
+	 Can have (b) without (a) by requesting more than one sanitizer on the
+	 command line.  */
+      if ((sanitizer_opts[i].flag & opts->x_flag_sanitize)
+	  != sanitizer_opts[i].flag)
+	continue;
+      if ((sanitizer_opts[i].flag & flags) != flags)
+	continue;
+      return sanitizer_opts[i].name;
+    }
+  return NULL;
+}
+
+
+/* Report an error to the user about sanitizer options they have requested
+   which have set conflicting flags.
+
+   LEFT and RIGHT indicate sanitizer flags which conflict with each other, this
+   function reports an error if both have been set in OPTS->x_flag_sanitize and
+   ensures the error identifies the requested command line options that have
+   set these flags.  */
+static void
+report_conflicting_sanitizer_options (struct gcc_options *opts, location_t loc,
+				      unsigned int left, unsigned int right)
+{
+  unsigned int left_seen = (opts->x_flag_sanitize & left);
+  unsigned int right_seen = (opts->x_flag_sanitize & right);
+  if (left_seen && right_seen)
+    {
+      const char* left_arg = find_sanitizer_argument (opts, left_seen);
+      const char* right_arg = find_sanitizer_argument (opts, right_seen);
+      gcc_assert (left_arg && right_arg);
+      error_at (loc,
+		"%<-fsanitize=%s%> is incompatible with %<-fsanitize=%s%>",
+		left_arg, right_arg);
+    }
+}
 
 /* After all options at LOC have been read into OPTS and OPTS_SET,
    finalize settings of those options and diagnose incompatible
@@ -1078,24 +1126,22 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
 		  "%<-fsanitize=address%> or %<-fsanitize=kernel-address%>");
     }
 
-  /* Userspace and kernel ASan conflict with each other.  */
-  if ((opts->x_flag_sanitize & SANITIZE_USER_ADDRESS)
-      && (opts->x_flag_sanitize & SANITIZE_KERNEL_ADDRESS))
-    error_at (loc,
-	      "%<-fsanitize=address%> is incompatible with "
-	      "%<-fsanitize=kernel-address%>");
+  /* Address sanitizers conflict with the thread sanitizer.  */
+  report_conflicting_sanitizer_options (opts, loc, SANITIZE_THREAD,
+					SANITIZE_ADDRESS | SANITIZE_HWADDRESS);
+  /* The leak sanitizer conflicts with the thread sanitizer.  */
+  report_conflicting_sanitizer_options (opts, loc, SANITIZE_LEAK,
+					SANITIZE_THREAD);
 
-  /* And with TSan.  */
-  if ((opts->x_flag_sanitize & SANITIZE_ADDRESS)
-      && (opts->x_flag_sanitize & SANITIZE_THREAD))
-    error_at (loc,
-	      "%<-fsanitize=address%> and %<-fsanitize=kernel-address%> "
-	      "are incompatible with %<-fsanitize=thread%>");
+  /* No combination of HWASAN and ASAN work together.  */
+  report_conflicting_sanitizer_options (opts, loc,
+					SANITIZE_HWADDRESS, SANITIZE_ADDRESS);
 
-  if ((opts->x_flag_sanitize & SANITIZE_LEAK)
-      && (opts->x_flag_sanitize & SANITIZE_THREAD))
-    error_at (loc,
-	      "%<-fsanitize=leak%> is incompatible with %<-fsanitize=thread%>");
+  /* The userspace and kernel address sanitizers conflict with each other.  */
+  report_conflicting_sanitizer_options (opts, loc, SANITIZE_USER_HWADDRESS,
+					SANITIZE_KERNEL_HWADDRESS);
+  report_conflicting_sanitizer_options (opts, loc, SANITIZE_USER_ADDRESS,
+					SANITIZE_KERNEL_ADDRESS);
 
   /* Check error recovery for -fsanitize-recover option.  */
   for (int i = 0; sanitizer_opts[i].name != NULL; ++i)
@@ -1114,9 +1160,10 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
   if (opts->x_flag_sanitize & ~(SANITIZE_LEAK | SANITIZE_UNREACHABLE))
     opts->x_flag_aggressive_loop_optimizations = 0;
 
-  /* Enable -fsanitize-address-use-after-scope if address sanitizer is
+  /* Enable -fsanitize-address-use-after-scope if either address sanitizer is
      enabled.  */
-  if (opts->x_flag_sanitize & SANITIZE_USER_ADDRESS)
+  if (opts->x_flag_sanitize
+      & (SANITIZE_USER_ADDRESS | SANITIZE_USER_HWADDRESS))
     SET_OPTION_IF_UNSET (opts, opts_set, flag_sanitize_address_use_after_scope,
 			 true);
 
@@ -1730,7 +1777,12 @@ const struct sanitizer_opts_s sanitizer_opts[] =
 #define SANITIZER_OPT(name, flags, recover) \
     { #name, flags, sizeof #name - 1, recover }
   SANITIZER_OPT (address, (SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS), true),
+  SANITIZER_OPT (hwaddress, (SANITIZE_HWADDRESS | SANITIZE_USER_HWADDRESS),
+		 true),
   SANITIZER_OPT (kernel-address, (SANITIZE_ADDRESS | SANITIZE_KERNEL_ADDRESS),
+		 true),
+  SANITIZER_OPT (kernel-hwaddress,
+		 (SANITIZE_HWADDRESS | SANITIZE_KERNEL_HWADDRESS),
 		 true),
   SANITIZER_OPT (pointer-compare, SANITIZE_POINTER_COMPARE, true),
   SANITIZER_OPT (pointer-subtract, SANITIZE_POINTER_SUBTRACT, true),
@@ -1774,6 +1826,24 @@ const struct sanitizer_opts_s coverage_sanitizer_opts[] =
   COVERAGE_SANITIZER_OPT (trace-cmp, SANITIZE_COV_TRACE_CMP),
 #undef COVERAGE_SANITIZER_OPT
   { NULL, 0U, 0UL, false }
+};
+
+/* -fzero-call-used-regs= suboptions.  */
+const struct zero_call_used_regs_opts_s zero_call_used_regs_opts[] =
+{
+#define ZERO_CALL_USED_REGS_OPT(name, flags) \
+    { #name, flags }
+  ZERO_CALL_USED_REGS_OPT (skip, zero_regs_flags::SKIP),
+  ZERO_CALL_USED_REGS_OPT (used-gpr-arg, zero_regs_flags::USED_GPR_ARG),
+  ZERO_CALL_USED_REGS_OPT (used-gpr, zero_regs_flags::USED_GPR),
+  ZERO_CALL_USED_REGS_OPT (used-arg, zero_regs_flags::USED_ARG),
+  ZERO_CALL_USED_REGS_OPT (used, zero_regs_flags::USED),
+  ZERO_CALL_USED_REGS_OPT (all-gpr-arg, zero_regs_flags::ALL_GPR_ARG),
+  ZERO_CALL_USED_REGS_OPT (all-gpr, zero_regs_flags::ALL_GPR),
+  ZERO_CALL_USED_REGS_OPT (all-arg, zero_regs_flags::ALL_ARG),
+  ZERO_CALL_USED_REGS_OPT (all, zero_regs_flags::ALL),
+#undef ZERO_CALL_USED_REGS_OPT
+  {NULL, 0U}
 };
 
 /* A struct for describing a run of chars within a string.  */
@@ -1970,6 +2040,27 @@ parse_no_sanitize_attribute (char *value)
   return flags;
 }
 
+/* Parse -fzero-call-used-regs suboptions from ARG, return the FLAGS.  */
+
+unsigned int
+parse_zero_call_used_regs_options (const char *arg)
+{
+  unsigned int flags = 0;
+
+  /* Check to see if the string matches a sub-option name.  */
+  for (unsigned int i = 0; zero_call_used_regs_opts[i].name != NULL; ++i)
+    if (strcmp (arg, zero_call_used_regs_opts[i].name) == 0)
+      {
+	flags = zero_call_used_regs_opts[i].flag;
+	break;
+      }
+
+  if (!flags)
+    error ("unrecognized argument to %<-fzero-call-used-regs=%>: %qs", arg);
+
+  return flags;
+}
+
 /* Parse -falign-NAME format for a FLAG value.  Return individual
    parsed integer values into RESULT_VALUES array.  If REPORT_ERROR is
    set, print error message at LOC location.  */
@@ -2037,6 +2128,44 @@ check_alignment_argument (location_t loc, const char *flag, const char *name,
       *opt_flag = 1;
       *opt_str = NULL;
     }
+}
+
+/* Parse argument of -fpatchable-function-entry option ARG and store
+   corresponding values to PATCH_AREA_SIZE and PATCH_AREA_START.
+   If REPORT_ERROR is set to true, generate error for a problematic
+   option arguments.  */
+
+void
+parse_and_check_patch_area (const char *arg, bool report_error,
+			    HOST_WIDE_INT *patch_area_size,
+			    HOST_WIDE_INT *patch_area_start)
+{
+  *patch_area_size = 0;
+  *patch_area_start = 0;
+
+  if (arg == NULL)
+    return;
+
+  char *patch_area_arg = xstrdup (arg);
+  char *comma = strchr (patch_area_arg, ',');
+  if (comma)
+    {
+      *comma = '\0';
+      *patch_area_size = integral_argument (patch_area_arg);
+      *patch_area_start = integral_argument (comma + 1);
+    }
+  else
+    *patch_area_size = integral_argument (patch_area_arg);
+
+  if (*patch_area_size < 0
+      || *patch_area_size > USHRT_MAX
+      || *patch_area_start < 0
+      || *patch_area_start > USHRT_MAX
+      || *patch_area_size < *patch_area_start)
+    if (report_error)
+      error ("invalid arguments for %<-fpatchable-function-entry%>");
+
+  free (patch_area_arg);
 }
 
 /* Print help when OPT__help_ is set.  */
@@ -2271,6 +2400,15 @@ common_handle_option (struct gcc_options *opts,
 	  SET_OPTION_IF_UNSET (opts, opts_set, param_asan_protect_allocas, 0);
 	  SET_OPTION_IF_UNSET (opts, opts_set, param_asan_use_after_return, 0);
 	}
+      if (opts->x_flag_sanitize & SANITIZE_KERNEL_HWADDRESS)
+	{
+	  SET_OPTION_IF_UNSET (opts, opts_set,
+			       param_hwasan_instrument_stack, 0);
+	  SET_OPTION_IF_UNSET (opts, opts_set,
+			       param_hwasan_random_frame_tag, 0);
+	  SET_OPTION_IF_UNSET (opts, opts_set,
+			       param_hwasan_instrument_allocas, 0);
+	}
       break;
 
     case OPT_fsanitize_recover_:
@@ -2361,11 +2499,6 @@ common_handle_option (struct gcc_options *opts,
       /* Deferred.  */
       break;
 
-    case OPT_fdbg_cnt_list:
-      /* Deferred.  */
-      opts->x_exit_after_options = true;
-      break;
-
     case OPT_fdebug_prefix_map_:
     case OPT_ffile_prefix_map_:
       /* Deferred.  */
@@ -2427,7 +2560,9 @@ common_handle_option (struct gcc_options *opts,
       break;
 
     case OPT_fdiagnostics_parseable_fixits:
-      dc->parseable_fixits_p = value;
+      dc->extra_output_kind = (value
+			       ? EXTRA_DIAGNOSTIC_OUTPUT_fixits_v1
+			       : EXTRA_DIAGNOSTIC_OUTPUT_none);
       break;
 
     case OPT_fdiagnostics_column_unit_:
@@ -2568,32 +2703,15 @@ common_handle_option (struct gcc_options *opts,
       SET_OPTION_IF_UNSET (opts, opts_set, flag_ipa_bit_cp, value);
       break;
 
+    case OPT_fprofile_info_section:
+      opts->x_profile_info_section = ".gcov_info";
+      break;
+
     case OPT_fpatchable_function_entry_:
       {
-	char *patch_area_arg = xstrdup (arg);
-	char *comma = strchr (patch_area_arg, ',');
-	if (comma)
-	  {
-	    *comma = '\0';
-	    function_entry_patch_area_size = 
-	      integral_argument (patch_area_arg);
-	    function_entry_patch_area_start =
-	      integral_argument (comma + 1);
-	  }
-	else
-	  {
-	    function_entry_patch_area_size =
-	      integral_argument (patch_area_arg);
-	    function_entry_patch_area_start = 0;
-	  }
-	if (function_entry_patch_area_size < 0
-	    || function_entry_patch_area_size > USHRT_MAX
-	    || function_entry_patch_area_start < 0
-	    || function_entry_patch_area_start > USHRT_MAX
-	    || function_entry_patch_area_size 
-		< function_entry_patch_area_start)
-	  error ("invalid arguments for %<-fpatchable-function-entry%>");
-	free (patch_area_arg);
+	HOST_WIDE_INT patch_area_size, patch_area_start;
+	parse_and_check_patch_area (arg, true, &patch_area_size,
+				    &patch_area_start);
       }
       break;
 
@@ -2601,6 +2719,11 @@ common_handle_option (struct gcc_options *opts,
       /* Automatically sets -ftree-loop-vectorize and
 	 -ftree-slp-vectorize.  Nothing more to do here.  */
       break;
+    case OPT_fzero_call_used_regs_:
+      opts->x_flag_zero_call_used_regs
+	= parse_zero_call_used_regs_options (arg);
+      break;
+
     case OPT_fshow_column:
       dc->show_column = value;
       break;
@@ -3161,6 +3284,128 @@ get_option_url (diagnostic_context *, int option_index)
 		   NULL);
   else
     return NULL;
+}
+
+/* Return a heap allocated producer with command line options.  */
+
+char *
+gen_command_line_string (cl_decoded_option *options,
+			 unsigned int options_count)
+{
+  auto_vec<const char *> switches;
+  char *options_string, *tail;
+  const char *p;
+  size_t len = 0;
+
+  for (unsigned i = 0; i < options_count; i++)
+    switch (options[i].opt_index)
+      {
+      case OPT_o:
+      case OPT_d:
+      case OPT_dumpbase:
+      case OPT_dumpbase_ext:
+      case OPT_dumpdir:
+      case OPT_quiet:
+      case OPT_version:
+      case OPT_v:
+      case OPT_w:
+      case OPT_L:
+      case OPT_D:
+      case OPT_I:
+      case OPT_U:
+      case OPT_SPECIAL_unknown:
+      case OPT_SPECIAL_ignore:
+      case OPT_SPECIAL_warn_removed:
+      case OPT_SPECIAL_program_name:
+      case OPT_SPECIAL_input_file:
+      case OPT_grecord_gcc_switches:
+      case OPT_frecord_gcc_switches:
+      case OPT__output_pch_:
+      case OPT_fdiagnostics_show_location_:
+      case OPT_fdiagnostics_show_option:
+      case OPT_fdiagnostics_show_caret:
+      case OPT_fdiagnostics_show_labels:
+      case OPT_fdiagnostics_show_line_numbers:
+      case OPT_fdiagnostics_color_:
+      case OPT_fdiagnostics_format_:
+      case OPT_fverbose_asm:
+      case OPT____:
+      case OPT__sysroot_:
+      case OPT_nostdinc:
+      case OPT_nostdinc__:
+      case OPT_fpreprocessed:
+      case OPT_fltrans_output_list_:
+      case OPT_fresolution_:
+      case OPT_fdebug_prefix_map_:
+      case OPT_fmacro_prefix_map_:
+      case OPT_ffile_prefix_map_:
+      case OPT_fcompare_debug:
+      case OPT_fchecking:
+      case OPT_fchecking_:
+	/* Ignore these.  */
+	continue;
+      case OPT_flto_:
+	{
+	  const char *lto_canonical = "-flto";
+	  switches.safe_push (lto_canonical);
+	  len += strlen (lto_canonical) + 1;
+	  break;
+	}
+      default:
+	if (cl_options[options[i].opt_index].flags
+	    & CL_NO_DWARF_RECORD)
+	  continue;
+	gcc_checking_assert (options[i].canonical_option[0][0] == '-');
+	switch (options[i].canonical_option[0][1])
+	  {
+	  case 'M':
+	  case 'i':
+	  case 'W':
+	    continue;
+	  case 'f':
+	    if (strncmp (options[i].canonical_option[0] + 2,
+			 "dump", 4) == 0)
+	      continue;
+	    break;
+	  default:
+	    break;
+	  }
+	switches.safe_push (options[i].orig_option_with_args_text);
+	len += strlen (options[i].orig_option_with_args_text) + 1;
+	break;
+      }
+
+  options_string = XNEWVEC (char, len + 1);
+  tail = options_string;
+
+  unsigned i;
+  FOR_EACH_VEC_ELT (switches, i, p)
+    {
+      len = strlen (p);
+      memcpy (tail, p, len);
+      tail += len;
+      if (i != switches.length () - 1)
+	{
+	  *tail = ' ';
+	  ++tail;
+	}
+    }
+
+  *tail = '\0';
+  return options_string;
+}
+
+/* Return a heap allocated producer string including command line options.  */
+
+char *
+gen_producer_string (const char *language_string, cl_decoded_option *options,
+		     unsigned int options_count)
+{
+  char *cmdline = gen_command_line_string (options, options_count);
+  char *combined = concat (language_string, " ", version_string, " ",
+			   cmdline, NULL);
+  free (cmdline);
+  return combined;
 }
 
 #if CHECKING_P

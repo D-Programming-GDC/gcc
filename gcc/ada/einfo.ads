@@ -13,16 +13,10 @@
 -- ware  Foundation;  either version 3,  or (at your option) any later ver- --
 -- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
 -- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
--- or FITNESS FOR A PARTICULAR PURPOSE.                                     --
---                                                                          --
--- As a special exception under Section 7 of GPL version 3, you are granted --
--- additional permissions described in the GCC Runtime Library Exception,   --
--- version 3.1, as published by the Free Software Foundation.               --
---                                                                          --
--- You should have received a copy of the GNU General Public License and    --
--- a copy of the GCC Runtime Library Exception along with this program;     --
--- see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see    --
--- <http://www.gnu.org/licenses/>.                                          --
+-- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+-- for  more details.  You should have  received  a copy of the GNU General --
+-- Public License  distributed with GNAT; see file COPYING3.  If not, go to --
+-- http://www.gnu.org/licenses for a complete copy of the license.          --
 --                                                                          --
 -- GNAT was originally developed  by the GNAT team at  New York University. --
 -- Extensive contributions were provided by Ada Core Technologies Inc.      --
@@ -426,8 +420,10 @@ package Einfo is
 --       output of certain warnings.
 
 --    Aft_Value (synthesized)
---       Applies to fixed and decimal types. Computes a universal integer that
---       holds value of the Aft attribute for the type.
+--       Applies to fixed-point types and subtypes. This yields the value of
+--       the Aft attribute for the type, i.e. the number of decimal digits
+--       needed after the decimal point to accommodate the delta of the type,
+--       unless the delta is greater than 0.1, in which case it is 1.
 
 --    Alias (Node18)
 --       Defined in overloadable entities (literals, subprograms, entries) and
@@ -1576,7 +1572,7 @@ package Einfo is
 --       Defined for the given type. Note that this flag can be False even
 --       if Component_Size is non-zero (happens in the case of derived types).
 
---    Has_Constrained_Partial_View (Flag187)
+--    Has_Constrained_Partial_View (Flag187) [base type only]
 --       Defined in private type and their completions, when the private
 --       type has no discriminants and the full view has discriminants with
 --       defaults. In Ada 2005 heap-allocated objects of such types are not
@@ -1785,6 +1781,10 @@ package Einfo is
 --       invariant of its own or inherits at least one class-wide invariant
 --       from a parent type or an interface.
 
+--    Has_Limited_View (synth)
+--       Defined in all entities. True for non-generic package entities that
+--       are non-instances and their Limited_View attribute is present.
+
 --    Has_Loop_Entry_Attributes (Flag260)
 --       Defined in E_Loop entities. Set when the loop is subject to at least
 --       one attribute 'Loop_Entry. The flag also implies that the loop has
@@ -1861,8 +1861,8 @@ package Einfo is
 
 --    Has_Own_DIC (Flag3) [base type only]
 --       Defined in all type entities. Set for a private type and its full view
---       (and its underlying full view, if the full view is itsef private) when
---       the type is subject to pragma Default_Initial_Condition.
+--       (and its underlying full view, if the full view is itself private)
+--       when the type is subject to pragma Default_Initial_Condition.
 
 --    Has_Own_Invariants (Flag232) [base type only]
 --       Defined in all type entities. Set on any type that defines at least
@@ -2376,12 +2376,11 @@ package Einfo is
 --       In the case of private and incomplete types, this flag is set in
 --       both the partial view and the full view.
 
---    Is_Atomic_Or_VFA (synth)
+--    Is_Full_Access (synth)
 --       Defined in all type entities, and also in constants, components and
---       variables. Set if a pragma Atomic or Shared or Volatile_Full_Access
---       applies to the entity. For many purposes VFA objects should be treated
---       the same as Atomic objects, and this predicate is intended for that
---       usage. In the case of private and incomplete types, the predicate
+--       variables. Set if an aspect/pragma Atomic/Shared, or an aspect/pragma
+--       Volatile_Full_Access or an Ada 2020 aspect Full_Access_Only applies
+--       to the entity. In the case of private and incomplete types, the flag
 --       applies to both the partial view and the full view.
 
 --    Is_Base_Type (synthesized)
@@ -2657,10 +2656,6 @@ package Einfo is
 --       Used to generate constraint checks on calls to these subprograms, even
 --       within an instance of a predefined run-time unit, in which checks
 --       are otherwise suppressed.
---
---       The flag is also set on the entity of the expression function created
---       within an instance, for a function that has external axiomatization,
---       for use in GNATprove mode.
 
 --    Is_Generic_Actual_Type (Flag94)
 --       Defined in all type and subtype entities. Set in the subtype
@@ -3424,9 +3419,10 @@ package Einfo is
 
 --    Is_Volatile_Full_Access (Flag285)
 --       Defined in all type entities, and also in constants, components, and
---       variables. Set if a pragma Volatile_Full_Access applies to the entity.
---       In the case of private and incomplete types, this flag is set in
---       both the partial view and the full view.
+--       variables. Set if an aspect/pragma Volatile_Full_Access or an Ada 2020
+--       aspect Full_Access_Only applies to the entity. In the case of private
+--       and incomplete types, this flag is set in both the partial view and
+--       the full view.
 
 --    Is_Wrapper_Package (synthesized)
 --       Defined in package entities. Indicates that the package has been
@@ -3936,6 +3932,20 @@ package Einfo is
 --       of a single protected/task type, the references are examined as they
 --       must appear only within the type defintion and the corresponding body.
 
+--    Partial_DIC_Procedure (synthesized)
+--       Defined in type entities. Set for a private type and its full view
+--       when the type is subject to pragma Default_Initial_Condition (DIC), or
+--       when the type inherits a DIC pragma from a parent type. Points to the
+--       entity of a procedure that takes a single argument of the given type
+--       and verifies the assertion expression of the DIC pragma at run time.
+--       When present, the Partial_DIC_Procedure of a type only checks DICs
+--       associated with the partial (private) view of the type, and is invoked
+--       by the full DIC_Procedure (which may check additional DICs associated
+--       with the full view).
+
+--       Note: the reason this is marked as a synthesized attribute is that the
+--       way this is stored is as an element of the Subprograms_For_Type field.
+
 --    Partial_Invariant_Procedure (synthesized)
 --       Defined in types and subtypes. Set for private types when one or more
 --       [class-wide] type invariants apply to them. Points to the entity for a
@@ -4121,14 +4131,16 @@ package Einfo is
 --       only for type-related error messages.
 
 --    Related_Expression (Node24)
---       Defined in variables and types. When Set for internally generated
---       entities, it may be used to denote the source expression whose
---       elaboration created the variable declaration. If set, it is used
+--       Defined in variables, types and functions. When Set for internally
+--       generated entities, it may be used to denote the source expression
+--       whose elaboration created the variable declaration. If set, it is used
 --       for generating clearer messages from CodePeer. It is used on source
 --       entities that are variables in iterator specifications, to provide
 --       a link to the container that is the domain of iteration. This allows
 --       for better cross-reference information when the loop modifies elements
 --       of the container, and suppresses spurious warnings.
+--       Finally this node is used on functions specified via the Real_Literal
+--       aspect, to denote the 2-parameter overloading, if found.
 --
 --       Shouldn't it also be used for the same purpose in errout? It seems
 --       odd to have two mechanisms here???
@@ -4267,9 +4279,10 @@ package Einfo is
 --       explicit range).
 
 --    Scale_Value (Uint16)
---       Defined in decimal fixed-point types and subtypes. Contains the scale
---       for the type (i.e. the value of type'Scale = the number of decimal
---       digits after the decimal point).
+--       Defined in decimal fixed-point types and subtypes. This holds the
+--       value of the Scale attribute for the type, i.e. the scale of the type
+--       defined as the integer N such that the delta is equal to 10.0**(-N).
+--       Note that, if Scale_Value is positive, then it is equal to Aft_Value.
 
 --    Scope (Node3)
 --       Defined in all entities. Points to the entity for the scope (block,
@@ -4280,14 +4293,16 @@ package Einfo is
 --       the Scope will be Standard.
 
 --    Scope_Depth (synthesized)
---       Applies to program units, blocks, concurrent types and entries, and
---       also to record types, i.e. to any entity that can appear on the scope
---       stack. Yields the scope depth value, which for those entities other
---       than records is simply the scope depth value, for record entities, it
---       is the Scope_Depth of the record scope.
+--       Applies to program units, blocks, loops, return statements,
+--       concurrent types, private types and entries, and also to record types,
+--       i.e. to any entity that can appear on the scope stack. Yields the
+--       scope depth value, which for those entities other than records is
+--       simply the scope depth value, for record entities, it is the
+--       Scope_Depth of the record scope.
 
 --    Scope_Depth_Value (Uint22)
---       Defined in program units, blocks, concurrent types, and entries.
+--       Defined in program units, blocks, loops, return statements,
+--       concurrent types, private types and entries.
 --       Indicates the number of scopes that statically enclose the declaration
 --       of the unit or type. Library units have a depth of zero. Note that
 --       record types can act as scopes but do NOT have this field set (see
@@ -4488,8 +4503,8 @@ package Einfo is
 --       stored discriminants for the record (sub)type.
 
 --    Stores_Attribute_Old_Prefix (Flag270)
---       Defined in constants. Set when the constant has been generated to save
---       the value of attribute 'Old's prefix.
+--       Defined in constants, variables, and types which are created during
+--       expansion in order to save the value of attribute 'Old's prefix.
 
 --    Strict_Alignment (Flag145) [implementation base type only]
 --       Defined in all type entities. Indicates that the type is by-reference
@@ -4595,15 +4610,13 @@ package Einfo is
 --       Applies to scalar types. Returns the tree node (Node_Id) that contains
 --       the high bound of a scalar type. The returned value is literal for a
 --       base type, but may be an expression in the case of scalar type with
---       dynamic bounds. Note that in the case of a fixed point type, the high
---       bound is in units of small, and is an integer.
+--       dynamic bounds.
 
 --    Type_Low_Bound (synthesized)
 --       Applies to scalar types. Returns the tree node (Node_Id) that contains
 --       the low bound of a scalar type. The returned value is literal for a
 --       base type, but may be an expression in the case of scalar type with
---       dynamic bounds. Note that in the case of a fixed point type, the low
---       bound is in units of small, and is an integer.
+--       dynamic bounds.
 
 --    Underlying_Full_View (Node19)
 --       Defined in private subtypes that are the completion of other private
@@ -5819,9 +5832,10 @@ package Einfo is
    --    Implementation_Base_Type            (synth)
    --    Invariant_Procedure                 (synth)
    --    Is_Access_Protected_Subprogram_Type (synth)
-   --    Is_Atomic_Or_VFA                    (synth)
+   --    Is_Full_Access                      (synth)
    --    Is_Controlled                       (synth)
    --    Object_Size_Clause                  (synth)
+   --    Partial_DIC_Procedure               (synth)
    --    Partial_Invariant_Procedure         (synth)
    --    Predicate_Function                  (synth)
    --    Predicate_Function_M                (synth)
@@ -5986,7 +6000,7 @@ package Einfo is
    --    Is_Volatile                         (Flag16)
    --    Is_Volatile_Full_Access             (Flag285)
    --    Treat_As_Volatile                   (Flag41)
-   --    Is_Atomic_Or_VFA                    (synth)
+   --    Is_Full_Access                      (synth)
    --    Next_Component                      (synth)
    --    Next_Component_Or_Discriminant      (synth)
 
@@ -6040,8 +6054,8 @@ package Einfo is
    --    Treat_As_Volatile                   (Flag41)
    --    Address_Clause                      (synth)
    --    Alignment_Clause                    (synth)
-   --    Is_Atomic_Or_VFA                    (synth)
    --    Is_Elaboration_Target               (synth)
+   --    Is_Full_Access                      (synth)
    --    Size_Clause                         (synth)
 
    --  E_Decimal_Fixed_Point_Type
@@ -6482,6 +6496,7 @@ package Einfo is
    --    Has_Null_Abstract_State             (synth)
    --    Is_Elaboration_Target               (synth)
    --    Is_Wrapper_Package                  (synth)    (non-generic case only)
+   --    Has_Limited_View                    (synth)    (non-generic case only)
    --    Scope_Depth                         (synth)
 
    --  E_Package_Body
@@ -6586,6 +6601,7 @@ package Einfo is
    --    Is_Invariant_Procedure              (Flag257)  (non-generic case only)
    --    Is_Machine_Code_Subprogram          (Flag137)  (non-generic case only)
    --    Is_Null_Init_Proc                   (Flag178)
+   --    Is_Partial_DIC_Procedure            (synth)    (non-generic case only)
    --    Is_Partial_Invariant_Procedure      (Flag292)  (non-generic case only)
    --    Is_Predicate_Function               (Flag255)  (non-generic case only)
    --    Is_Predicate_Function_M             (Flag256)  (non-generic case only)
@@ -6859,8 +6875,8 @@ package Einfo is
    --    Treat_As_Volatile                   (Flag41)
    --    Address_Clause                      (synth)
    --    Alignment_Clause                    (synth)
-   --    Is_Atomic_Or_VFA                    (synth)
    --    Is_Elaboration_Target               (synth)
+   --    Is_Full_Access                      (synth)
    --    Size_Clause                         (synth)
 
    --  E_Void
@@ -7405,6 +7421,7 @@ package Einfo is
    function Is_Packed_Array_Impl_Type           (Id : E) return B;
    function Is_Potentially_Use_Visible          (Id : E) return B;
    function Is_Param_Block_Component_Type       (Id : E) return B;
+   function Is_Partial_DIC_Procedure            (Id : E) return B;
    function Is_Partial_Invariant_Procedure      (Id : E) return B;
    function Is_Predicate_Function               (Id : E) return B;
    function Is_Predicate_Function_M             (Id : E) return B;
@@ -7673,13 +7690,13 @@ package Einfo is
    function Has_Foreign_Convention              (Id : E) return B;
    function Has_Interrupt_Handler               (Id : E) return B;
    function Has_Invariants                      (Id : E) return B;
+   function Has_Limited_View                    (Id : E) return B;
    function Has_Non_Limited_View                (Id : E) return B;
    function Has_Non_Null_Abstract_State         (Id : E) return B;
    function Has_Non_Null_Visible_Refinement     (Id : E) return B;
    function Has_Null_Abstract_State             (Id : E) return B;
    function Has_Null_Visible_Refinement         (Id : E) return B;
    function Implementation_Base_Type            (Id : E) return E;
-   function Is_Atomic_Or_VFA                    (Id : E) return B;
    function Is_Base_Type                        (Id : E) return B;
    function Is_Boolean_Type                     (Id : E) return B;
    function Is_Constant_Object                  (Id : E) return B;
@@ -7689,6 +7706,7 @@ package Einfo is
    function Is_Elaboration_Target               (Id : E) return B;
    function Is_External_State                   (Id : E) return B;
    function Is_Finalizer                        (Id : E) return B;
+   function Is_Full_Access                      (Id : E) return B;
    function Is_Null_State                       (Id : E) return B;
    function Is_Package_Or_Generic_Package       (Id : E) return B;
    function Is_Packed_Array                     (Id : E) return B;
@@ -8308,12 +8326,14 @@ package Einfo is
    ---------------------------------------------------
 
    function DIC_Procedure                        (Id : E) return E;
+   function Partial_DIC_Procedure                (Id : E) return E;
    function Invariant_Procedure                  (Id : E) return E;
    function Partial_Invariant_Procedure          (Id : E) return E;
    function Predicate_Function                   (Id : E) return E;
    function Predicate_Function_M                 (Id : E) return E;
 
    procedure Set_DIC_Procedure                   (Id : E; V : E);
+   procedure Set_Partial_DIC_Procedure           (Id : E; V : E);
    procedure Set_Invariant_Procedure             (Id : E; V : E);
    procedure Set_Partial_Invariant_Procedure     (Id : E; V : E);
    procedure Set_Predicate_Function              (Id : E; V : E);
@@ -8519,6 +8539,7 @@ package Einfo is
    --    Refined_Global
    --    Refined_Post
    --    Refined_State
+   --    Subprogram_Variant
    --    Test_Case
    --    Volatile_Function
 
@@ -8890,7 +8911,6 @@ package Einfo is
    pragma Inline (Is_Assignable);
    pragma Inline (Is_Asynchronous);
    pragma Inline (Is_Atomic);
-   pragma Inline (Is_Atomic_Or_VFA);
    pragma Inline (Is_Bit_Packed_Array);
    pragma Inline (Is_Called);
    pragma Inline (Is_Character_Type);
@@ -8941,6 +8961,7 @@ package Einfo is
    pragma Inline (Is_Formal_Object);
    pragma Inline (Is_Formal_Subprogram);
    pragma Inline (Is_Frozen);
+   pragma Inline (Is_Full_Access);
    pragma Inline (Is_Generic_Actual_Subprogram);
    pragma Inline (Is_Generic_Actual_Type);
    pragma Inline (Is_Generic_Instance);
@@ -9204,6 +9225,7 @@ package Einfo is
    pragma Inline (Base_Type);
    pragma Inline (Float_Rep);
    pragma Inline (Has_Foreign_Convention);
+   pragma Inline (Has_Limited_View);
    pragma Inline (Has_Non_Limited_View);
    pragma Inline (Is_Base_Type);
    pragma Inline (Is_Boolean_Type);

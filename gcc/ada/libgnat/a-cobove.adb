@@ -30,6 +30,7 @@
 with Ada.Containers.Generic_Array_Sort;
 
 with System; use type System.Address;
+with System.Put_Images;
 
 package body Ada.Containers.Bounded_Vectors is
 
@@ -320,23 +321,10 @@ package body Ada.Containers.Bounded_Vectors is
    -- Append --
    ------------
 
-   procedure Append (Container : in out Vector; New_Item : Vector) is
-   begin
-      if New_Item.Is_Empty then
-         return;
-      end if;
-
-      if Checks and then Container.Last >= Index_Type'Last then
-         raise Constraint_Error with "vector is already at its maximum length";
-      end if;
-
-      Container.Insert (Container.Last + 1, New_Item);
-   end Append;
-
    procedure Append
      (Container : in out Vector;
       New_Item  : Element_Type;
-      Count     : Count_Type := 1)
+      Count     : Count_Type)
    is
    begin
       if Count = 0 then
@@ -348,6 +336,34 @@ package body Ada.Containers.Bounded_Vectors is
       end if;
 
       Container.Insert (Container.Last + 1, New_Item, Count);
+   end Append;
+
+   -------------------
+   -- Append_Vector --
+   -------------------
+
+   procedure Append_Vector (Container : in out Vector; New_Item : Vector) is
+   begin
+      if New_Item.Is_Empty then
+         return;
+      end if;
+
+      if Checks and then Container.Last >= Index_Type'Last then
+         raise Constraint_Error with "vector is already at its maximum length";
+      end if;
+
+      Container.Insert_Vector (Container.Last + 1, New_Item);
+   end Append_Vector;
+
+   ------------
+   -- Append --
+   ------------
+
+   procedure Append (Container : in out Vector;
+                     New_Item  :        Element_Type)
+   is
+   begin
+      Insert (Container, Last_Index (Container) + 1, New_Item, 1);
    end Append;
 
    --------------
@@ -696,6 +712,17 @@ package body Ada.Containers.Bounded_Vectors is
       end if;
    end Element;
 
+   -----------
+   -- Empty --
+   -----------
+
+   function Empty (Capacity : Count_Type := 10) return Vector is
+   begin
+      return Result : Vector (Capacity) do
+         Reserve_Capacity (Result, Capacity);
+      end return;
+   end Empty;
+
    --------------
    -- Finalize --
    --------------
@@ -823,6 +850,16 @@ package body Ada.Containers.Bounded_Vectors is
    begin
       return Index_Type'First;
    end First_Index;
+
+   -----------------
+   -- New_Vector --
+   -----------------
+
+   function New_Vector (First, Last : Index_Type) return Vector
+   is
+   begin
+      return (To_Vector (Count_Type (Last - First + 1)));
+   end New_Vector;
 
    ---------------------
    -- Generic_Sorting --
@@ -1210,7 +1247,7 @@ package body Ada.Containers.Bounded_Vectors is
       end if;
    end Insert;
 
-   procedure Insert
+   procedure Insert_Vector
      (Container : in out Vector;
       Before    : Extended_Index;
       New_Item  : Vector)
@@ -1276,9 +1313,9 @@ package body Ada.Containers.Bounded_Vectors is
 
          Container.Elements (B + N - Src'Length .. B + N - 1) := Src;
       end;
-   end Insert;
+   end Insert_Vector;
 
-   procedure Insert
+   procedure Insert_Vector
      (Container : in out Vector;
       Before    : Cursor;
       New_Item  : Vector)
@@ -1310,10 +1347,10 @@ package body Ada.Containers.Bounded_Vectors is
          Index := Before.Index;
       end if;
 
-      Insert (Container, Index, New_Item);
-   end Insert;
+      Insert_Vector (Container, Index, New_Item);
+   end Insert_Vector;
 
-   procedure Insert
+   procedure Insert_Vector
      (Container : in out Vector;
       Before    : Cursor;
       New_Item  : Vector;
@@ -1354,10 +1391,10 @@ package body Ada.Containers.Bounded_Vectors is
          Index := Before.Index;
       end if;
 
-      Insert (Container, Index, New_Item);
+      Insert_Vector (Container, Index, New_Item);
 
       Position := Cursor'(Container'Unchecked_Access, Index);
-   end Insert;
+   end Insert_Vector;
 
    procedure Insert
      (Container : in out Vector;
@@ -1995,22 +2032,23 @@ package body Ada.Containers.Bounded_Vectors is
    -- Prepend --
    -------------
 
-   procedure Prepend (Container : in out Vector; New_Item : Vector) is
-   begin
-      Insert (Container, Index_Type'First, New_Item);
-   end Prepend;
-
    procedure Prepend
      (Container : in out Vector;
       New_Item  : Element_Type;
       Count     : Count_Type := 1)
    is
    begin
-      Insert (Container,
-              Index_Type'First,
-              New_Item,
-              Count);
+      Insert (Container, Index_Type'First, New_Item, Count);
    end Prepend;
+
+   --------------------
+   -- Prepend_Vector --
+   --------------------
+
+   procedure Prepend_Vector (Container : in out Vector; New_Item : Vector) is
+   begin
+      Insert_Vector (Container, Index_Type'First, New_Item);
+   end Prepend_Vector;
 
    --------------
    -- Previous --
@@ -2096,6 +2134,31 @@ package body Ada.Containers.Bounded_Vectors is
 
       Query_Element (Position.Container.all, Position.Index, Process);
    end Query_Element;
+
+   ---------------
+   -- Put_Image --
+   ---------------
+
+   procedure Put_Image
+     (S : in out Ada.Strings.Text_Output.Sink'Class; V : Vector)
+   is
+      First_Time : Boolean := True;
+      use System.Put_Images;
+   begin
+      Array_Before (S);
+
+      for X of V loop
+         if First_Time then
+            First_Time := False;
+         else
+            Simple_Array_Between (S);
+         end if;
+
+         Element_Type'Put_Image (S, X);
+      end loop;
+
+      Array_After (S);
+   end Put_Image;
 
    ----------
    -- Read --

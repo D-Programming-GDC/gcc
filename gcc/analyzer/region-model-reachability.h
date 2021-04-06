@@ -1,5 +1,5 @@
 /* Finding reachable regions and values.
-   Copyright (C) 2020 Free Software Foundation, Inc.
+   Copyright (C) 2020-2021 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -35,7 +35,7 @@ namespace ana {
 class reachable_regions
 {
 public:
-  reachable_regions (store *store, region_model_manager *mgr);
+  reachable_regions (region_model *model);
 
   /* Callback called for each cluster when initializing this object.  */
   static void init_cluster_cb (const region *base_reg,
@@ -59,8 +59,9 @@ public:
   void handle_parm (const svalue *sval, tree param_type);
 
   /* Update the store to mark the clusters that were found to be mutable
-     as having escaped.  */
-  void mark_escaped_clusters ();
+     as having escaped.
+     Notify CTXT about escaping function_decls.  */
+  void mark_escaped_clusters (region_model_context *ctxt);
 
   /* Iteration over reachable base regions.  */
   hash_set<const region *>::iterator begin ()
@@ -94,8 +95,8 @@ public:
   DEBUG_FUNCTION void dump () const;
 
 private:
+  region_model *m_model;
   store *m_store;
-  region_model_manager *m_mgr;
 
   /* The base regions already seen.  */
   hash_set<const region *> m_reachable_base_regs;

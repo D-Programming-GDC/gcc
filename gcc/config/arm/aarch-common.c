@@ -1,7 +1,7 @@
 /* Dependency checks for instruction scheduling, shared between ARM and
    AARCH64.
 
-   Copyright (C) 1991-2020 Free Software Foundation, Inc.
+   Copyright (C) 1991-2021 Free Software Foundation, Inc.
    Contributed by ARM Ltd.
 
    This file is part of GCC.
@@ -485,7 +485,7 @@ aarch_accumulator_forwarding (rtx_insn *producer, rtx_insn *consumer)
 	return 0;
     }
 
-  if (GET_CODE (accumulator) == SUBREG)
+  if (SUBREG_P (accumulator))
     accumulator = SUBREG_REG (accumulator);
 
   if (!REG_P (accumulator))
@@ -531,9 +531,10 @@ arm_mac_accumulator_is_mul_result (rtx producer, rtx consumer)
    We implement asm flag outputs.  */
 
 rtx_insn *
-arm_md_asm_adjust (vec<rtx> &outputs, vec<rtx> &/*inputs*/,
-		    vec<const char *> &constraints,
-		    vec<rtx> &/*clobbers*/, HARD_REG_SET &/*clobbered_regs*/)
+arm_md_asm_adjust (vec<rtx> &outputs, vec<rtx> & /*inputs*/,
+		   vec<machine_mode> & /*input_modes*/,
+		   vec<const char *> &constraints, vec<rtx> & /*clobbers*/,
+		   HARD_REG_SET & /*clobbered_regs*/)
 {
   bool saw_asm_flag = false;
 

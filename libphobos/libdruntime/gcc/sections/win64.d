@@ -1,5 +1,5 @@
 // Win64-specific support for sections.
-// Copyright (C) 2019-2020 Free Software Foundation, Inc.
+// Copyright (C) 2019-2021 Free Software Foundation, Inc.
 
 // GCC is free software; you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free
@@ -49,14 +49,6 @@ struct SectionGroup
     @property ref inout(ModuleGroup) moduleGroup() inout nothrow @nogc
     {
         return _moduleGroup;
-    }
-
-    version (Win64)
-    @property immutable(FuncTable)[] ehTables() const nothrow @nogc
-    {
-        auto pbeg = cast(immutable(FuncTable)*)&_deh_beg;
-        auto pend = cast(immutable(FuncTable)*)&_deh_end;
-        return pbeg[0 .. pend - pbeg];
     }
 
     @property inout(void[])[] gcRanges() inout nothrow @nogc

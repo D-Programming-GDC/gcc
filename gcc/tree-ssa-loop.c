@@ -1,5 +1,5 @@
 /* Loop optimizations over tree-ssa.
-   Copyright (C) 2003-2020 Free Software Foundation, Inc.
+   Copyright (C) 2003-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -529,7 +529,7 @@ tree_ssa_loop_done (void)
 {
   free_numbers_of_iterations_estimates (cfun);
   scev_finalize ();
-  loop_optimizer_finalize ();
+  loop_optimizer_finalize (cfun, true);
   return 0;
 }
 

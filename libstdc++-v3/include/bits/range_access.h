@@ -1,6 +1,6 @@
 // Range access functions for containers -*- C++ -*-
 
-// Copyright (C) 2010-2020 Free Software Foundation, Inc.
+// Copyright (C) 2010-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -35,6 +35,7 @@
 #if __cplusplus >= 201103L
 #include <initializer_list>
 #include <type_traits>	    // common_type_t, make_signed_t
+#include <bits/stl_iterator.h> // reverse_iterator
 
 namespace std _GLIBCXX_VISIBILITY(default)
 {

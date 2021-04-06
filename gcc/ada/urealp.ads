@@ -13,16 +13,10 @@
 -- ware  Foundation;  either version 3,  or (at your option) any later ver- --
 -- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
 -- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
--- or FITNESS FOR A PARTICULAR PURPOSE.                                     --
---                                                                          --
--- As a special exception under Section 7 of GPL version 3, you are granted --
--- additional permissions described in the GCC Runtime Library Exception,   --
--- version 3.1, as published by the Free Software Foundation.               --
---                                                                          --
--- You should have received a copy of the GNU General Public License and    --
--- a copy of the GCC Runtime Library Exception along with this program;     --
--- see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see    --
--- <http://www.gnu.org/licenses/>.                                          --
+-- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+-- for  more details.  You should have  received  a copy of the GNU General --
+-- Public License  distributed with GNAT; see file COPYING3.  If not, go to --
+-- http://www.gnu.org/licenses for a complete copy of the license.          --
 --                                                                          --
 -- GNAT was originally developed  by the GNAT team at  New York University. --
 -- Extensive contributions were provided by Ada Core Technologies Inc.      --
@@ -112,11 +106,23 @@ package Urealp is
    function Ureal_100 return Ureal;
    --  Returns value 100.0
 
+   function Ureal_2_31 return Ureal;
+   --  Returns value 2.0 ** 31
+
+   function Ureal_2_63 return Ureal;
+   --  Returns value 2.0 ** 63
+
    function Ureal_2_80 return Ureal;
    --  Returns value 2.0 ** 80
 
    function Ureal_2_M_80 return Ureal;
    --  Returns value 2.0 ** (-80)
+
+   function Ureal_2_127 return Ureal;
+   --  Returns value 2.0 ** 127
+
+   function Ureal_2_M_127 return Ureal;
+   --  Returns value 2.0 ** (-127)
 
    function Ureal_2_128 return Ureal;
    --  Returns value 2.0 ** 128
@@ -124,11 +130,23 @@ package Urealp is
    function Ureal_2_M_128 return Ureal;
    --  Returns value 2.0 ** (-128)
 
-   function Ureal_10_36 return Ureal;
-   --  Returns value 10.0 ** 36
+   function Ureal_2_10_18 return Ureal;
+   --  Returns value 2.0 * 10.0 ** 18
 
-   function Ureal_M_10_36 return Ureal;
-   --  Returns value -10.0 ** 36
+   function Ureal_M_2_10_18 return Ureal;
+   --  Returns value -2.0 * 10.0 ** 18
+
+   function Ureal_9_10_36 return Ureal;
+   --  Returns value 9.0 * 10.0 ** 36
+
+   function Ureal_M_9_10_36 return Ureal;
+   --  Returns value -9.0 * 10.0 ** 36
+
+   function Ureal_10_76 return Ureal;
+   --  Returns value 10.0 ** 76
+
+   function Ureal_M_10_76 return Ureal;
+   --  Returns value -10.0 ** 76
 
    -----------------
    -- Subprograms --

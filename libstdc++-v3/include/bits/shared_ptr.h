@@ -1,6 +1,6 @@
 // shared_ptr and weak_ptr implementation -*- C++ -*-
 
-// Copyright (C) 2007-2020 Free Software Foundation, Inc.
+// Copyright (C) 2007-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -49,6 +49,7 @@
 #ifndef _SHARED_PTR_H
 #define _SHARED_PTR_H 1
 
+#include <iosfwd>           	  // std::basic_ostream
 #include <bits/shared_ptr_base.h>
 
 namespace std _GLIBCXX_VISIBILITY(default)
@@ -413,7 +414,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	allocate_shared(const _Alloc& __a, _Args&&... __args);
 
       // This constructor is non-standard, it is used by weak_ptr::lock().
-      shared_ptr(const weak_ptr<_Tp>& __r, std::nothrow_t)
+      shared_ptr(const weak_ptr<_Tp>& __r, std::nothrow_t) noexcept
       : __shared_ptr<_Tp>(__r, std::nothrow) { }
 
       friend class weak_ptr<_Tp>;

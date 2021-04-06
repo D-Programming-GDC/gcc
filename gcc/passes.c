@@ -1,5 +1,5 @@
 /* Top level of GCC compilers (cc1, cc1plus, etc.)
-   Copyright (C) 1987-2020 Free Software Foundation, Inc.
+   Copyright (C) 1987-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -731,7 +731,54 @@ make_pass_late_compilation (gcc::context *ctxt)
   return new pass_late_compilation (ctxt);
 }
 
+/* Pre-SLP scalar cleanup, it has several cleanup passes like FRE, DSE.  */
 
+namespace {
+
+const pass_data pass_data_pre_slp_scalar_cleanup =
+{
+  GIMPLE_PASS, /* type */
+  "*pre_slp_scalar_cleanup", /* name */
+  OPTGROUP_LOOP, /* optinfo_flags */
+  TV_SCALAR_CLEANUP, /* tv_id */
+  ( PROP_cfg | PROP_ssa ), /* properties_required */
+  0, /* properties_provided */
+  0, /* properties_destroyed */
+  0, /* todo_flags_start */
+  0, /* todo_flags_finish */
+};
+
+class pass_pre_slp_scalar_cleanup : public gimple_opt_pass
+{
+public:
+  pass_pre_slp_scalar_cleanup (gcc::context *ctxt)
+    : gimple_opt_pass (pass_data_pre_slp_scalar_cleanup, ctxt)
+  {
+  }
+
+  virtual bool
+  gate (function *fun)
+  {
+    return flag_tree_slp_vectorize
+	   && (fun->pending_TODOs & PENDING_TODO_force_next_scalar_cleanup);
+  }
+
+  virtual unsigned int
+  execute (function *fun)
+  {
+    fun->pending_TODOs &= ~PENDING_TODO_force_next_scalar_cleanup;
+    return 0;
+  }
+
+}; // class pass_pre_slp_scalar_cleanup
+
+} // anon namespace
+
+gimple_opt_pass *
+make_pass_pre_slp_scalar_cleanup (gcc::context *ctxt)
+{
+  return new pass_pre_slp_scalar_cleanup (ctxt);
+}
 
 /* Set the static pass number of pass PASS to ID and record that
    in the mapping from static pass number to pass.  */
@@ -1746,7 +1793,7 @@ execute_function_dump (function *fn, void *data)
     {
       push_cfun (fn);
 
-      if (fn->curr_properties & PROP_trees)
+      if (fn->curr_properties & PROP_gimple)
         dump_function_to_file (fn->decl, dump_file, dump_flags);
       else
 	print_rtl_with_bb (dump_file, get_insns (), dump_flags);
@@ -1790,6 +1837,9 @@ emergency_dump_function ()
   fnotice (stderr, "dump file: %s\n", dump_file_name);
   fprintf (dump_file, "\n\n\nEMERGENCY DUMP:\n\n");
   execute_function_dump (cfun, current_pass);
+
+  if (symtab && current_pass->type == IPA_PASS)
+    symtab->dump (dump_file);
 }
 
 static struct profile_record *profile_record;
@@ -1984,7 +2034,7 @@ execute_function_todo (function *fn, void *data)
 
       if (flags & TODO_verify_il)
 	{
-	  if (cfun->curr_properties & PROP_trees)
+	  if (cfun->curr_properties & PROP_gimple)
 	    {
 	      if (cfun->curr_properties & PROP_cfg)
 		/* IPA passes leave stmts to be fixed up, so make sure to
@@ -2222,7 +2272,7 @@ execute_one_ipa_transform_pass (struct cgraph_node *node,
 
   /* Note that the folders should only create gimple expressions.
      This is a hack until the new folder is ready.  */
-  in_gimple_form = (cfun && (cfun->curr_properties & PROP_trees)) != 0;
+  in_gimple_form = (cfun && (cfun->curr_properties & PROP_gimple)) != 0;
 
   pass_init_dump_file (pass);
 
@@ -2270,6 +2320,14 @@ execute_all_ipa_transforms (bool do_not_collect)
   if (!cfun)
     return;
   node = cgraph_node::get (current_function_decl);
+
+  cgraph_node *next_clone;
+  for (cgraph_node *n = node->clones; n; n = next_clone)
+    {
+      next_clone = n->next_sibling_clone;
+      if (n->decl != node->decl)
+	n->materialize_clone ();
+    }
 
   if (node->ipa_transforms_to_apply.exists ())
     {
@@ -2487,7 +2545,7 @@ execute_one_pass (opt_pass *pass)
 
   /* Note that the folders should only create gimple expressions.
      This is a hack until the new folder is ready.  */
-  in_gimple_form = (cfun && (cfun->curr_properties & PROP_trees)) != 0;
+  in_gimple_form = (cfun && (cfun->curr_properties & PROP_gimple)) != 0;
 
   pass_init_dump_file (pass);
 
@@ -2558,7 +2616,8 @@ execute_one_pass (opt_pass *pass)
     {
       struct cgraph_node *node;
       FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
-	node->ipa_transforms_to_apply.safe_push ((ipa_opt_pass_d *)pass);
+	if (!node->inlined_to)
+	  node->ipa_transforms_to_apply.safe_push ((ipa_opt_pass_d *)pass);
     }
   else if (dump_file)
     do_per_function (execute_function_dump, pass);
@@ -2569,7 +2628,7 @@ execute_one_pass (opt_pass *pass)
   pass_fini_dump_file (pass);
 
   if (pass->type != SIMPLE_IPA_PASS && pass->type != IPA_PASS)
-    gcc_assert (!(cfun->curr_properties & PROP_trees)
+    gcc_assert (!(cfun->curr_properties & PROP_gimple)
 		|| pass->type != RTL_PASS);
 
   current_pass = NULL;
@@ -2722,7 +2781,8 @@ ipa_write_summaries (void)
     {
       struct cgraph_node *node = order[i];
 
-      if (node->definition && node->need_lto_streaming)
+      if ((node->definition || node->declare_variant_alt)
+	  && node->need_lto_streaming)
 	{
 	  if (gimple_has_body_p (node->decl))
 	    lto_prepare_function_for_streaming (node);

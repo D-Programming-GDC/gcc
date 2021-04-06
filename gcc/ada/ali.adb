@@ -590,7 +590,8 @@ package body ALI is
       --         scope__name__line_column__locations
       --
       --    * The String is converted into a Name_Id
-      --    * The Name_Id is used as the hash
+      --
+      --    * The absolute value of the Name_Id is used as the hash
 
       Append (Buffer, IS_Rec.Scope);
       Append (Buffer, "__");
@@ -606,7 +607,7 @@ package body ALI is
       end if;
 
       IS_Nam := Name_Find (Buffer);
-      return Bucket_Range_Type (IS_Nam);
+      return Bucket_Range_Type (abs IS_Nam);
    end Hash;
 
    --------------------
@@ -3813,15 +3814,15 @@ package body ALI is
          return No_ALI_Id;
    end Scan_ALI;
 
-   -----------
-   -- Scope --
-   -----------
+   --------------
+   -- IS_Scope --
+   --------------
 
-   function Scope (IS_Id : Invocation_Signature_Id) return Name_Id is
+   function IS_Scope (IS_Id : Invocation_Signature_Id) return Name_Id is
    begin
       pragma Assert (Present (IS_Id));
       return Invocation_Signatures.Table (IS_Id).Scope;
-   end Scope;
+   end IS_Scope;
 
    ---------
    -- SEq --

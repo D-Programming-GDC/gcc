@@ -1,6 +1,6 @@
 /* Get common system includes and various definitions and declarations based
    on autoconf macros.
-   Copyright (C) 1998-2020 Free Software Foundation, Inc.
+   Copyright (C) 1998-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -231,6 +231,12 @@ extern int errno;
 #endif
 #ifdef INCLUDE_VECTOR
 # include <vector>
+#endif
+#ifdef INCLUDE_ARRAY
+# include <array>
+#endif
+#ifdef INCLUDE_FUNCTIONAL
+# include <functional>
 #endif
 # include <cstring>
 # include <new>
@@ -529,6 +535,10 @@ extern void *realloc (void *, size_t);
 #include <inttypes.h>
 #endif
 
+#ifndef SIZE_MAX
+# define SIZE_MAX INTTYPE_MAXIMUM (size_t)
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -787,6 +797,12 @@ extern void fancy_abort (const char *, int, const char *)
 #define ALWAYS_INLINE inline __attribute__ ((always_inline))
 #else
 #define ALWAYS_INLINE inline
+#endif
+
+#if GCC_VERSION >= 3004
+#define WARN_UNUSED_RESULT __attribute__ ((__warn_unused_result__))
+#else
+#define WARN_UNUSED_RESULT
 #endif
 
 /* Use gcc_unreachable() to mark unreachable locations (like an

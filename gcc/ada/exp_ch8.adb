@@ -101,10 +101,6 @@ package body Exp_Ch8 is
    --  More comments needed for this para ???
 
    procedure Expand_N_Object_Renaming_Declaration (N : Node_Id) is
-      Nam  : constant Node_Id := Name (N);
-      Decl : Node_Id;
-      T    : Entity_Id;
-
       function Evaluation_Required (Nam : Node_Id) return Boolean;
       --  Determines whether it is necessary to do static name evaluation for
       --  renaming of Nam. It is considered necessary if evaluating the name
@@ -129,7 +125,7 @@ package body Exp_Ch8 is
             if Is_Packed (Etype (Prefix (Nam))) then
                return True;
 
-            elsif Is_Atomic_Or_VFA_Object (Prefix (Nam)) then
+            elsif Is_Full_Access_Object (Prefix (Nam)) then
                return True;
 
             else
@@ -152,7 +148,7 @@ package body Exp_Ch8 is
                then
                   return True;
 
-               elsif Is_Atomic_Or_VFA_Object (Prefix (Nam)) then
+               elsif Is_Full_Access_Object (Prefix (Nam)) then
                   return True;
 
                else
@@ -165,6 +161,12 @@ package body Exp_Ch8 is
          end if;
       end Evaluation_Required;
 
+      --  Local variables
+
+      Decl : Node_Id;
+      Nam  : constant Node_Id   := Name (N);
+      T    : constant Entity_Id := Etype (Defining_Identifier (N));
+
    --  Start of processing for Expand_N_Object_Renaming_Declaration
 
    begin
@@ -176,8 +178,6 @@ package body Exp_Ch8 is
       end if;
 
       --  Deal with construction of subtype in class-wide case
-
-      T := Etype (Defining_Identifier (N));
 
       if Is_Class_Wide_Type (T) then
          Expand_Subtype_From_Expr (N, T, Subtype_Mark (N), Name (N));

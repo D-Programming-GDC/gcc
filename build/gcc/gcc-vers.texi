@@ -1,0 +1,5 @@
+@set version-GCC 11.0.1
+@set DEVELOPMENT
+@set srcdir C:/data/build/gcc/../../gcc
+@set VERSION_PACKAGE (GCC) 
+@set BUGURL @uref{https://gcc.gnu.org/bugs/}

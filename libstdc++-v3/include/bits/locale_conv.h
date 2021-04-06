@@ -1,6 +1,6 @@
 // wstring_convert implementation -*- C++ -*-
 
-// Copyright (C) 2015-2020 Free Software Foundation, Inc.
+// Copyright (C) 2015-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -185,7 +185,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _State __state = {};
       size_t __n;
       return __str_codecvt_out(__first, __last, __outstr, __cvt, __state, __n)
-	&& (__n == (__last - __first));
+	&& (__n == size_t(__last - __first));
     }
 
 #ifdef _GLIBCXX_USE_CHAR8_T

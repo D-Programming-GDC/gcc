@@ -1,5 +1,5 @@
 /* Interprocedural analyses.
-   Copyright (C) 2005-2020 Free Software Foundation, Inc.
+   Copyright (C) 2005-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -94,9 +94,14 @@ struct GTY(()) ipa_pass_through_data
   /* Number of the caller's formal parameter being passed.  */
   int formal_id;
   /* Operation that is performed on the argument before it is passed on.
-     NOP_EXPR means no operation.  Otherwise oper must be a simple binary
-     arithmetic operation where the caller's parameter is the first operand and
-     operand field from this structure is the second one.  */
+     Special values which have other meaning than in normal contexts:
+       - NOP_EXPR means no operation, not even type conversion.
+       - ASSERT_EXPR means that only the value in operand is allowed to pass
+         through (without any change), for all other values the result is
+         unknown.
+     Otherwise operation must be a simple binary or unary arithmetic operation
+     where the caller's parameter is the first operand and (for binary
+     operations) the operand field from this structure is the second one.  */
   enum tree_code operation;
   /* When the passed value is a pointer, it is set to true only when we are
      certain that no write to the object it points to has occurred since the
@@ -433,6 +438,107 @@ ipa_get_jf_ancestor_type_preserved (struct ipa_jump_func *jfunc)
   return jfunc->value.ancestor.agg_preserved;
 }
 
+/* Class for allocating a bundle of various potentially known properties about
+   actual arguments of a particular call on stack for the usual case and on
+   heap only if there are unusually many arguments.  The data is deallocated
+   when the instance of this class goes out of scope or is otherwise
+   destructed.  */
+
+class ipa_auto_call_arg_values
+{
+public:
+  ~ipa_auto_call_arg_values ();
+
+  /* If m_known_vals (vector of known "scalar" values) is sufficiantly long,
+     return its element at INDEX, otherwise return NULL.  */
+  tree safe_sval_at (int index)
+  {
+    /* TODO: Assert non-negative index here and test.  */
+    if ((unsigned) index < m_known_vals.length ())
+      return m_known_vals[index];
+    return NULL;
+  }
+
+  /* If m_known_aggs is sufficiantly long, return the pointer rto its element
+     at INDEX, otherwise return NULL.  */
+  ipa_agg_value_set *safe_aggval_at (int index)
+  {
+    /* TODO: Assert non-negative index here and test.  */
+    if ((unsigned) index < m_known_aggs.length ())
+      return &m_known_aggs[index];
+    return NULL;
+  }
+
+  /* Vector describing known values of parameters.  */
+  auto_vec<tree, 32> m_known_vals;
+
+  /* Vector describing known polymorphic call contexts.  */
+  auto_vec<ipa_polymorphic_call_context, 32> m_known_contexts;
+
+  /* Vector describing known aggregate values.  */
+  auto_vec<ipa_agg_value_set, 32> m_known_aggs;
+
+  /* Vector describing known value ranges of arguments.  */
+  auto_vec<value_range, 32> m_known_value_ranges;
+};
+
+/* Class bundling the various potentially known properties about actual
+   arguments of a particular call.  This variant does not deallocate the
+   bundled data in any way.  */
+
+class ipa_call_arg_values
+{
+public:
+  /* Default constructor, setting the vectors to empty ones.  */
+  ipa_call_arg_values ()
+  {}
+
+  /* Construct this general variant of the bundle from the variant which uses
+     auto_vecs to hold the vectors.  This means that vectors of objects
+     constructed with this constructor should not be changed because if they
+     get reallocated, the member vectors and the underlying auto_vecs would get
+     out of sync.  */
+  ipa_call_arg_values (ipa_auto_call_arg_values *aavals)
+    : m_known_vals (aavals->m_known_vals),
+      m_known_contexts (aavals->m_known_contexts),
+      m_known_aggs (aavals->m_known_aggs),
+      m_known_value_ranges (aavals->m_known_value_ranges)
+  {}
+
+  /* If m_known_vals (vector of known "scalar" values) is sufficiantly long,
+     return its element at INDEX, otherwise return NULL.  */
+  tree safe_sval_at (int index)
+  {
+    /* TODO: Assert non-negative index here and test.  */
+    if ((unsigned) index < m_known_vals.length ())
+      return m_known_vals[index];
+    return NULL;
+  }
+
+  /* If m_known_aggs is sufficiantly long, return the pointer rto its element
+     at INDEX, otherwise return NULL.  */
+  ipa_agg_value_set *safe_aggval_at (int index)
+  {
+    /* TODO: Assert non-negative index here and test.  */
+    if ((unsigned) index < m_known_aggs.length ())
+      return &m_known_aggs[index];
+    return NULL;
+  }
+
+  /* Vector describing known values of parameters.  */
+  vec<tree> m_known_vals = vNULL;
+
+  /* Vector describing known polymorphic call contexts.  */
+  vec<ipa_polymorphic_call_context> m_known_contexts = vNULL;
+
+  /* Vector describing known aggregate values.  */
+  vec<ipa_agg_value_set> m_known_aggs = vNULL;
+
+  /* Vector describing known value ranges of arguments.  */
+  vec<value_range> m_known_value_ranges = vNULL;
+};
+
+
 /* Summary describing a single formal parameter.  */
 
 struct GTY(()) ipa_param_descriptor
@@ -519,6 +625,7 @@ inline
 ipa_node_params::~ipa_node_params ()
 {
   free (lattices);
+  vec_free (descriptors);
   known_csts.release ();
   known_contexts.release ();
 }
@@ -794,6 +901,10 @@ class GTY((for_user)) ipa_edge_args
   /* Destructor.  */
   ~ipa_edge_args ()
     {
+      unsigned int i;
+      ipa_jump_func *jf;
+      FOR_EACH_VEC_SAFE_ELT (jump_functions, i, jf)
+	vec_free (jf->agg.items);
       vec_free (jump_functions);
       vec_free (polymorphic_call_contexts);
     }
@@ -840,7 +951,10 @@ class GTY((user)) ipa_node_params_t: public function_summary <ipa_node_params *>
 {
 public:
   ipa_node_params_t (symbol_table *table, bool ggc):
-    function_summary<ipa_node_params *> (table, ggc) { }
+    function_summary<ipa_node_params *> (table, ggc)
+  {
+    disable_insertion_hook ();
+  }
 
   /* Hook that is called by summary when a node is duplicated.  */
   virtual void duplicate (cgraph_node *node,
@@ -970,12 +1084,13 @@ void ipa_initialize_node_params (struct cgraph_node *node);
 bool ipa_propagate_indirect_call_infos (struct cgraph_edge *cs,
 					vec<cgraph_edge *> *new_edges);
 
-/* Indirect edge and binfo processing.  */
+/* Indirect edge processing and target discovery.  */
 tree ipa_get_indirect_edge_target (struct cgraph_edge *ie,
-				   vec<tree>,
-				   vec<ipa_polymorphic_call_context>,
-				   vec<ipa_agg_value_set>,
-				   bool *);
+				   ipa_call_arg_values *avals,
+				   bool *speculative);
+tree ipa_get_indirect_edge_target (struct cgraph_edge *ie,
+				   ipa_auto_call_arg_values *avals,
+				   bool *speculative);
 struct cgraph_edge *ipa_make_edge_direct_to_target (struct cgraph_edge *, tree,
 						    bool speculative = false);
 tree ipa_impossible_devirt_target (struct cgraph_edge *, tree);
@@ -1042,6 +1157,8 @@ void ipa_dump_param (FILE *, class ipa_node_params *info, int i);
 void ipa_release_body_info (struct ipa_func_body_info *);
 tree ipa_get_callee_param_type (struct cgraph_edge *e, int i);
 bool ipcp_get_parm_bits (tree, tree *, widest_int *);
+bool unadjusted_ptr_and_unit_offset (tree op, tree *ret,
+				     poly_int64 *offset_ret);
 
 /* From tree-sra.c:  */
 tree build_ref_for_offset (location_t, tree, poly_int64, bool, tree,

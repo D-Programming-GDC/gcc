@@ -1,6 +1,6 @@
 // class template regex -*- C++ -*-
 
-// Copyright (C) 2013-2020 Free Software Foundation, Inc.
+// Copyright (C) 2013-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -233,16 +233,16 @@ namespace __detail
 	  _StateSeqT __e(*_M_nfa, _M_nfa->_M_insert_dummy());
 	  long __min_rep = _M_cur_int_value(10);
 	  bool __infi = false;
-	  long __n;
+	  long __n = 0;
 
 	  // {3
 	  if (_M_match_token(_ScannerT::_S_token_comma))
-	    if (_M_match_token(_ScannerT::_S_token_dup_count)) // {3,7}
-	      __n = _M_cur_int_value(10) - __min_rep;
-	    else
-	      __infi = true;
-	  else
-	    __n = 0;
+	    {
+	      if (_M_match_token(_ScannerT::_S_token_dup_count)) // {3,7}
+		__n = _M_cur_int_value(10) - __min_rep;
+	      else
+		__infi = true;
+	    }
 	  if (!_M_match_token(_ScannerT::_S_token_interval_end))
 	    __throw_regex_error(regex_constants::error_brace,
 				"Unexpected end of brace expression.");

@@ -1,5 +1,5 @@
 /* Generic routines for manipulating SSA_NAME expressions
-   Copyright (C) 2003-2020 Free Software Foundation, Inc.
+   Copyright (C) 2003-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -77,10 +77,10 @@ unsigned int ssa_name_nodes_created;
 void
 init_ssanames (struct function *fn, int size)
 {
-  if (size < 50)
-    size = 50;
-
-  vec_alloc (SSANAMES (fn), size);
+  if (!size)
+    vec_alloc (SSANAMES (fn), 50);
+  else
+    vec_safe_reserve (SSANAMES (fn), size, true);
 
   /* Version 0 is special, so reserve the first slot in the table.  Though
      currently unused, we may use version 0 in alias analysis as part of
@@ -102,6 +102,14 @@ init_ssanames (struct function *fn, int size)
 void
 fini_ssanames (struct function *fn)
 {
+  unsigned i;
+  tree name;
+  /* Some SSA names leak into global tree data structures so we can't simply
+     ggc_free them.  But make sure to clear references to stmts since we now
+     ggc_free the CFG itself.  */
+  FOR_EACH_VEC_SAFE_ELT (SSANAMES (fn), i, name)
+    if (name)
+      SSA_NAME_DEF_STMT (name) = NULL;
   vec_free (SSANAMES (fn));
   vec_free (FREE_SSANAMES (fn));
   vec_free (FREE_SSANAMES_QUEUE (fn));
@@ -420,21 +428,30 @@ set_range_info (tree name, const value_range &vr)
    is used to determine if MIN and MAX are valid values.  */
 
 enum value_range_kind
-get_range_info (const_tree name, wide_int *min, wide_int *max)
+get_range_info (const_tree expr, wide_int *min, wide_int *max)
 {
-  gcc_assert (!POINTER_TYPE_P (TREE_TYPE (name)));
+  gcc_assert (!POINTER_TYPE_P (TREE_TYPE (expr)));
   gcc_assert (min && max);
-  range_info_def *ri = SSA_NAME_RANGE_INFO (name);
+  if (TREE_CODE (expr) == INTEGER_CST)
+    {
+      *min = wi::to_wide (expr);
+      *max = *min;
+      return VR_RANGE;
+    }
+  if (TREE_CODE (expr) != SSA_NAME)
+    return VR_VARYING;
+
+  range_info_def *ri = SSA_NAME_RANGE_INFO (expr);
 
   /* Return VR_VARYING for SSA_NAMEs with NULL RANGE_INFO or SSA_NAMEs
      with integral types width > 2 * HOST_BITS_PER_WIDE_INT precision.  */
-  if (!ri || (GET_MODE_PRECISION (SCALAR_INT_TYPE_MODE (TREE_TYPE (name)))
+  if (!ri || (GET_MODE_PRECISION (SCALAR_INT_TYPE_MODE (TREE_TYPE (expr)))
 	      > 2 * HOST_BITS_PER_WIDE_INT))
     return VR_VARYING;
 
   *min = ri->get_min ();
   *max = ri->get_max ();
-  return SSA_NAME_RANGE_TYPE (name);
+  return SSA_NAME_RANGE_TYPE (expr);
 }
 
 /* Gets range information corresponding to ssa_name NAME and stores it

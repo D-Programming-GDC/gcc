@@ -1,5 +1,5 @@
 // GNU D Compiler exception personality routines.
-// Copyright (C) 2011-2020 Free Software Foundation, Inc.
+// Copyright (C) 2011-2021 Free Software Foundation, Inc.
 
 // GCC is free software; you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free
@@ -805,7 +805,7 @@ version (GNU_SEH_Exceptions)
                                                            void* ms_orig_context, void* ms_disp)
     {
         return _GCC_specific_handler(ms_exc, this_frame, ms_orig_context,
-                                     ms_disp, &__gdc_personality_imp);
+                                     ms_disp, &gdc_personality);
     }
 }
 else version (GNU_SjLj_Exceptions)

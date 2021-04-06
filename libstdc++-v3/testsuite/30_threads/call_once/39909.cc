@@ -1,9 +1,8 @@
-// { dg-do run }
+// { dg-do run { target c++11 } }
 // { dg-additional-options "-pthread" { target pthread } }
-// { dg-require-effective-target c++11 }
 // { dg-require-gthreads "" }
 
-// Copyright (C) 2009-2020 Free Software Foundation, Inc.
+// Copyright (C) 2009-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the

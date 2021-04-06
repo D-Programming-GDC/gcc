@@ -1,4 +1,4 @@
-/* Copyright (C) 2005-2020 Free Software Foundation, Inc.
+/* Copyright (C) 2005-2021 Free Software Foundation, Inc.
    Contributed by Richard Henderson <rth@redhat.com>.
 
    This file is part of the GNU Offloading and Multi Processing Library
@@ -53,11 +53,11 @@ gomp_resolve_num_threads (unsigned specified, unsigned count)
   /* Accelerators with fixed thread counts require this to return 1 for
      nested parallel regions.  */
 #if !defined(__AMDGCN__) && !defined(__nvptx__)
-      && !icv->nest_var
+      && icv->max_active_levels_var <= 1
 #endif
       )
     return 1;
-  else if (thr->ts.active_level >= gomp_max_active_levels_var)
+  else if (thr->ts.active_level >= icv->max_active_levels_var)
     return 1;
 
   /* If NUM_THREADS not specified, use nthreads_var.  */

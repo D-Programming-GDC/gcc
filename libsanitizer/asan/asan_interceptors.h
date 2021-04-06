@@ -13,9 +13,10 @@
 #ifndef ASAN_INTERCEPTORS_H
 #define ASAN_INTERCEPTORS_H
 
-#include "asan_internal.h"
 #include "asan_interceptors_memintrinsics.h"
+#include "asan_internal.h"
 #include "interception/interception.h"
+#include "sanitizer_common/sanitizer_platform.h"
 #include "sanitizer_common/sanitizer_platform_interceptors.h"
 
 namespace __asan {
@@ -116,8 +117,9 @@ void InitializePlatformInterceptors();
 # define ASAN_INTERCEPT___STRDUP 0
 #endif
 
-#if SANITIZER_LINUX && (defined(__arm__) || defined(__aarch64__) || \
-                        defined(__i386__) || defined(__x86_64__))
+#if SANITIZER_LINUX &&                                                \
+    (defined(__arm__) || defined(__aarch64__) || defined(__i386__) || \
+     defined(__x86_64__) || SANITIZER_RISCV64)
 # define ASAN_INTERCEPT_VFORK 1
 #else
 # define ASAN_INTERCEPT_VFORK 0
@@ -148,6 +150,13 @@ DECLARE_REAL(char*, strstr, const char *s1, const char *s2)
       VReport(1, "AddressSanitizer: failed to intercept '%s@@%s'\n", #name, \
               #ver);                                                        \
   } while (0)
+#define ASAN_INTERCEPT_FUNC_VER_UNVERSIONED_FALLBACK(name, ver)              \
+  do {                                                                       \
+    if (!INTERCEPT_FUNCTION_VER(name, ver) && !INTERCEPT_FUNCTION(name))     \
+      VReport(1, "AddressSanitizer: failed to intercept '%s@@%s' or '%s'\n", \
+              #name, #ver, #name);                                           \
+  } while (0)
+
 #else
 // OS X interceptors don't need to be initialized with INTERCEPT_FUNCTION.
 #define ASAN_INTERCEPT_FUNC(name)

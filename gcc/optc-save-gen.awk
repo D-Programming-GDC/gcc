@@ -1,4 +1,4 @@
-#  Copyright (C) 2003-2020 Free Software Foundation, Inc.
+#  Copyright (C) 2003-2021 Free Software Foundation, Inc.
 #  Contributed by Kelley Cook, June 2004.
 #  Original code from Neil Booth, May 2003.
 #
@@ -516,6 +516,10 @@ if (have_save) {
 
 			var_save_seen[name]++;
 			otype = var_type_struct(flags[i])
+			if (opt_args("Mask", flags[i]) != "" \
+			    || opt_args("InverseMask", flags[i]))
+				var_target_explicit_mask[name] = 1;
+
 			if (otype ~ "^((un)?signed +)?int *$")
 				var_target_int[n_target_int++] = name;
 
@@ -545,6 +549,7 @@ if (have_save) {
 	}
 } else {
 	var_target_int[n_target_int++] = "target_flags";
+	var_target_explicit_mask["target_flags"] = 1;
 }
 
 have_assert = 0;
@@ -592,11 +597,13 @@ for (i = 0; i < n_target_string; i++) {
 }
 
 print "";
-print "  unsigned HOST_WIDE_INT mask = 0;";
 
 j = 0;
 k = 0;
 for (i = 0; i < n_extra_target_vars; i++) {
+	if (j == 0 && k == 0) {
+		print "  unsigned HOST_WIDE_INT mask = 0;";
+	}
 	print "  if (opts_set->x_" extra_target_vars[i] ") mask |= HOST_WIDE_INT_1U << " j ";";
 	j++;
 	if (j == 64) {
@@ -608,6 +615,13 @@ for (i = 0; i < n_extra_target_vars; i++) {
 }
 
 for (i = 0; i < n_target_other; i++) {
+	if (var_target_other[i] in var_target_explicit_mask) {
+		print "  ptr->explicit_mask_" var_target_other[i] " = opts_set->x_" var_target_other[i] ";";
+		continue;
+	}
+	if (j == 0 && k == 0) {
+		print "  unsigned HOST_WIDE_INT mask = 0;";
+	}
 	print "  if (opts_set->x_" var_target_other[i] ") mask |= HOST_WIDE_INT_1U << " j ";";
 	j++;
 	if (j == 64) {
@@ -619,6 +633,9 @@ for (i = 0; i < n_target_other; i++) {
 }
 
 for (i = 0; i < n_target_enum; i++) {
+	if (j == 0 && k == 0) {
+		print "  unsigned HOST_WIDE_INT mask = 0;";
+	}
 	print "  if (opts_set->x_" var_target_enum[i] ") mask |= HOST_WIDE_INT_1U << " j ";";
 	j++;
 	if (j == 64) {
@@ -630,6 +647,13 @@ for (i = 0; i < n_target_enum; i++) {
 }
 
 for (i = 0; i < n_target_int; i++) {
+	if (var_target_int[i] in var_target_explicit_mask) {
+		print "  ptr->explicit_mask_" var_target_int[i] " = opts_set->x_" var_target_int[i] ";";
+		continue;
+	}
+	if (j == 0 && k == 0) {
+		print "  unsigned HOST_WIDE_INT mask = 0;";
+	}
 	print "  if (opts_set->x_" var_target_int[i] ") mask |= HOST_WIDE_INT_1U << " j ";";
 	j++;
 	if (j == 64) {
@@ -641,6 +665,9 @@ for (i = 0; i < n_target_int; i++) {
 }
 
 for (i = 0; i < n_target_short; i++) {
+	if (j == 0 && k == 0) {
+		print "  unsigned HOST_WIDE_INT mask = 0;";
+	}
 	print "  if (opts_set->x_" var_target_short[i] ") mask |= HOST_WIDE_INT_1U << " j ";";
 	j++;
 	if (j == 64) {
@@ -652,6 +679,9 @@ for (i = 0; i < n_target_short; i++) {
 }
 
 for (i = 0; i < n_target_char; i++) {
+	if (j == 0 && k == 0) {
+		print "  unsigned HOST_WIDE_INT mask = 0;";
+	}
 	print "  if (opts_set->x_" var_target_char[i] ") mask |= HOST_WIDE_INT_1U << " j ";";
 	j++;
 	if (j == 64) {
@@ -663,6 +693,9 @@ for (i = 0; i < n_target_char; i++) {
 }
 
 for (i = 0; i < n_target_string; i++) {
+	if (j == 0 && k == 0) {
+		print "  unsigned HOST_WIDE_INT mask = 0;";
+	}
 	print "  if (opts_set->x_" var_target_string[i] ") mask |= HOST_WIDE_INT_1U << " j ";";
 	j++;
 	if (j == 64) {
@@ -675,6 +708,10 @@ for (i = 0; i < n_target_string; i++) {
 
 if (j != 0) {
 	print "  ptr->explicit_mask[" k "] = mask;";
+}
+has_target_explicit_mask = 0;
+if (j != 0 || k != 0) {
+	has_target_explicit_mask = 1;
 }
 
 print "}";
@@ -715,7 +752,9 @@ for (i = 0; i < n_target_string; i++) {
 }
 
 print "";
-print "  unsigned HOST_WIDE_INT mask;";
+if (has_target_explicit_mask) {
+	print "  unsigned HOST_WIDE_INT mask;";
+}
 
 j = 64;
 k = 0;
@@ -739,6 +778,10 @@ for (i = 0; i < n_extra_target_vars; i++) {
 }
 
 for (i = 0; i < n_target_other; i++) {
+	if (var_target_other[i] in var_target_explicit_mask) {
+		print "  opts_set->x_" var_target_other[i] " = ptr->explicit_mask_" var_target_other[i] ";";
+		continue;
+	}
 	if (j == 64) {
 		print "  mask = ptr->explicit_mask[" k "];";
 		k++;
@@ -761,6 +804,10 @@ for (i = 0; i < n_target_enum; i++) {
 }
 
 for (i = 0; i < n_target_int; i++) {
+	if (var_target_int[i] in var_target_explicit_mask) {
+		print "  opts_set->x_" var_target_int[i] " = ptr->explicit_mask_" var_target_int[i] ";";
+		continue;
+	}
 	if (j == 64) {
 		print "  mask = ptr->explicit_mask[" k "];";
 		k++;
@@ -989,8 +1036,10 @@ for (i = 0; i < n_target_save; i++) {
 	type = var;
 	sub("^.*[ *]", "", name)
 	sub(" *" name "$", "", type)
-	if (target_save_decl[i] ~ "^const char \\*+[_" alnum "]+$")
+	if (target_save_decl[i] ~ "^const char \\*+[_" alnum "]+$") {
 		var_target_str[n_target_str++] = name;
+		string_options_names[name]++
+	}
 	else {
 		if (target_save_decl[i] ~ " .*\\[.+\\]+$") {
 			size = name;
@@ -1054,9 +1103,25 @@ for (i = 0; i < n_target_val; i++) {
 	print "    return false;";
 }
 
-print "  for (size_t i = 0; i < sizeof (ptr1->explicit_mask) / sizeof (ptr1->explicit_mask[0]); i++)";
-print "    if (ptr1->explicit_mask[i] != ptr2->explicit_mask[i])";
-print "      return false;"
+if (has_target_explicit_mask) {
+	print "  for (size_t i = 0; i < sizeof (ptr1->explicit_mask) / sizeof (ptr1->explicit_mask[0]); i++)";
+	print "    if (ptr1->explicit_mask[i] != ptr2->explicit_mask[i])";
+	print "      return false;"
+}
+
+for (i = 0; i < n_target_other; i++) {
+	if (var_target_other[i] in var_target_explicit_mask) {
+		print "  if (ptr1->explicit_mask_" var_target_other[i] " != ptr2->explicit_mask_" var_target_other[i] ")";
+		print "    return false;";
+	}
+}
+
+for (i = 0; i < n_target_int; i++) {
+	if (var_target_int[i] in var_target_explicit_mask) {
+		print "  if (ptr1->explicit_mask_" var_target_int[i] " != ptr2->explicit_mask_" var_target_int[i] ")";
+		print "    return false;";
+	}
+}
 
 print "  return true;";
 
@@ -1086,8 +1151,21 @@ for (i = 0; i < n_target_val; i++) {
 	name = var_target_val[i]
 	print "  hstate.add_hwi (ptr->" name");";
 }
-print "  for (size_t i = 0; i < sizeof (ptr->explicit_mask) / sizeof (ptr->explicit_mask[0]); i++)";
-print "    hstate.add_hwi (ptr->explicit_mask[i]);";
+if (has_target_explicit_mask) {
+	print "  for (size_t i = 0; i < sizeof (ptr->explicit_mask) / sizeof (ptr->explicit_mask[0]); i++)";
+	print "    hstate.add_hwi (ptr->explicit_mask[i]);";
+}
+
+for (i = 0; i < n_target_other; i++) {
+	if (var_target_other[i] in var_target_explicit_mask)
+		print "  hstate.add_hwi (ptr->explicit_mask_" var_target_other[i] ");";
+}
+
+for (i = 0; i < n_target_int; i++) {
+	if (var_target_int[i] in var_target_explicit_mask)
+		print "  hstate.add_hwi (ptr->explicit_mask_" var_target_int[i] ");";
+}
+
 print "  return hstate.end ();";
 print "}";
 
@@ -1113,8 +1191,22 @@ for (i = 0; i < n_target_val; i++) {
 	print "  bp_pack_value (bp, ptr->" name", 64);";
 }
 
-print "  for (size_t i = 0; i < sizeof (ptr->explicit_mask) / sizeof (ptr->explicit_mask[0]); i++)";
-print "    bp_pack_value (bp, ptr->explicit_mask[i], 64);";
+if (has_target_explicit_mask) {
+	print "  for (size_t i = 0; i < sizeof (ptr->explicit_mask) / sizeof (ptr->explicit_mask[0]); i++)";
+	print "    bp_pack_value (bp, ptr->explicit_mask[i], 64);";
+}
+
+for (i = 0; i < n_target_other; i++) {
+	if (var_target_other[i] in var_target_explicit_mask) {
+		print "  bp_pack_value (bp, ptr->explicit_mask_" var_target_other[i] ", 64);";
+	}
+}
+
+for (i = 0; i < n_target_int; i++) {
+	if (var_target_int[i] in var_target_explicit_mask) {
+		print "  bp_pack_value (bp, ptr->explicit_mask_" var_target_int[i] ", 64);";
+	}
+}
 
 print "}";
 
@@ -1142,8 +1234,22 @@ for (i = 0; i < n_target_val; i++) {
 	print "  ptr->" name" = (" var_target_val_type[i] ") bp_unpack_value (bp, 64);";
 }
 
-print "  for (size_t i = 0; i < sizeof (ptr->explicit_mask) / sizeof (ptr->explicit_mask[0]); i++)";
-print "    ptr->explicit_mask[i] = bp_unpack_value (bp, 64);";
+if (has_target_explicit_mask) {
+	print "  for (size_t i = 0; i < sizeof (ptr->explicit_mask) / sizeof (ptr->explicit_mask[0]); i++)";
+	print "    ptr->explicit_mask[i] = bp_unpack_value (bp, 64);";
+}
+
+for (i = 0; i < n_target_other; i++) {
+	if (var_target_other[i] in var_target_explicit_mask) {
+		print "  ptr->explicit_mask_" var_target_other[i] " = bp_unpack_value (bp, 64);";
+	}
+}
+
+for (i = 0; i < n_target_int; i++) {
+	if (var_target_int[i] in var_target_explicit_mask) {
+		print "  ptr->explicit_mask_" var_target_int[i] " = bp_unpack_value (bp, 64);";
+	}
+}
 
 print "}";
 
@@ -1186,6 +1292,7 @@ for (i = 0; i < n_opts; i++) {
 		var_opt_val_type[n_opt_val] = otype;
 		var_opt_val[n_opt_val] = "x_" name;
 		var_opt_hash[n_opt_val] = flag_set_p("Optimization", flags[i]);
+		var_opt_init[n_opt_val] = opt_args("Init", flags[i]);
 		n_opt_val++;
 	}
 }
@@ -1257,10 +1364,21 @@ for (i = 0; i < n_opt_val; i++) {
 	otype = var_opt_val_type[i];
 	if (otype ~ "^const char \\**$")
 		print "  bp_pack_string (ob, bp, ptr->" name", true);";
-	else if (otype ~ "^unsigned")
-		print "  bp_pack_var_len_unsigned (bp, ptr->" name");";
-	else
-		print "  bp_pack_var_len_int (bp, ptr->" name");";
+	else {
+		if (otype ~ "^unsigned") {
+			sgn = "unsigned";
+		} else {
+			sgn = "int";
+		}
+		if (name ~ "^x_param" && !(otype ~ "^enum ") && var_opt_init[i]) {
+			print "  if (" var_opt_init[i] " > (" var_opt_val_type[i] ") 10)";
+			print "    bp_pack_var_len_" sgn " (bp, ptr->" name" ^ " var_opt_init[i] ");";
+			print "  else";
+			print "    bp_pack_var_len_" sgn " (bp, ptr->" name");";
+		} else {
+			print "  bp_pack_var_len_" sgn " (bp, ptr->" name");";
+		}
+	}
 }
 print "  for (size_t i = 0; i < sizeof (ptr->explicit_mask) / sizeof (ptr->explicit_mask[0]); i++)";
 print "    bp_pack_value (bp, ptr->explicit_mask[i], 64);";
@@ -1281,10 +1399,18 @@ for (i = 0; i < n_opt_val; i++) {
 		print "  if (ptr->" name")";
 		print "    ptr->" name" = xstrdup (ptr->" name");";
 	}
-	else if (otype ~ "^unsigned")
-		print "  ptr->" name" = (" var_opt_val_type[i] ") bp_unpack_var_len_unsigned (bp);";
-	else
-		print "  ptr->" name" = (" var_opt_val_type[i] ") bp_unpack_var_len_int (bp);";
+	else {
+		if (otype ~ "^unsigned") {
+			sgn = "unsigned";
+		} else {
+			sgn = "int";
+		}
+		print "  ptr->" name" = (" var_opt_val_type[i] ") bp_unpack_var_len_" sgn " (bp);";
+		if (name ~ "^x_param" && !(otype ~ "^enum ") && var_opt_init[i]) {
+			print "  if (" var_opt_init[i] " > (" var_opt_val_type[i] ") 10)";
+			print "    ptr->" name" ^= " var_opt_init[i] ";";
+		}
+	}
 }
 print "  for (size_t i = 0; i < sizeof (ptr->explicit_mask) / sizeof (ptr->explicit_mask[0]); i++)";
 print "    ptr->explicit_mask[i] = bp_unpack_value (bp, 64);";
@@ -1317,6 +1443,15 @@ checked_options["unroll_only_small_loops"]++
 checked_options["TARGET_ALIGN_CALL"]++
 checked_options["TARGET_CASE_VECTOR_PC_RELATIVE"]++
 checked_options["arc_size_opt_level"]++
+# arm exceptions
+checked_options["arm_fp16_format"]++
+checked_options["flag_ipa_ra"]++
+# s390 exceptions
+checked_options["param_max_completely_peel_times"]++
+checked_options["param_max_completely_peeled_insns"]++
+checked_options["param_max_unroll_times"]++
+checked_options["param_max_unrolled_insns"]++
+
 
 for (i = 0; i < n_opts; i++) {
 	name = var_name(flags[i]);
@@ -1327,7 +1462,7 @@ for (i = 0; i < n_opts; i++) {
 		continue;
 	checked_options[name]++
 
-	if (name in string_options_names) {
+	if (name in string_options_names || ("x_" name) in string_options_names) {
 	  print "  if (ptr1->x_" name " != ptr2->x_" name "";
 	  print "      && (!ptr1->x_" name" || !ptr2->x_" name
 	  print "          || strcmp (ptr1->x_" name", ptr2->x_" name ")))";

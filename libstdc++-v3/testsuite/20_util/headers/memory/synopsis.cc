@@ -1,7 +1,7 @@
 // { dg-do compile }
 // { dg-require-normal-namespace "" }
 
-// Copyright (C) 2007-2020 Free Software Foundation, Inc.
+// Copyright (C) 2007-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -19,6 +19,10 @@
 // <http://www.gnu.org/licenses/>.
 
 #include <memory>
+
+#if __cplusplus >= 201103L
+# define NOTHROW noexcept
+#endif
 
 namespace std {
   //  lib.default.allocator, the default allocator:
@@ -40,7 +44,7 @@ namespace std {
 
   //  lib.temporary.buffer, temporary buffers:
   template <class T>
-  pair<T*,ptrdiff_t> get_temporary_buffer(ptrdiff_t n);
+  pair<T*,ptrdiff_t> get_temporary_buffer(ptrdiff_t n) NOTHROW;
   template <class T>
   void return_temporary_buffer(T* p);
 

@@ -1,5 +1,5 @@
 /* CPP Library - traditional lexical analysis and macro expansion.
-   Copyright (C) 2002-2020 Free Software Foundation, Inc.
+   Copyright (C) 2002-2021 Free Software Foundation, Inc.
    Contributed by Neil Booth, May 2002
 
 This program is free software; you can redistribute it and/or modify it
@@ -330,6 +330,7 @@ fun_like_macro (cpp_hashnode *node)
 {
   if (cpp_builtin_macro_p (node))
     return (node->value.builtin == BT_HAS_ATTRIBUTE
+	    || node->value.builtin == BT_HAS_STD_ATTRIBUTE
 	    || node->value.builtin == BT_HAS_BUILTIN
 	    || node->value.builtin == BT_HAS_INCLUDE
 	    || node->value.builtin == BT_HAS_INCLUDE_NEXT);

@@ -1,5 +1,5 @@
 /* Callgraph based analysis of static variables.
-   Copyright (C) 2004-2020 Free Software Foundation, Inc.
+   Copyright (C) 2004-2021 Free Software Foundation, Inc.
    Contributed by Kenneth Zadeck <zadeck@naturalbridge.com>
 
 This file is part of GCC.
@@ -61,6 +61,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "symbol-summary.h"
 #include "ipa-prop.h"
 #include "ipa-fnsummary.h"
+#include "symtab-thunks.h"
 
 /* Lattice values for const and pure functions.  Everything starts out
    being const, then may drop to pure and then neither depending on
@@ -841,20 +842,20 @@ check_retval_uses (tree retval, gimple *stmt)
       {
 	tree op2 = gimple_cond_rhs (cond);
 	if (!integer_zerop (op2))
-	  RETURN_FROM_IMM_USE_STMT (use_iter, false);
+	  return false;
       }
     else if (gassign *ga = dyn_cast<gassign *> (use_stmt))
       {
 	enum tree_code code = gimple_assign_rhs_code (ga);
 	if (TREE_CODE_CLASS (code) != tcc_comparison)
-	  RETURN_FROM_IMM_USE_STMT (use_iter, false);
+	  return false;
 	if (!integer_zerop (gimple_assign_rhs2 (ga)))
-	  RETURN_FROM_IMM_USE_STMT (use_iter, false);
+	  return false;
       }
     else if (is_gimple_debug (use_stmt))
       ;
     else if (use_stmt != stmt)
-      RETURN_FROM_IMM_USE_STMT (use_iter, false);
+      return false;
 
   return true;
 }
@@ -1025,11 +1026,11 @@ analyze_function (struct cgraph_node *fn, bool ipa)
 		    flags_from_decl_or_type (fn->decl),
 		    fn->cannot_return_p ());
 
-  if (fn->thunk.thunk_p || fn->alias)
+  if (fn->thunk || fn->alias)
     {
       /* Thunk gets propagated through, so nothing interesting happens.  */
       gcc_assert (ipa);
-      if (fn->thunk.thunk_p && fn->thunk.virtual_offset_p)
+      if (fn->thunk && thunk_info::get (fn)->virtual_offset_p)
 	l->pure_const_state = IPA_NEITHER;
       return l;
     }
@@ -1152,6 +1153,9 @@ funct_state_summary_t::insert (cgraph_node *node, funct_state_d *state)
       new (state) funct_state_d (*a);
       free (a);
     }
+  else
+    /* Do not keep stale summaries.  */
+    funct_state_summaries->remove (node);
 }
 
 /* Called when new clone is inserted to callgraph late.  */
@@ -1933,7 +1937,7 @@ propagate_malloc (void)
 	  if (l->malloc_state == STATE_MALLOC_BOTTOM)
 	    continue;
 
-	  vec<cgraph_node *> callees = vNULL;
+	  auto_vec<cgraph_node *, 16> callees;
 	  for (cgraph_edge *cs = node->callees; cs; cs = cs->next_callee)
 	    {
 	      ipa_call_summary *es = ipa_call_summaries->get_create (cs);
@@ -1969,7 +1973,8 @@ propagate_malloc (void)
 	funct_state l = funct_state_summaries->get (node);
 	if (!node->alias
 	    && l->malloc_state == STATE_MALLOC
-	    && !node->inlined_to)
+	    && !node->inlined_to
+	    && !VOID_TYPE_P (TREE_TYPE (TREE_TYPE (node->decl))))
 	  {
 	    if (dump_file && (dump_flags & TDF_DETAILS))
 	      fprintf (dump_file, "Function %s found to be malloc\n",

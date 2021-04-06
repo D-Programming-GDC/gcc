@@ -13,16 +13,10 @@
 -- ware  Foundation;  either version 3,  or (at your option) any later ver- --
 -- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
 -- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
--- or FITNESS FOR A PARTICULAR PURPOSE.                                     --
---                                                                          --
--- As a special exception under Section 7 of GPL version 3, you are granted --
--- additional permissions described in the GCC Runtime Library Exception,   --
--- version 3.1, as published by the Free Software Foundation.               --
---                                                                          --
--- You should have received a copy of the GNU General Public License and    --
--- a copy of the GCC Runtime Library Exception along with this program;     --
--- see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see    --
--- <http://www.gnu.org/licenses/>.                                          --
+-- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+-- for  more details.  You should have  received  a copy of the GNU General --
+-- Public License  distributed with GNAT; see file COPYING3.  If not, go to --
+-- http://www.gnu.org/licenses for a complete copy of the license.          --
 --                                                                          --
 -- GNAT was originally developed  by the GNAT team at  New York University. --
 -- Extensive contributions were provided by Ada Core Technologies Inc.      --
@@ -369,6 +363,11 @@ package Opt is
    Config_File_Names : String_List_Access := null;
    --  GNAT
    --  Names of configuration pragmas files (given by switches -gnatec)
+
+   Config_Files_Store_Basename : Boolean := False;
+   --  GNAT
+   --  Set True for -gnateb. Tells GNAT that config files should be referred to
+   --  by their basename and their checksums computed in ALI files.
 
    Configurable_Run_Time_Mode : Boolean := False;
    --  GNAT, GNATBIND
@@ -724,6 +723,10 @@ package Opt is
    --  Set to file name to generate full source listing to named file (or if
    --  the name is of the form .xxx, then to name.xxx where name is the source
    --  file name with extension stripped.
+
+   Generate_Asm : Boolean := False;
+   --  GNAT
+   --  True if generating assembly instead of an object file, via the -S switch
 
    Generate_C_Code : Boolean := False;
    --  GNAT, GNATBIND
@@ -1132,7 +1135,7 @@ package Opt is
    --  make it easier to interface with back ends that implement C semantics.
    --  There is a section in Sinfo which describes the transformations made.
 
-   Multiple_Unit_Index : Int := 0;
+   Multiple_Unit_Index : Nat := 0;
    --  GNAT
    --  This is set non-zero if the current unit is being compiled in multiple
    --  unit per file mode, meaning that the current unit is selected from the
@@ -1198,6 +1201,12 @@ package Opt is
    --  GNAT
    --  If a pragma No_Tagged_Streams is active for the current scope, this
    --  points to the corresponding pragma.
+
+   Nodes_Size_In_Meg : Nat := 0;
+   --  GNAT
+   --  Amount of memory to allocate for all nodes, in units of 2**20 bytes.
+   --  Set by the -gnaten switch; 0 means -gnaten was not given, and a default
+   --  value should be used.
 
    Normalize_Scalars : Boolean := False;
    --  GNAT, GNATBIND
@@ -1305,11 +1314,6 @@ package Opt is
    Pessimistic_Elab_Order : Boolean := False;
    --  GNATBIND
    --  True if pessimistic elaboration order is to be chosen (-p switch set)
-
-   Polling_Required : Boolean := False;
-   --  GNAT
-   --  Set to True if polling for asynchronous abort is enabled by using
-   --  the -gnatP option for GNAT.
 
    Prefix_Exception_Messages : Boolean := False;
    --  GNAT
@@ -1592,6 +1596,12 @@ package Opt is
    --  GNATBIND
    --  Tolerate time stamp and other consistency errors. If this flag is set to
    --  True (-t), then inconsistencies result in warnings rather than errors.
+
+   Transform_Function_Array : Boolean := False;
+   --  GNAT
+   --  If this switch is set True, then functions returning constrained arrays
+   --  are transformed into a procedure with an out parameter, and all calls
+   --  are updated accordingly.
 
    Treat_Categorization_Errors_As_Warnings : Boolean := False;
    --  Normally categorization errors are true illegalities. If this switch
@@ -2103,14 +2113,6 @@ package Opt is
    --  at the start of each compilation unit, except that it is always
    --  set False for predefined units.
 
-   Polling_Required_Config : Boolean;
-   --  GNAT
-   --  This is the value of the configuration switch that controls polling
-   --  mode. It can be set True by the command line switch -gnatP, and then
-   --  further modified by the use of pragma Polling in the gnat.adc file. This
-   --  flag is used to set the initial value for Polling_Required at the start
-   --  of analyzing each unit.
-
    Prefix_Exception_Messages_Config : Boolean;
    --  The setting of Prefix_Exception_Messages from configuration pragmas
 
@@ -2338,7 +2340,6 @@ private
       Optimize_Alignment             : Character;
       Optimize_Alignment_Local       : Boolean;
       Persistent_BSS_Mode            : Boolean;
-      Polling_Required               : Boolean;
       Prefix_Exception_Messages      : Boolean;
       SPARK_Mode                     : SPARK_Mode_Type;
       SPARK_Mode_Pragma              : Node_Id;

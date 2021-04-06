@@ -1,5 +1,5 @@
 /* Classes for purging state at function_points.
-   Copyright (C) 2019-2020 Free Software Foundation, Inc.
+   Copyright (C) 2019-2021 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -209,13 +209,21 @@ state_purge_per_ssa_name::state_purge_per_ssa_name (const state_purge_map &map,
   if (map.get_logger ())
     {
       map.log ("%qE in %qD is needed to process:", name, fun->decl);
+      /* Log m_points_needing_name, sorting it to avoid churn when comparing
+	 dumps.  */
+      auto_vec<function_point> points;
       for (point_set_t::iterator iter = m_points_needing_name.begin ();
 	   iter != m_points_needing_name.end ();
 	   ++iter)
+	points.safe_push (*iter);
+      points.qsort (function_point::cmp_ptr);
+      unsigned i;
+      function_point *point;
+      FOR_EACH_VEC_ELT (points, i, point)
 	{
 	  map.start_log_line ();
 	  map.get_logger ()->log_partial ("  point: ");
-	  (*iter).print (map.get_logger ()->get_printer (), format (false));
+	  point->print (map.get_logger ()->get_printer (), format (false));
 	  map.end_log_line ();
 	}
     }

@@ -1,6 +1,6 @@
 /* Operating system specific defines to be used when targeting GCC for
    hosting on Windows32, using a Unix style C library and tools.
-   Copyright (C) 1995-2020 Free Software Foundation, Inc.
+   Copyright (C) 1995-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -209,6 +209,8 @@ along with GCC; see the file COPYING3.  If not see
 #define SUBTARGET_OVERRIDE_OPTIONS					\
 do {									\
   flag_pic = TARGET_64BIT ? 1 : 0;                                      \
+  if (!global_options_set.x_dwarf_version)				\
+    dwarf_version = 4;							\
 } while (0)
 
 /* Define this macro if references to a symbol must be treated

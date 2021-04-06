@@ -1,5 +1,5 @@
 /* Subroutines for manipulating rtx's in semantically interesting ways.
-   Copyright (C) 1987-2020 Free Software Foundation, Inc.
+   Copyright (C) 1987-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -27,9 +27,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree.h"
 #include "memmodel.h"
 #include "tm_p.h"
+#include "optabs.h"
 #include "expmed.h"
 #include "profile-count.h"
-#include "optabs.h"
 #include "emit-rtl.h"
 #include "recog.h"
 #include "diagnostic-core.h"
@@ -375,6 +375,26 @@ convert_memory_address_addr_space_1 (scalar_int_mode to_mode ATTRIBUTE_UNUSED,
 	  return (temp ? gen_rtx_fmt_ee (GET_CODE (x), to_mode,
 					 temp, XEXP (x, 1))
 		       : temp);
+	}
+      break;
+
+    case UNSPEC:
+      /* Assume that all UNSPECs in a constant address can be converted
+	 operand-by-operand.  We could add a target hook if some targets
+	 require different behavior.  */
+      if (in_const && GET_MODE (x) == from_mode)
+	{
+	  unsigned int n = XVECLEN (x, 0);
+	  rtvec v = gen_rtvec (n);
+	  for (unsigned int i = 0; i < n; ++i)
+	    {
+	      rtx op = XVECEXP (x, 0, i);
+	      if (GET_MODE (op) == from_mode)
+		op = convert_memory_address_addr_space_1 (to_mode, op, as,
+							  in_const, no_emit);
+	      RTVEC_ELT (v, i) = op;
+	    }
+	  return gen_rtx_UNSPEC (to_mode, v, XINT (x, 1));
 	}
       break;
 
@@ -1583,10 +1603,14 @@ allocate_dynamic_stack_space (rtx size, unsigned size_align,
    OFFSET is the offset of the area into the virtual stack vars area.
 
    REQUIRED_ALIGN is the alignment (in bits) required for the region
-   of memory.  */
+   of memory.
+
+   BASE is the rtx of the base of this virtual stack vars area.
+   The only time this is not `virtual_stack_vars_rtx` is when tagging pointers
+   on the stack.  */
 
 rtx
-get_dynamic_stack_base (poly_int64 offset, unsigned required_align)
+get_dynamic_stack_base (poly_int64 offset, unsigned required_align, rtx base)
 {
   rtx target;
 
@@ -1594,7 +1618,7 @@ get_dynamic_stack_base (poly_int64 offset, unsigned required_align)
     crtl->preferred_stack_boundary = PREFERRED_STACK_BOUNDARY;
 
   target = gen_reg_rtx (Pmode);
-  emit_move_insn (target, virtual_stack_vars_rtx);
+  emit_move_insn (target, base);
   target = expand_binop (Pmode, add_optab, target,
 			 gen_int_mode (offset, Pmode),
 			 NULL_RTX, 1, OPTAB_LIB_WIDEN);

@@ -1,5 +1,5 @@
 /* Interprocedural Identical Code Folding pass
-   Copyright (C) 2014-2020 Free Software Foundation, Inc.
+   Copyright (C) 2014-2021 Free Software Foundation, Inc.
 
    Contributed by Jan Hubicka <hubicka@ucw.cz> and Martin Liska <mliska@suse.cz>
 
@@ -66,6 +66,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "coverage.h"
 #include "gimple-pretty-print.h"
 #include "data-streamer.h"
+#include "tree-streamer.h"
 #include "fold-const.h"
 #include "calls.h"
 #include "varasm.h"
@@ -78,12 +79,16 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "print-tree.h"
 #include "ipa-utils.h"
+#include "tree-ssa-alias-compare.h"
 #include "ipa-icf-gimple.h"
 #include "fibonacci_heap.h"
 #include "ipa-icf.h"
 #include "stor-layout.h"
 #include "dbgcnt.h"
 #include "tree-vector-builder.h"
+#include "symtab-thunks.h"
+#include "alias.h"
+#include "asan.h"
 
 using namespace ipa_icf_gimple;
 
@@ -161,8 +166,11 @@ sem_item::add_reference (ref_map *refs,
   unsigned index = reference_count++;
   bool existed;
 
-  vec<sem_item *> &v
-    = refs->get_or_insert (new sem_usage_pair (target, index), &existed);
+  sem_usage_pair *pair = new sem_usage_pair (target, index);
+  vec<sem_item *> &v = refs->get_or_insert (pair, &existed);
+  if (existed)
+    delete pair;
+
   v.safe_push (this);
   bitmap_set_bit (target->usage_index_bitmap, index);
   refs_set.add (target->node);
@@ -225,14 +233,16 @@ hash_map<const_tree, hashval_t> sem_item::m_type_hash_cache;
 /* Semantic function constructor that uses STACK as bitmap memory stack.  */
 
 sem_function::sem_function (bitmap_obstack *stack)
-: sem_item (FUNC, stack), m_checker (NULL), m_compared_func (NULL)
+  : sem_item (FUNC, stack), memory_access_types (), m_alias_sets_hash (0),
+    m_checker (NULL), m_compared_func (NULL)
 {
   bb_sizes.create (0);
   bb_sorted.create (0);
 }
 
 sem_function::sem_function (cgraph_node *node, bitmap_obstack *stack)
-: sem_item (FUNC, node, stack), m_checker (NULL), m_compared_func (NULL)
+  : sem_item (FUNC, node, stack), memory_access_types (),
+    m_alias_sets_hash (0), m_checker (NULL), m_compared_func (NULL)
 {
   bb_sizes.create (0);
   bb_sorted.create (0);
@@ -530,22 +540,14 @@ sem_function::equals_wpa (sem_item *item,
 
   m_compared_func = static_cast<sem_function *> (item);
 
-  if (cnode->thunk.thunk_p != cnode2->thunk.thunk_p)
-    return return_false_with_msg ("thunk_p mismatch");
+  if (cnode->thunk != cnode2->thunk)
+    return return_false_with_msg ("thunk mismatch");
+  if (cnode->former_thunk_p () != cnode2->former_thunk_p ())
+    return return_false_with_msg ("former_thunk_p mismatch");
 
-  if (cnode->thunk.thunk_p)
-    {
-      if (cnode->thunk.fixed_offset != cnode2->thunk.fixed_offset)
-        return return_false_with_msg ("thunk fixed_offset mismatch");
-      if (cnode->thunk.virtual_value != cnode2->thunk.virtual_value)
-        return return_false_with_msg ("thunk virtual_value mismatch");
-      if (cnode->thunk.indirect_offset != cnode2->thunk.indirect_offset)
-        return return_false_with_msg ("thunk indirect_offset mismatch");
-      if (cnode->thunk.this_adjusting != cnode2->thunk.this_adjusting)
-        return return_false_with_msg ("thunk this_adjusting mismatch");
-      if (cnode->thunk.virtual_offset_p != cnode2->thunk.virtual_offset_p)
-        return return_false_with_msg ("thunk virtual_offset_p mismatch");
-    }
+  if ((cnode->thunk || cnode->former_thunk_p ())
+      && thunk_info::get (cnode) != thunk_info::get (cnode2))
+    return return_false_with_msg ("thunk_info mismatch");
 
   /* Compare special function DECL attributes.  */
   if (DECL_FUNCTION_PERSONALITY (decl)
@@ -577,6 +579,7 @@ sem_function::equals_wpa (sem_item *item,
      type memory location for ipa-polymorphic-call and we do not want
      it to get confused by wrong type.  */
   if (DECL_CXX_CONSTRUCTOR_P (decl)
+      && opt_for_fn (decl, flag_devirtualize)
       && TREE_CODE (TREE_TYPE (decl)) == METHOD_TYPE)
     {
       if (TREE_CODE (TREE_TYPE (item->decl)) != METHOD_TYPE)
@@ -850,6 +853,8 @@ sem_function::equals_private (sem_item *item)
 
   m_checker = new func_checker (decl, m_compared_func->decl,
 				false,
+				opt_for_fn (m_compared_func->decl,
+					    flag_strict_aliasing),
 				&refs_set,
 				&m_compared_func->refs_set);
   arg1 = DECL_ARGUMENTS (decl);
@@ -968,7 +973,7 @@ redirect_all_callers (cgraph_node *n, cgraph_node *to)
       /* Redirecting thunks to interposable symbols or symbols in other sections
 	 may not be supported by target output code.  Play safe for now and
 	 punt on redirection.  */
-      if (!e->caller->thunk.thunk_p)
+      if (!e->caller->thunk)
 	{
 	  struct cgraph_edge *nexte = e->next_caller;
           e->redirect_callee (to);
@@ -1362,7 +1367,7 @@ sem_function::init (ipa_icf_gimple::func_checker *checker)
 
   edge_count = n_edges_for_fn (func);
   cgraph_node *cnode = dyn_cast <cgraph_node *> (node);
-  if (!cnode->thunk.thunk_p)
+  if (!cnode->thunk)
     {
       cfg_checksum = coverage_compute_cfg_checksum (func);
 
@@ -1407,12 +1412,7 @@ sem_function::init (ipa_icf_gimple::func_checker *checker)
   else
     {
       cfg_checksum = 0;
-      inchash::hash hstate;
-      hstate.add_hwi (cnode->thunk.fixed_offset);
-      hstate.add_hwi (cnode->thunk.virtual_value);
-      hstate.add_flag (cnode->thunk.this_adjusting);
-      hstate.add_flag (cnode->thunk.virtual_offset_p);
-      gcode_hash = hstate.end ();
+      gcode_hash = thunk_info::get (cnode)->hash ();
     }
 
   m_checker = NULL;
@@ -1431,33 +1431,53 @@ sem_function::hash_stmt (gimple *stmt, inchash::hash &hstate)
     {
     case GIMPLE_SWITCH:
       m_checker->hash_operand (gimple_switch_index (as_a <gswitch *> (stmt)),
-			     hstate, 0);
+			       hstate, 0, func_checker::OP_NORMAL);
       break;
     case GIMPLE_ASSIGN:
       hstate.add_int (gimple_assign_rhs_code (stmt));
-      if (commutative_tree_code (gimple_assign_rhs_code (stmt))
-	  || commutative_ternary_tree_code (gimple_assign_rhs_code (stmt)))
-	{
-	  m_checker->hash_operand (gimple_assign_rhs1 (stmt), hstate, 0);
-	  m_checker->hash_operand (gimple_assign_rhs2 (stmt), hstate, 0);
-	  if (commutative_ternary_tree_code (gimple_assign_rhs_code (stmt)))
-	    m_checker->hash_operand (gimple_assign_rhs3 (stmt), hstate, 0);
-	  m_checker->hash_operand (gimple_assign_lhs (stmt), hstate, 0);
-	}
       /* fall through */
     case GIMPLE_CALL:
     case GIMPLE_ASM:
     case GIMPLE_COND:
     case GIMPLE_GOTO:
     case GIMPLE_RETURN:
-      /* All these statements are equivalent if their operands are.  */
-      for (unsigned i = 0; i < gimple_num_ops (stmt); ++i)
-	m_checker->hash_operand (gimple_op (stmt, i), hstate, 0);
-      /* Consider nocf_check attribute in hash as it affects code
- 	 generation.  */
-      if (code == GIMPLE_CALL
-	  && flag_cf_protection & CF_BRANCH)
-	hstate.add_flag (gimple_call_nocf_check_p (as_a <gcall *> (stmt)));
+      {
+	func_checker::operand_access_type_map map (5);
+	func_checker::classify_operands (stmt, &map);
+
+	/* All these statements are equivalent if their operands are.  */
+	for (unsigned i = 0; i < gimple_num_ops (stmt); ++i)
+	  {
+	    func_checker::operand_access_type
+		access_type = func_checker::get_operand_access_type
+					  (&map, gimple_op (stmt, i));
+	    m_checker->hash_operand (gimple_op (stmt, i), hstate, 0,
+				     access_type);
+	    /* For memory accesses when hasing for LTO stremaing record
+	       base and ref alias ptr types so we can compare them at WPA
+	       time without having to read actual function body.  */
+	    if (access_type == func_checker::OP_MEMORY
+		&& lto_streaming_expected_p ()
+		&& flag_strict_aliasing)
+	      {
+		ao_ref ref;
+
+		ao_ref_init (&ref, gimple_op (stmt, i));
+		tree t = ao_ref_alias_ptr_type (&ref);
+		if (!variably_modified_type_p (t, NULL_TREE))
+		  memory_access_types.safe_push (t);
+		t = ao_ref_base_alias_ptr_type (&ref);
+		if (!variably_modified_type_p (t, NULL_TREE))
+		  memory_access_types.safe_push (t);
+	      }
+	  }
+	/* Consider nocf_check attribute in hash as it affects code
+	   generation.  */
+	if (code == GIMPLE_CALL
+	    && flag_cf_protection & CF_BRANCH)
+	  hstate.add_flag (gimple_call_nocf_check_p (as_a <gcall *> (stmt)));
+      }
+      break;
     default:
       break;
     }
@@ -1494,7 +1514,7 @@ sem_function::parse (cgraph_node *node, bitmap_obstack *stack,
   tree fndecl = node->decl;
   function *func = DECL_STRUCT_FUNCTION (fndecl);
 
-  if (!func || (!node->has_gimple_body_p () && !node->thunk.thunk_p))
+  if (!func || (!node->has_gimple_body_p () && !node->thunk))
     return NULL;
 
   if (lookup_attribute_by_prefix ("omp ", DECL_ATTRIBUTES (node->decl)) != NULL)
@@ -1546,7 +1566,8 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2)
       tree phi_result1 = gimple_phi_result (phi1);
       tree phi_result2 = gimple_phi_result (phi2);
 
-      if (!m_checker->compare_operand (phi_result1, phi_result2))
+      if (!m_checker->compare_operand (phi_result1, phi_result2,
+				       func_checker::OP_NORMAL))
 	return return_false_with_msg ("PHI results are different");
 
       size1 = gimple_phi_num_args (phi1);
@@ -1560,7 +1581,7 @@ sem_function::compare_phi_node (basic_block bb1, basic_block bb2)
 	  t1 = gimple_phi_arg (phi1, i)->def;
 	  t2 = gimple_phi_arg (phi2, i)->def;
 
-	  if (!m_checker->compare_operand (t1, t2))
+	  if (!m_checker->compare_operand (t1, t2, func_checker::OP_NORMAL))
 	    return return_false ();
 
 	  e1 = gimple_phi_arg_edge (phi1, i);
@@ -2002,6 +2023,18 @@ sem_variable::merge (sem_item *alias_item)
       return false;
     }
 
+  if (DECL_ALIGN (original->decl) != DECL_ALIGN (alias->decl)
+      && (sanitize_flags_p (SANITIZE_ADDRESS, original->decl)
+	  || sanitize_flags_p (SANITIZE_ADDRESS, alias->decl)))
+    {
+      if (dump_enabled_p ())
+	dump_printf (MSG_MISSED_OPTIMIZATION,
+		     "Not unifying; "
+		     "ASAN requires equal alignments for original and alias\n");
+
+      return false;
+    }
+
   if (DECL_ALIGN (original->decl) < DECL_ALIGN (alias->decl))
     {
       if (dump_enabled_p ())
@@ -2138,6 +2171,14 @@ sem_item_optimizer::write_summary (void)
 	  streamer_write_uhwi_stream (ob->main_stream, node_ref);
 
 	  streamer_write_uhwi (ob, (*item)->get_hash ());
+
+	  if ((*item)->type == FUNC)
+	    {
+	      sem_function *fn = static_cast<sem_function *> (*item);
+	      streamer_write_uhwi (ob, fn->memory_access_types.length ());
+	      for (unsigned i = 0; i < fn->memory_access_types.length (); i++)
+		stream_write_tree (ob, fn->memory_access_types[i], true);
+	    }
 	}
     }
 
@@ -2189,6 +2230,18 @@ sem_item_optimizer::read_section (lto_file_decl_data *file_data,
 	  cgraph_node *cnode = dyn_cast <cgraph_node *> (node);
 
 	  sem_function *fn = new sem_function (cnode, &m_bmstack);
+	  unsigned count = streamer_read_uhwi (&ib_main);
+	  inchash::hash hstate (0);
+	  if (flag_incremental_link == INCREMENTAL_LINK_LTO)
+	    fn->memory_access_types.reserve_exact (count);
+	  for (unsigned i = 0; i < count; i++)
+	    {
+	      tree type = stream_read_tree (&ib_main, data_in);
+	      hstate.add_int (get_deref_alias_set (type));
+	      if (flag_incremental_link == INCREMENTAL_LINK_LTO)
+		fn->memory_access_types.quick_push (type);
+	    }
+	  fn->m_alias_sets_hash = hstate.end ();
 	  fn->set_hash (hash);
 	  m_items.safe_push (fn);
 	}
@@ -2385,6 +2438,7 @@ sem_item_optimizer::execute (void)
 
   build_graph ();
   update_hash_by_addr_refs ();
+  update_hash_by_memory_access_type ();
   build_hash_based_classes ();
 
   if (dump_file)
@@ -2499,11 +2553,24 @@ sem_item_optimizer::update_hash_by_addr_refs ()
 		  = TYPE_METHOD_BASETYPE (TREE_TYPE (m_items[i]->decl));
 		inchash::hash hstate (m_items[i]->get_hash ());
 
+		/* Hash ODR types by mangled name if it is defined.
+		   If not we know that type is anonymous of free_lang_data
+		   was not run and in that case type main variants are
+		   unique.  */
 		if (TYPE_NAME (class_type)
-		     && DECL_ASSEMBLER_NAME_SET_P (TYPE_NAME (class_type)))
+		     && DECL_ASSEMBLER_NAME_SET_P (TYPE_NAME (class_type))
+		     && !type_in_anonymous_namespace_p
+				 (class_type))
 		  hstate.add_hwi
 		    (IDENTIFIER_HASH_VALUE
 		       (DECL_ASSEMBLER_NAME (TYPE_NAME (class_type))));
+		else
+		  {
+		    gcc_checking_assert
+			 (!in_lto_p
+			  || type_in_anonymous_namespace_p (class_type));
+		    hstate.add_hwi (TYPE_UID (TYPE_MAIN_VARIANT (class_type)));
+		  }
 
 		m_items[i]->set_hash (hstate.end ());
 	     }
@@ -2520,6 +2587,21 @@ sem_item_optimizer::update_hash_by_addr_refs ()
   /* Global hash value replace current hash values.  */
   for (unsigned i = 0; i < m_items.length (); i++)
     m_items[i]->set_hash (m_items[i]->global_hash);
+}
+
+void
+sem_item_optimizer::update_hash_by_memory_access_type ()
+{
+  for (unsigned i = 0; i < m_items.length (); i++)
+    {
+      if (m_items[i]->type == FUNC)
+	{
+	  sem_function *fn = static_cast<sem_function *> (m_items[i]);
+	  inchash::hash hstate (fn->get_hash ());
+	  hstate.add_int (fn->m_alias_sets_hash);
+	  fn->set_hash (hstate.end ());
+	}
+    }
 }
 
 /* Congruence classes are built by hash value.  */

@@ -1,5 +1,5 @@
 /* Diagnostic routines shared by all languages that are variants of C.
-   Copyright (C) 1992-2020 Free Software Foundation, Inc.
+   Copyright (C) 1992-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -585,7 +585,7 @@ warn_logical_not_parentheses (location_t location, enum tree_code code,
    (potential) location of the expression.  */
 
 bool
-warn_if_unused_value (const_tree exp, location_t locus)
+warn_if_unused_value (const_tree exp, location_t locus, bool quiet)
 {
  restart:
   if (TREE_USED (exp) || TREE_NO_WARNING (exp))
@@ -633,7 +633,7 @@ warn_if_unused_value (const_tree exp, location_t locus)
       goto restart;
 
     case COMPOUND_EXPR:
-      if (warn_if_unused_value (TREE_OPERAND (exp, 0), locus))
+      if (warn_if_unused_value (TREE_OPERAND (exp, 0), locus, quiet))
 	return true;
       /* Let people do `(foo (), 0)' without a warning.  */
       if (TREE_CONSTANT (TREE_OPERAND (exp, 1)))
@@ -647,6 +647,13 @@ warn_if_unused_value (const_tree exp, location_t locus)
       if (TREE_SIDE_EFFECTS (exp))
 	return false;
       goto warn;
+
+    case COMPLEX_EXPR:
+      /* Warn only if both operands are unused.  */
+      if (warn_if_unused_value (TREE_OPERAND (exp, 0), locus, true)
+	  && warn_if_unused_value (TREE_OPERAND (exp, 1), locus, true))
+	goto warn;
+      return false;
 
     case INDIRECT_REF:
       /* Don't warn about automatic dereferencing of references, since
@@ -671,6 +678,8 @@ warn_if_unused_value (const_tree exp, location_t locus)
 	return false;
 
     warn:
+      if (quiet)
+	return true;
       return warning_at (locus, OPT_Wunused_value, "value computed is not used");
     }
 }
@@ -3177,13 +3186,13 @@ warn_parm_ptrarray_mismatch (location_t origloc, tree curparms, tree newparms)
 	{
 	  curtyp = TREE_TYPE (curtyp);
 	  newtyp = TREE_TYPE (newtyp);
+
+	  if (!newtyp)
+	    /* Bail on error.  */
+	    return;
 	}
       while (TREE_CODE (curtyp) == POINTER_TYPE
 	     && TREE_CODE (newtyp) == POINTER_TYPE);
-
-      if (!newtyp)
-	/* Bail on error.  */
-	return;
 
       if (TREE_CODE (curtyp) != ARRAY_TYPE
 	  || TREE_CODE (newtyp) != ARRAY_TYPE)
@@ -3310,6 +3319,19 @@ warn_parm_ptrarray_mismatch (location_t origloc, tree curparms, tree newparms)
     }
 }
 
+/* Format EXPR if nonnull and return the formatted string.  If EXPR is
+   null return DFLT.  */
+
+static inline const char*
+expr_to_str (pretty_printer &pp, tree expr, const char *dflt)
+{
+  if (!expr)
+    return dflt;
+
+  dump_generic_node (&pp, expr, 0, TDF_VOPS | TDF_MEMSYMS, false);
+  return pp_formatted_text (&pp);
+}
+
 /* Detect and diagnose a mismatch between an attribute access specification
    on the original declaration of FNDECL and that on the parameters NEWPARMS
    from its refeclaration.  ORIGLOC is the location of the first declaration
@@ -3365,18 +3387,21 @@ warn_parm_array_mismatch (location_t origloc, tree fndecl, tree newparms)
   for (tree curp = curparms, newp = newparms; curp;
        curp = TREE_CHAIN (curp), newp = TREE_CHAIN (newp), ++parmpos)
     {
+      if (!newp)
+	/* Bail on invalid redeclarations with fewer arguments.  */
+	return;
+
       /* Only check pointers and C++ references.  */
+      tree curptype = TREE_TYPE (curp);
       tree newptype = TREE_TYPE (newp);
-      if (!POINTER_TYPE_P (newptype))
+      if (!POINTER_TYPE_P (curptype) || !POINTER_TYPE_P (newptype))
 	continue;
 
-      {
-	/* Skip mismatches in __builtin_va_list that is commonly
-	   an array but that in declarations of built-ins decays
-	   to a pointer.  */
-	if (builtin && TREE_TYPE (newptype) == TREE_TYPE (va_list_type_node))
-	  continue;
-      }
+      /* Skip mismatches in __builtin_va_list that is commonly
+	 an array but that in declarations of built-ins decays
+	 to a pointer.  */
+      if (builtin && TREE_TYPE (newptype) == TREE_TYPE (va_list_type_node))
+	continue;
 
       /* Access specs for the argument on the current (previous) and
 	 new (to replace the current) declarations.  Either may be null,
@@ -3419,7 +3444,6 @@ warn_parm_array_mismatch (location_t origloc, tree fndecl, tree newparms)
       if (origloc == UNKNOWN_LOCATION)
 	origloc = newloc;
 
-      tree curptype = TREE_TYPE (curp);
       const std::string newparmstr = newa->array_as_string (newptype);
       const std::string curparmstr = cura->array_as_string (curptype);
       if (new_vla_p && !cur_vla_p)
@@ -3574,10 +3598,9 @@ warn_parm_array_mismatch (location_t origloc, tree fndecl, tree newparms)
 	       the same.  */
 	    continue;
 
-	  const char* const newbndstr =
-	    newbnd ? print_generic_expr_to_str (newbnd) : "*";
-	  const char* const curbndstr =
-	    curbnd ? print_generic_expr_to_str (curbnd) : "*";
+	  pretty_printer pp1, pp2;
+	  const char* const newbndstr = expr_to_str (pp1, newbnd, "*");
+	  const char* const curbndstr = expr_to_str (pp2, curbnd, "*");
 
 	  if (!newpos != !curpos
 	      || (newpos && !tree_int_cst_equal (newpos, curpos)))
@@ -3663,5 +3686,52 @@ warn_parm_array_mismatch (location_t origloc, tree fndecl, tree newparms)
 		      "argument %u of type %s with mismatched bound",
 		      parmpos + 1, newparmstr.c_str ()))
 	inform (origloc, "previously declared as %s", curparmstr.c_str ());
+    }
+}
+
+/* Warn about divisions of two sizeof operators when the first one is applied
+   to an array and the divisor does not equal the size of the array element.
+   For instance:
+
+     sizeof (ARR) / sizeof (OP)
+
+   ARR is the array argument of the first sizeof, ARR_TYPE is its ARRAY_TYPE.
+   OP1 is the whole second SIZEOF_EXPR, or its argument; TYPE1 is the type
+   of the second argument.  */
+
+void
+maybe_warn_sizeof_array_div (location_t loc, tree arr, tree arr_type,
+			     tree op1, tree type1)
+{
+  tree elt_type = TREE_TYPE (arr_type);
+
+  if (!warn_sizeof_array_div
+      /* Don't warn on multidimensional arrays.  */
+      || TREE_CODE (elt_type) == ARRAY_TYPE)
+    return;
+
+  if (!tree_int_cst_equal (TYPE_SIZE (elt_type), TYPE_SIZE (type1)))
+    {
+      auto_diagnostic_group d;
+      if (warning_at (loc, OPT_Wsizeof_array_div,
+		      "expression does not compute the number of "
+		      "elements in this array; element type is "
+		      "%qT, not %qT", elt_type, type1))
+	{
+	  if (EXPR_HAS_LOCATION (op1))
+	    {
+	      location_t op1_loc = EXPR_LOCATION (op1);
+	      gcc_rich_location richloc (op1_loc);
+	      richloc.add_fixit_insert_before (op1_loc, "(");
+	      richloc.add_fixit_insert_after (op1_loc, ")");
+	      inform (&richloc, "add parentheses around %qE to "
+		      "silence this warning", op1);
+	    }
+	  else
+	    inform (loc, "add parentheses around the second %<sizeof%> "
+		    "to silence this warning");
+	  if (DECL_P (arr))
+	    inform (DECL_SOURCE_LOCATION (arr), "array %qD declared here", arr);
+	}
     }
 }

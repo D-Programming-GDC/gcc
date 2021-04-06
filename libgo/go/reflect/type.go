@@ -49,13 +49,13 @@ type Type interface {
 	// It panics if i is not in the range [0, NumMethod()).
 	//
 	// For a non-interface type T or *T, the returned Method's Type and Func
-	// fields describe a function whose first argument is the receiver.
+	// fields describe a function whose first argument is the receiver,
+	// and only exported methods are accessible.
 	//
 	// For an interface type, the returned Method's Type field gives the
 	// method signature, without a receiver, and the Func field is nil.
 	//
-	// Only exported methods are accessible and they are sorted in
-	// lexicographic order.
+	// Methods are sorted in lexicographic order.
 	Method(int) Method
 
 	// MethodByName returns the method with that name in the type's
@@ -68,7 +68,9 @@ type Type interface {
 	// method signature, without a receiver, and the Func field is nil.
 	MethodByName(string) (Method, bool)
 
-	// NumMethod returns the number of exported methods in the type's method set.
+	// NumMethod returns the number of methods accessible using Method.
+	//
+	// Note that NumMethod counts unexported methods only for interface types.
 	NumMethod() int
 
 	// Name returns the type's name within its package for a defined type.
@@ -1129,7 +1131,7 @@ func (t *rtype) ptrTo() *rtype {
 	// Look in known types.
 	s := "*" + *t.string
 	if tt := lookupType(s); tt != nil {
-		p := (*ptrType)(unsafe.Pointer(tt))
+		p := (*ptrType)(unsafe.Pointer(toType(tt).(*rtype)))
 		if p.elem == t {
 			pi, _ := ptrMap.LoadOrStore(t, p)
 			return &pi.(*ptrType).rtype
@@ -1158,7 +1160,9 @@ func (t *rtype) ptrTo() *rtype {
 	pp.ptrToThis = nil
 	pp.elem = t
 
-	pi, _ := ptrMap.LoadOrStore(t, &pp)
+	q := toType(&pp.rtype).(*rtype)
+	p := (*ptrType)(unsafe.Pointer(q))
+	pi, _ := ptrMap.LoadOrStore(t, p)
 	return &pi.(*ptrType).rtype
 }
 
@@ -1273,7 +1277,7 @@ func specialChannelAssignability(T, V *rtype) bool {
 // and the ideal constant rules (no ideal constants at run time).
 func directlyAssignable(T, V *rtype) bool {
 	// x's type V is identical to T?
-	if T == V {
+	if rtypeEqual(T, V) {
 		return true
 	}
 
@@ -1304,7 +1308,7 @@ func haveIdenticalType(T, V Type, cmpTags bool) bool {
 }
 
 func haveIdenticalUnderlyingType(T, V *rtype, cmpTags bool) bool {
-	if T == V {
+	if rtypeEqual(T, V) {
 		return true
 	}
 
@@ -1436,7 +1440,6 @@ func ChanOf(dir ChanDir, t Type) Type {
 	}
 
 	// Look in known types.
-	// TODO: Precedence when constructing string.
 	var s string
 	switch dir {
 	default:
@@ -1446,10 +1449,19 @@ func ChanOf(dir ChanDir, t Type) Type {
 	case RecvDir:
 		s = "<-chan " + *typ.string
 	case BothDir:
-		s = "chan " + *typ.string
+		typeStr := *typ.string
+		if typeStr[0] == '<' {
+			// typ is recv chan, need parentheses as "<-" associates with leftmost
+			// chan possible, see:
+			// * https://golang.org/ref/spec#Channel_types
+			// * https://github.com/golang/go/issues/39897
+			s = "chan (" + typeStr + ")"
+		} else {
+			s = "chan " + typeStr
+		}
 	}
 	if tt := lookupType(s); tt != nil {
-		ch := (*chanType)(unsafe.Pointer(tt))
+		ch := (*chanType)(unsafe.Pointer(toType(tt).(*rtype)))
 		if ch.elem == typ && ch.dir == uintptr(dir) {
 			ti, _ := lookupCache.LoadOrStore(ckey, tt)
 			return ti.(Type)
@@ -1481,7 +1493,7 @@ func ChanOf(dir ChanDir, t Type) Type {
 	ch.uncommonType = nil
 	ch.ptrToThis = nil
 
-	ti, _ := lookupCache.LoadOrStore(ckey, &ch.rtype)
+	ti, _ := lookupCache.LoadOrStore(ckey, toType(&ch.rtype).(*rtype))
 	return ti.(Type)
 }
 
@@ -1508,7 +1520,7 @@ func MapOf(key, elem Type) Type {
 	// Look in known types.
 	s := "map[" + *ktyp.string + "]" + *etyp.string
 	if tt := lookupType(s); tt != nil {
-		mt := (*mapType)(unsafe.Pointer(tt))
+		mt := (*mapType)(unsafe.Pointer(toType(tt).(*rtype)))
 		if mt.key == ktyp && mt.elem == etyp {
 			ti, _ := lookupCache.LoadOrStore(ckey, tt)
 			return ti.(Type)
@@ -1559,7 +1571,7 @@ func MapOf(key, elem Type) Type {
 		mt.flags |= 16
 	}
 
-	ti, _ := lookupCache.LoadOrStore(ckey, &mt.rtype)
+	ti, _ := lookupCache.LoadOrStore(ckey, toType(&mt.rtype).(*rtype))
 	return ti.(Type)
 }
 
@@ -1648,7 +1660,7 @@ func FuncOf(in, out []Type, variadic bool) Type {
 	ft.string = &str
 	ft.uncommonType = nil
 	ft.ptrToThis = nil
-	return addToCache(&ft.rtype)
+	return addToCache(toType(&ft.rtype).(*rtype))
 }
 
 // funcStr builds a string representation of a funcType.
@@ -1909,7 +1921,7 @@ func SliceOf(t Type) Type {
 	// Look in known types.
 	s := "[]" + *typ.string
 	if tt := lookupType(s); tt != nil {
-		slice := (*sliceType)(unsafe.Pointer(tt))
+		slice := (*sliceType)(unsafe.Pointer(toType(tt).(*rtype)))
 		if slice.elem == typ {
 			ti, _ := lookupCache.LoadOrStore(ckey, tt)
 			return ti.(Type)
@@ -1930,7 +1942,7 @@ func SliceOf(t Type) Type {
 	slice.uncommonType = nil
 	slice.ptrToThis = nil
 
-	ti, _ := lookupCache.LoadOrStore(ckey, &slice.rtype)
+	ti, _ := lookupCache.LoadOrStore(ckey, toType(&slice.rtype).(*rtype))
 	return ti.(Type)
 }
 
@@ -2234,7 +2246,7 @@ func StructOf(fields []StructField) Type {
 
 	typ.uncommonType = nil
 	typ.ptrToThis = nil
-	return addToCache(&typ.rtype)
+	return addToCache(toType(&typ.rtype).(*rtype))
 }
 
 // runtimeStructField takes a StructField value passed to StructOf and
@@ -2330,7 +2342,7 @@ func ArrayOf(count int, elem Type) Type {
 	// Look in known types.
 	s := "[" + strconv.Itoa(count) + "]" + *typ.string
 	if tt := lookupType(s); tt != nil {
-		array := (*arrayType)(unsafe.Pointer(tt))
+		array := (*arrayType)(unsafe.Pointer(toType(tt).(*rtype)))
 		if array.elem == typ {
 			ti, _ := lookupCache.LoadOrStore(ckey, tt)
 			return ti.(Type)
@@ -2446,7 +2458,7 @@ func ArrayOf(count int, elem Type) Type {
 		array.kind &^= kindDirectIface
 	}
 
-	ti, _ := lookupCache.LoadOrStore(ckey, &array.rtype)
+	ti, _ := lookupCache.LoadOrStore(ckey, toType(&array.rtype).(*rtype))
 	return ti.(Type)
 }
 
@@ -2456,16 +2468,6 @@ func appendVarint(x []byte, v uintptr) []byte {
 	}
 	x = append(x, byte(v))
 	return x
-}
-
-// toType converts from a *rtype to a Type that can be returned
-// to the client of package reflect. The only concern is that
-// a nil *rtype must be replaced by a nil Type.
-func toType(p *rtype) Type {
-	if p == nil {
-		return nil
-	}
-	return p
 }
 
 // Look up a compiler-generated type descriptor.

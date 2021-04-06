@@ -1,5 +1,5 @@
 # Make-lang.in -- Top level -*- makefile -*- fragment for the D frontend.
-# Copyright (C) 2006-2020 Free Software Foundation, Inc.
+# Copyright (C) 2006-2021 Free Software Foundation, Inc.
 
 # GCC is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@ D_LIBPHOBOS = -DLIBPHOBOS=\"gphobos\"
 
 # The name for selecting d in LANGUAGES.
 d: d21$(exeext)
+d.serial = d21$(exeext)
 
 # Tell GNU make to ignore these if they exist.
 .PHONY: d
@@ -83,6 +84,7 @@ D_FRONTEND_OBJS = \
 	d/dscope.o \
 	d/dstruct.o \
 	d/dsymbol.o \
+	d/dsymbolsem.o \
 	d/dtemplate.o \
 	d/dversion.o \
 	d/entity.o \
@@ -114,6 +116,8 @@ D_FRONTEND_OBJS = \
 	d/rootobject.o \
 	d/safe.o \
 	d/sapply.o \
+	d/semantic2.o \
+	d/semantic3.o \
 	d/sideeffect.o \
 	d/speller.o \
 	d/statement.o \
@@ -121,6 +125,7 @@ D_FRONTEND_OBJS = \
 	d/staticassert.o \
 	d/staticcond.o \
 	d/stringtable.o \
+	d/templateparamsem.o \
 	d/tokens.o \
 	d/traits.o \
 	d/typesem.o \
@@ -162,9 +167,11 @@ D_ALL_OBJS = $(D_FRONTEND_OBJS) $(D_GENERATED_OBJS) $(D_OBJS) $(D_TARGET_OBJS)
 
 d_OBJS = $(D_ALL_OBJS) d/d-spec.o
 
-d21$(exeext): $(D_ALL_OBJS) attribs.o $(BACKEND) $(LIBDEPS)
+d21$(exeext): $(D_ALL_OBJS) attribs.o $(BACKEND) $(LIBDEPS) $(d.prev)
+	@$(call LINK_PROGRESS,$(INDEX.d),start)
 	+$(LLINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o $@ \
 		$(D_ALL_OBJS) attribs.o $(BACKEND) $(LIBS) $(BACKENDLIBS)
+	@$(call LINK_PROGRESS,$(INDEX.d),end)
 
 # Documentation.
 

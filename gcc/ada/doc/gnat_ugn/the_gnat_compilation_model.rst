@@ -1445,7 +1445,6 @@ recognized by GNAT::
      Overriding_Renamings
      Partition_Elaboration_Policy
      Persistent_BSS
-     Polling
      Prefix_Exception_Messages
      Priority_Specific_Dispatching
      Profile
@@ -1560,6 +1559,10 @@ convention because they pass information to ``gcc`` via
 temporary files that are immediately deleted; it doesn't make sense to
 depend on a file that no longer exists. Such tools include
 ``gprbuild``, ``gnatmake``, and ``gnatcheck``.
+
+By default, configuration pragma files are stored by their absolute paths in
+ALI files. You can use the :switch:`-gnateb` switch in order to store them by
+their basename instead.
 
 If you are using project file, a separate mechanism is provided using
 project attributes.

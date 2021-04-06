@@ -13,16 +13,10 @@
 -- ware  Foundation;  either version 3,  or (at your option) any later ver- --
 -- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
 -- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
--- or FITNESS FOR A PARTICULAR PURPOSE.                                     --
---                                                                          --
--- As a special exception under Section 7 of GPL version 3, you are granted --
--- additional permissions described in the GCC Runtime Library Exception,   --
--- version 3.1, as published by the Free Software Foundation.               --
---                                                                          --
--- You should have received a copy of the GNU General Public License and    --
--- a copy of the GCC Runtime Library Exception along with this program;     --
--- see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see    --
--- <http://www.gnu.org/licenses/>.                                          --
+-- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+-- for  more details.  You should have  received  a copy of the GNU General --
+-- Public License  distributed with GNAT; see file COPYING3.  If not, go to --
+-- http://www.gnu.org/licenses for a complete copy of the license.          --
 --                                                                          --
 -- GNAT was originally developed  by the GNAT team at  New York University. --
 -- Extensive contributions were provided by Ada Core Technologies Inc.      --
@@ -69,10 +63,12 @@ package Uintp is
    Uint_15  : constant Uint;
    Uint_16  : constant Uint;
    Uint_24  : constant Uint;
+   Uint_31  : constant Uint;
    Uint_32  : constant Uint;
    Uint_63  : constant Uint;
    Uint_64  : constant Uint;
    Uint_80  : constant Uint;
+   Uint_127 : constant Uint;
    Uint_128 : constant Uint;
 
    Uint_Minus_1   : constant Uint;
@@ -85,9 +81,13 @@ package Uintp is
    Uint_Minus_8   : constant Uint;
    Uint_Minus_9   : constant Uint;
    Uint_Minus_12  : constant Uint;
+   Uint_Minus_18  : constant Uint;
+   Uint_Minus_31  : constant Uint;
    Uint_Minus_36  : constant Uint;
    Uint_Minus_63  : constant Uint;
+   Uint_Minus_76  : constant Uint;
    Uint_Minus_80  : constant Uint;
+   Uint_Minus_127 : constant Uint;
    Uint_Minus_128 : constant Uint;
 
    type UI_Vector is array (Pos range <>) of Int;
@@ -286,7 +286,7 @@ package Uintp is
    --  or decimal format. Auto, the default setting, lets the routine make a
    --  decision based on the value.
 
-   UI_Image_Max    : constant := 48; -- Enough for a 128-bit number
+   UI_Image_Max    : constant := 1024;
    UI_Image_Buffer : String (1 .. UI_Image_Max);
    UI_Image_Length : Natural;
    --  Buffer used for UI_Image as described below
@@ -475,10 +475,12 @@ private
    Uint_15  : constant Uint := Uint (Uint_Direct_Bias + 15);
    Uint_16  : constant Uint := Uint (Uint_Direct_Bias + 16);
    Uint_24  : constant Uint := Uint (Uint_Direct_Bias + 24);
+   Uint_31  : constant Uint := Uint (Uint_Direct_Bias + 31);
    Uint_32  : constant Uint := Uint (Uint_Direct_Bias + 32);
    Uint_63  : constant Uint := Uint (Uint_Direct_Bias + 63);
    Uint_64  : constant Uint := Uint (Uint_Direct_Bias + 64);
    Uint_80  : constant Uint := Uint (Uint_Direct_Bias + 80);
+   Uint_127 : constant Uint := Uint (Uint_Direct_Bias + 127);
    Uint_128 : constant Uint := Uint (Uint_Direct_Bias + 128);
 
    Uint_Minus_1   : constant Uint := Uint (Uint_Direct_Bias - 1);
@@ -491,9 +493,13 @@ private
    Uint_Minus_8   : constant Uint := Uint (Uint_Direct_Bias - 8);
    Uint_Minus_9   : constant Uint := Uint (Uint_Direct_Bias - 9);
    Uint_Minus_12  : constant Uint := Uint (Uint_Direct_Bias - 12);
+   Uint_Minus_18  : constant Uint := Uint (Uint_Direct_Bias - 18);
+   Uint_Minus_31  : constant Uint := Uint (Uint_Direct_Bias - 31);
    Uint_Minus_36  : constant Uint := Uint (Uint_Direct_Bias - 36);
    Uint_Minus_63  : constant Uint := Uint (Uint_Direct_Bias - 63);
+   Uint_Minus_76  : constant Uint := Uint (Uint_Direct_Bias - 76);
    Uint_Minus_80  : constant Uint := Uint (Uint_Direct_Bias - 80);
+   Uint_Minus_127 : constant Uint := Uint (Uint_Direct_Bias - 127);
    Uint_Minus_128 : constant Uint := Uint (Uint_Direct_Bias - 128);
 
    Uint_Max_Simple_Mul : constant := Uint_Direct_Bias + 2**15;

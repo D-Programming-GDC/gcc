@@ -1,4 +1,4 @@
-// Copyright (C) 2018-2020 Free Software Foundation, Inc.
+// Copyright (C) 2018-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -150,7 +150,7 @@ test04()
   {
     std::size_t size = 1 << i;
     void* ptr = mr.allocate(size, 1);
-    VERIFY( ((char*)ptr - (char*)prev_ptr) == prev_size );
+    VERIFY( std::size_t((char*)ptr - (char*)prev_ptr) == prev_size );
     prev_ptr = ptr;
     prev_size = size;
   }

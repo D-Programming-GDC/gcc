@@ -1,5 +1,5 @@
 /* Classes for modeling the state of memory.
-   Copyright (C) 2019-2020 Free Software Foundation, Inc.
+   Copyright (C) 2019-2021 Free Software Foundation, Inc.
    Contributed by David Malcolm <dmalcolm@redhat.com>.
 
 This file is part of GCC.
@@ -65,6 +65,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "analyzer/region-model-reachability.h"
 #include "analyzer/analyzer-selftests.h"
 #include "stor-layout.h"
+#include "attribs.h"
 
 #if ENABLE_ANALYZER
 
@@ -363,6 +364,88 @@ private:
   enum poison_kind m_pkind;
 };
 
+/* A subclass of pending_diagnostic for complaining about shifts
+   by negative counts.  */
+
+class shift_count_negative_diagnostic
+: public pending_diagnostic_subclass<shift_count_negative_diagnostic>
+{
+public:
+  shift_count_negative_diagnostic (const gassign *assign, tree count_cst)
+  : m_assign (assign), m_count_cst (count_cst)
+  {}
+
+  const char *get_kind () const FINAL OVERRIDE
+  {
+    return "shift_count_negative_diagnostic";
+  }
+
+  bool operator== (const shift_count_negative_diagnostic &other) const
+  {
+    return (m_assign == other.m_assign
+	    && same_tree_p (m_count_cst, other.m_count_cst));
+  }
+
+  bool emit (rich_location *rich_loc) FINAL OVERRIDE
+  {
+    return warning_at (rich_loc, OPT_Wanalyzer_shift_count_negative,
+		       "shift by negative count (%qE)", m_count_cst);
+  }
+
+  label_text describe_final_event (const evdesc::final_event &ev) FINAL OVERRIDE
+  {
+    return ev.formatted_print ("shift by negative amount here (%qE)", m_count_cst);
+  }
+
+private:
+  const gassign *m_assign;
+  tree m_count_cst;
+};
+
+/* A subclass of pending_diagnostic for complaining about shifts
+   by counts >= the width of the operand type.  */
+
+class shift_count_overflow_diagnostic
+: public pending_diagnostic_subclass<shift_count_overflow_diagnostic>
+{
+public:
+  shift_count_overflow_diagnostic (const gassign *assign,
+				   int operand_precision,
+				   tree count_cst)
+  : m_assign (assign), m_operand_precision (operand_precision),
+    m_count_cst (count_cst)
+  {}
+
+  const char *get_kind () const FINAL OVERRIDE
+  {
+    return "shift_count_overflow_diagnostic";
+  }
+
+  bool operator== (const shift_count_overflow_diagnostic &other) const
+  {
+    return (m_assign == other.m_assign
+	    && m_operand_precision == other.m_operand_precision
+	    && same_tree_p (m_count_cst, other.m_count_cst));
+  }
+
+  bool emit (rich_location *rich_loc) FINAL OVERRIDE
+  {
+    return warning_at (rich_loc, OPT_Wanalyzer_shift_count_overflow,
+		       "shift by count (%qE) >= precision of type (%qi)",
+		       m_count_cst, m_operand_precision);
+  }
+
+  label_text describe_final_event (const evdesc::final_event &ev) FINAL OVERRIDE
+  {
+    return ev.formatted_print ("shift by count %qE here", m_count_cst);
+  }
+
+private:
+  const gassign *m_assign;
+  int m_operand_precision;
+  tree m_count_cst;
+};
+
 /* If ASSIGN is a stmt that can be modelled via
      set_value (lhs_reg, SVALUE, CTXT)
    for some SVALUE, get the SVALUE.
@@ -514,6 +597,26 @@ region_model::get_gassign_result (const gassign *assign,
 	const svalue *rhs1_sval = get_rvalue (rhs1, ctxt);
 	const svalue *rhs2_sval = get_rvalue (rhs2, ctxt);
 
+	if (ctxt && (op == LSHIFT_EXPR || op == RSHIFT_EXPR))
+	  {
+	    /* "INT34-C. Do not shift an expression by a negative number of bits
+	       or by greater than or equal to the number of bits that exist in
+	       the operand."  */
+	    if (const tree rhs2_cst = rhs2_sval->maybe_get_constant ())
+	      if (TREE_CODE (rhs2_cst) == INTEGER_CST)
+		{
+		  if (tree_int_cst_sgn (rhs2_cst) < 0)
+		    ctxt->warn (new shift_count_negative_diagnostic
+				  (assign, rhs2_cst));
+		  else if (compare_tree_int (rhs2_cst,
+					     TYPE_PRECISION (TREE_TYPE (rhs1)))
+			   >= 0)
+		    ctxt->warn (new shift_count_overflow_diagnostic
+				  (assign, TYPE_PRECISION (TREE_TYPE (rhs1)),
+				   rhs2_cst));
+		}
+	  }
+
 	const svalue *sval_binop
 	  = m_mgr->get_or_create_binop (TREE_TYPE (lhs), op,
 					rhs1_sval, rhs2_sval);
@@ -638,10 +741,14 @@ region_model::on_assignment (const gassign *assign, region_model_context *ctxt)
 
    Return true if the function call has unknown side effects (it wasn't
    recognized and we don't have a body for it, or are unable to tell which
-   fndecl it is).  */
+   fndecl it is).
+
+   Write true to *OUT_TERMINATE_PATH if this execution path should be
+   terminated (e.g. the function call terminates the process).  */
 
 bool
-region_model::on_call_pre (const gcall *call, region_model_context *ctxt)
+region_model::on_call_pre (const gcall *call, region_model_context *ctxt,
+			   bool *out_terminate_path)
 {
   bool unknown_side_effects = false;
 
@@ -684,6 +791,9 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt)
 	    impl_call_memset (cd);
 	    return false;
 	    break;
+	  case BUILT_IN_REALLOC:
+	    impl_call_realloc (cd);
+	    return false;
 	  case BUILT_IN_STRCPY:
 	  case BUILT_IN_STRCPY_CHK:
 	    impl_call_strcpy (cd);
@@ -733,6 +843,25 @@ region_model::on_call_pre (const gcall *call, region_model_context *ctxt)
 	return impl_call_calloc (cd);
       else if (is_named_call_p (callee_fndecl, "alloca", call, 1))
 	return impl_call_alloca (cd);
+      else if (is_named_call_p (callee_fndecl, "realloc", call, 2))
+	{
+	  impl_call_realloc (cd);
+	  return false;
+	}
+      else if (is_named_call_p (callee_fndecl, "error"))
+	{
+	  if (impl_call_error (cd, 3, out_terminate_path))
+	    return false;
+	  else
+	    unknown_side_effects = true;
+	}
+      else if (is_named_call_p (callee_fndecl, "error_at_line"))
+	{
+	  if (impl_call_error (cd, 5, out_terminate_path))
+	    return false;
+	  else
+	    unknown_side_effects = true;
+	}
       else if (is_named_call_p (callee_fndecl, "getchar", call, 0))
 	{
 	  /* No side-effects (tracking stream state is out-of-scope
@@ -815,6 +944,14 @@ region_model::on_call_post (const gcall *call,
 	  impl_call_operator_delete (cd);
 	  return;
 	}
+      /* Was this fndecl referenced by
+	 __attribute__((malloc(FOO)))?  */
+      if (lookup_attribute ("*dealloc", DECL_ATTRIBUTES (callee_fndecl)))
+	{
+	  call_details cd (call, this, ctxt);
+	  impl_deallocation_call (cd);
+	  return;
+	}
     }
 
   if (unknown_side_effects)
@@ -836,7 +973,7 @@ region_model::handle_unrecognized_call (const gcall *call,
 {
   tree fndecl = get_fndecl_for_call (call, ctxt);
 
-  reachable_regions reachable_regs (&m_store, m_mgr);
+  reachable_regions reachable_regs (this);
 
   /* Determine the reachable regions and their mutability.  */
   {
@@ -884,7 +1021,7 @@ region_model::handle_unrecognized_call (const gcall *call,
     }
 
   /* Mark any clusters that have escaped.  */
-  reachable_regs.mark_escaped_clusters ();
+  reachable_regs.mark_escaped_clusters (ctxt);
 
   /* Update bindings for all clusters that have escaped, whether above,
      or previously.  */
@@ -904,7 +1041,7 @@ void
 region_model::get_reachable_svalues (svalue_set *out,
 				     const svalue *extra_sval)
 {
-  reachable_regions reachable_regs (&m_store, m_mgr);
+  reachable_regions reachable_regs (this);
 
   /* Add globals and regions that already escaped in previous
      unknown calls.  */
@@ -1333,35 +1470,38 @@ region_model::get_initial_value_for_global (const region *reg) const
      an unknown value if an unknown call has occurred, unless this is
      static to-this-TU and hasn't escaped.  Globals that have escaped
      are explicitly tracked, so we shouldn't hit this case for them.  */
-  if (m_store.called_unknown_fn_p () && TREE_PUBLIC (decl))
+  if (m_store.called_unknown_fn_p ()
+      && TREE_PUBLIC (decl)
+      && !TREE_READONLY (decl))
     return m_mgr->get_or_create_unknown_svalue (reg->get_type ());
 
   /* If we are on a path from the entrypoint from "main" and we have a
      global decl defined in this TU that hasn't been touched yet, then
      the initial value of REG can be taken from the initialization value
      of the decl.  */
-  if (called_from_main_p () && !DECL_EXTERNAL (decl))
+  if (called_from_main_p () || TREE_READONLY (decl))
     {
-      /* Get the initializer value for base_reg.  */
-      const svalue *base_reg_init
-	= base_reg->get_svalue_for_initializer (m_mgr);
-      gcc_assert (base_reg_init);
-      if (reg == base_reg)
-	return base_reg_init;
-      else
+      /* Attempt to get the initializer value for base_reg.  */
+      if (const svalue *base_reg_init
+	    = base_reg->get_svalue_for_initializer (m_mgr))
 	{
-	  /* Get the value for REG within base_reg_init.  */
-	  binding_cluster c (base_reg);
-	  c.bind (m_mgr->get_store_manager (), base_reg, base_reg_init,
-		  BK_direct);
-	  const svalue *sval
-	    = c.get_any_binding (m_mgr->get_store_manager (), reg);
-	  if (sval)
+	  if (reg == base_reg)
+	    return base_reg_init;
+	  else
 	    {
-	      if (reg->get_type ())
-		sval = m_mgr->get_or_create_cast (reg->get_type (),
-						  sval);
-	      return sval;
+	      /* Get the value for REG within base_reg_init.  */
+	      binding_cluster c (base_reg);
+	      c.bind (m_mgr->get_store_manager (), base_reg, base_reg_init,
+		      BK_direct);
+	      const svalue *sval
+		= c.get_any_binding (m_mgr->get_store_manager (), reg);
+	      if (sval)
+		{
+		  if (reg->get_type ())
+		    sval = m_mgr->get_or_create_cast (reg->get_type (),
+						      sval);
+		  return sval;
+		}
 	    }
 	}
     }
@@ -1532,15 +1672,130 @@ region_model::deref_rvalue (const svalue *ptr_sval, tree ptr_tree,
   return m_mgr->get_symbolic_region (ptr_sval);
 }
 
+/* A subclass of pending_diagnostic for complaining about writes to
+   constant regions of memory.  */
+
+class write_to_const_diagnostic
+: public pending_diagnostic_subclass<write_to_const_diagnostic>
+{
+public:
+  write_to_const_diagnostic (const region *reg, tree decl)
+  : m_reg (reg), m_decl (decl)
+  {}
+
+  const char *get_kind () const FINAL OVERRIDE
+  {
+    return "write_to_const_diagnostic";
+  }
+
+  bool operator== (const write_to_const_diagnostic &other) const
+  {
+    return (m_reg == other.m_reg
+	    && m_decl == other.m_decl);
+  }
+
+  bool emit (rich_location *rich_loc) FINAL OVERRIDE
+  {
+    bool warned = warning_at (rich_loc, OPT_Wanalyzer_write_to_const,
+			      "write to %<const%> object %qE", m_decl);
+    if (warned)
+      inform (DECL_SOURCE_LOCATION (m_decl), "declared here");
+    return warned;
+  }
+
+  label_text describe_final_event (const evdesc::final_event &ev) FINAL OVERRIDE
+  {
+    return ev.formatted_print ("write to %<const%> object %qE here", m_decl);
+  }
+
+private:
+  const region *m_reg;
+  tree m_decl;
+};
+
+/* A subclass of pending_diagnostic for complaining about writes to
+   string literals.  */
+
+class write_to_string_literal_diagnostic
+: public pending_diagnostic_subclass<write_to_string_literal_diagnostic>
+{
+public:
+  write_to_string_literal_diagnostic (const region *reg)
+  : m_reg (reg)
+  {}
+
+  const char *get_kind () const FINAL OVERRIDE
+  {
+    return "write_to_string_literal_diagnostic";
+  }
+
+  bool operator== (const write_to_string_literal_diagnostic &other) const
+  {
+    return m_reg == other.m_reg;
+  }
+
+  bool emit (rich_location *rich_loc) FINAL OVERRIDE
+  {
+    return warning_at (rich_loc, OPT_Wanalyzer_write_to_string_literal,
+		       "write to string literal");
+    /* Ideally we would show the location of the STRING_CST as well,
+       but it is not available at this point.  */
+  }
+
+  label_text describe_final_event (const evdesc::final_event &ev) FINAL OVERRIDE
+  {
+    return ev.formatted_print ("write to string literal here");
+  }
+
+private:
+  const region *m_reg;
+};
+
+/* Use CTXT to warn If DEST_REG is a region that shouldn't be written to.  */
+
+void
+region_model::check_for_writable_region (const region* dest_reg,
+					 region_model_context *ctxt) const
+{
+  /* Fail gracefully if CTXT is NULL.  */
+  if (!ctxt)
+    return;
+
+  const region *base_reg = dest_reg->get_base_region ();
+  switch (base_reg->get_kind ())
+    {
+    default:
+      break;
+    case RK_DECL:
+      {
+	const decl_region *decl_reg = as_a <const decl_region *> (base_reg);
+	tree decl = decl_reg->get_decl ();
+	/* Warn about writes to const globals.
+	   Don't warn for writes to const locals, and params in particular,
+	   since we would warn in push_frame when setting them up (e.g the
+	   "this" param is "T* const").  */
+	if (TREE_READONLY (decl)
+	    && is_global_var (decl))
+	  ctxt->warn (new write_to_const_diagnostic (dest_reg, decl));
+      }
+      break;
+    case RK_STRING:
+      ctxt->warn (new write_to_string_literal_diagnostic (dest_reg));
+      break;
+    }
+}
+
 /* Set the value of the region given by LHS_REG to the value given
    by RHS_SVAL.  */
 
 void
 region_model::set_value (const region *lhs_reg, const svalue *rhs_sval,
-			 region_model_context */*ctxt*/)
+			 region_model_context *ctxt)
 {
   gcc_assert (lhs_reg);
   gcc_assert (rhs_sval);
+
+  check_for_writable_region (lhs_reg, ctxt);
 
   m_store.set_value (m_mgr->get_store_manager(), lhs_reg, rhs_sval,
 		     BK_direct);
@@ -1751,18 +2006,8 @@ region_model::compare_initial_and_pointer (const initial_svalue *init,
   /* If we have a pointer to something within a stack frame, it can't be the
      initial value of a param.  */
   if (pointee->maybe_get_frame_region ())
-    {
-      const region *reg = init->get_region ();
-      if (tree reg_decl = reg->maybe_get_decl ())
-	if (TREE_CODE (reg_decl) == SSA_NAME)
-	  {
-	    tree ssa_name = reg_decl;
-	    if (SSA_NAME_IS_DEFAULT_DEF (ssa_name)
-		&& SSA_NAME_VAR (ssa_name)
-		&& TREE_CODE (SSA_NAME_VAR (ssa_name)) == PARM_DECL)
-	      return tristate::TS_FALSE;
-	  }
-    }
+    if (init->initial_value_of_param_p ())
+      return tristate::TS_FALSE;
 
   return tristate::TS_UNKNOWN;
 }
@@ -1973,24 +2218,32 @@ region_model::eval_condition (tree lhs,
   return eval_condition (get_rvalue (lhs, ctxt), op, get_rvalue (rhs, ctxt));
 }
 
-/* Attempt to return a path_var that represents SVAL, or return NULL_TREE.
+/* Implementation of region_model::get_representative_path_var.
+   Attempt to return a path_var that represents SVAL, or return NULL_TREE.
    Use VISITED to prevent infinite mutual recursion with the overload for
    regions.  */
 
 path_var
-region_model::get_representative_path_var (const svalue *sval,
-					    svalue_set *visited) const
+region_model::get_representative_path_var_1 (const svalue *sval,
+					     svalue_set *visited) const
 {
-  if (sval == NULL)
-    return path_var (NULL_TREE, 0);
-
-  if (const svalue *cast_sval = sval->maybe_undo_cast ())
-    sval = cast_sval;
+  gcc_assert (sval);
 
   /* Prevent infinite recursion.  */
   if (visited->contains (sval))
     return path_var (NULL_TREE, 0);
   visited->add (sval);
+
+  /* Handle casts by recursion into get_representative_path_var.  */
+  if (const svalue *cast_sval = sval->maybe_undo_cast ())
+    {
+      path_var result = get_representative_path_var (cast_sval, visited);
+      tree orig_type = sval->get_type ();
+      /* If necessary, wrap the result in a cast.  */
+      if (result.m_tree && orig_type)
+	result.m_tree = build1 (NOP_EXPR, orig_type, result.m_tree);
+      return result;
+    }
 
   auto_vec<path_var> pvs;
   m_store.get_representative_path_vars (this, visited, sval, &pvs);
@@ -2004,7 +2257,7 @@ region_model::get_representative_path_var (const svalue *sval,
       const region *reg = ptr_sval->get_pointee ();
       if (path_var pv = get_representative_path_var (reg, visited))
 	return path_var (build1 (ADDR_EXPR,
-				 TREE_TYPE (sval->get_type ()),
+				 sval->get_type (),
 				 pv.m_tree),
 			 pv.m_stack_depth);
     }
@@ -2032,16 +2285,54 @@ region_model::get_representative_path_var (const svalue *sval,
   return pvs[0];
 }
 
-/* Attempt to return a tree that represents SVAL, or return NULL_TREE.  */
+/* Attempt to return a path_var that represents SVAL, or return NULL_TREE.
+   Use VISITED to prevent infinite mutual recursion with the overload for
+   regions
+
+   This function defers to get_representative_path_var_1 to do the work;
+   it adds verification that get_representative_path_var_1 returned a tree
+   of the correct type.  */
+
+path_var
+region_model::get_representative_path_var (const svalue *sval,
+					   svalue_set *visited) const
+{
+  if (sval == NULL)
+    return path_var (NULL_TREE, 0);
+
+  tree orig_type = sval->get_type ();
+
+  path_var result = get_representative_path_var_1 (sval, visited);
+
+  /* Verify that the result has the same type as SVAL, if any.  */
+  if (result.m_tree && orig_type)
+    gcc_assert (TREE_TYPE (result.m_tree) == orig_type);
+
+  return result;
+}
+
+/* Attempt to return a tree that represents SVAL, or return NULL_TREE.
+
+   Strip off any top-level cast, to avoid messages like
+     double-free of '(void *)ptr'
+   from analyzer diagnostics.  */
 
 tree
 region_model::get_representative_tree (const svalue *sval) const
 {
   svalue_set visited;
-  return get_representative_path_var (sval, &visited).m_tree;
+  tree expr = get_representative_path_var (sval, &visited).m_tree;
+
+  /* Strip off any top-level cast.  */
+  if (expr && TREE_CODE (expr) == NOP_EXPR)
+    return TREE_OPERAND (expr, 0);
+
+  return expr;
 }
 
-/* Attempt to return a path_var that represents REG, or return
+/* Implementation of region_model::get_representative_path_var.
+
+   Attempt to return a path_var that represents REG, or return
    the NULL path_var.
    For example, a region for a field of a local would be a path_var
    wrapping a COMPONENT_REF.
@@ -2049,8 +2340,8 @@ region_model::get_representative_tree (const svalue *sval) const
    svalues.  */
 
 path_var
-region_model::get_representative_path_var (const region *reg,
-					    svalue_set *visited) const
+region_model::get_representative_path_var_1 (const region *reg,
+					     svalue_set *visited) const
 {
   switch (reg->get_kind ())
     {
@@ -2073,7 +2364,10 @@ region_model::get_representative_path_var (const region *reg,
 	return path_var (function_reg->get_fndecl (), 0);
       }
     case RK_LABEL:
-      gcc_unreachable (); // TODO
+      {
+	const label_region *label_reg = as_a <const label_region *> (reg);
+	return path_var (label_reg->get_label (), 0);
+      }
 
     case RK_SYMBOLIC:
       {
@@ -2177,6 +2471,30 @@ region_model::get_representative_path_var (const region *reg,
     case RK_UNKNOWN:
       return path_var (NULL_TREE, 0);
     }
+}
+
+/* Attempt to return a path_var that represents REG, or return
+   the NULL path_var.
+   For example, a region for a field of a local would be a path_var
+   wrapping a COMPONENT_REF.
+   Use VISITED to prevent infinite mutual recursion with the overload for
+   svalues.
+
+   This function defers to get_representative_path_var_1 to do the work;
+   it adds verification that get_representative_path_var_1 returned a tree
+   of the correct type.  */
+
+path_var
+region_model::get_representative_path_var (const region *reg,
+					   svalue_set *visited) const
+{
+  path_var result = get_representative_path_var_1 (reg, visited);
+
+  /* Verify that the result has the same type as REG, if any.  */
+  if (result.m_tree && reg->get_type ())
+    gcc_assert (TREE_TYPE (result.m_tree) == reg->get_type ());
+
+  return result;
 }
 
 /* Update this model for any phis in SNODE, assuming we came from
@@ -2736,8 +3054,7 @@ region_model::can_merge_with_p (const region_model &other_model,
   /* Merge constraints.  */
   constraint_manager::merge (*m_constraints,
 			      *other_model.m_constraints,
-			      out_model->m_constraints,
-			      m);
+			      out_model->m_constraints);
 
   return true;
 }

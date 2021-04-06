@@ -1,5 +1,5 @@
 /* Definitions of target machine for GNU compiler, for IBM RS/6000.
-   Copyright (C) 2000-2020 Free Software Foundation, Inc.
+   Copyright (C) 2000-2021 Free Software Foundation, Inc.
    Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 
    This file is part of GCC.
@@ -57,7 +57,7 @@ extern bool rs6000_move_128bit_ok_p (rtx []);
 extern bool rs6000_split_128bit_ok_p (rtx []);
 extern void rs6000_expand_float128_convert (rtx, rtx, bool);
 extern void rs6000_expand_vector_init (rtx, rtx);
-extern void rs6000_expand_vector_set (rtx, rtx, int);
+extern void rs6000_expand_vector_set (rtx, rtx, rtx);
 extern void rs6000_expand_vector_extract (rtx, rtx, rtx);
 extern void rs6000_split_vec_extract_var (rtx, rtx, rtx, rtx, rtx);
 extern rtx rs6000_adjust_vec_address (rtx, rtx, rtx, rtx, machine_mode);
@@ -155,6 +155,7 @@ extern void rs6000_split_logical (rtx [], enum rtx_code, bool, bool, bool);
 extern bool rs6000_function_pcrel_p (struct function *);
 extern bool rs6000_pcrel_p (void);
 extern bool rs6000_fndecl_pcrel_p (const_tree);
+extern void rs6000_output_addr_vec_elt (FILE *, int);
 
 /* Different PowerPC instruction formats that are used by GCC.  There are
    various other instruction formats used by the PowerPC hardware, but these
@@ -190,10 +191,15 @@ enum non_prefixed_form {
 
 extern enum insn_form address_to_insn_form (rtx, machine_mode,
 					    enum non_prefixed_form);
+extern bool address_is_non_pfx_d_or_x (rtx addr, machine_mode mode,
+				       enum non_prefixed_form non_prefix_format);
+extern bool pcrel_opt_valid_mem_p (rtx, machine_mode, rtx);
+enum non_prefixed_form reg_to_non_prefixed (rtx reg, machine_mode mode);
 extern bool prefixed_load_p (rtx_insn *);
 extern bool prefixed_store_p (rtx_insn *);
 extern bool prefixed_paddi_p (rtx_insn *);
 extern void rs6000_asm_output_opcode (FILE *);
+extern void output_pcrel_opt_reloc (rtx);
 extern void rs6000_final_prescan_insn (rtx_insn *, rtx [], int);
 extern int rs6000_adjust_insn_length (rtx_insn *, int);
 
@@ -306,6 +312,7 @@ namespace gcc { class context; }
 class rtl_opt_pass;
 
 extern rtl_opt_pass *make_pass_analyze_swaps (gcc::context *);
+extern rtl_opt_pass *make_pass_pcrel_opt (gcc::context *);
 extern bool rs6000_sum_of_two_registers_p (const_rtx expr);
 extern bool rs6000_quadword_masked_address_p (const_rtx exp);
 extern rtx rs6000_gen_lvx (enum machine_mode, rtx, rtx);

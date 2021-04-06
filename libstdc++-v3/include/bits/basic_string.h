@@ -1,6 +1,6 @@
 // Components for manipulating sequences of characters -*- C++ -*-
 
-// Copyright (C) 1997-2020 Free Software Foundation, Inc.
+// Copyright (C) 1997-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -548,7 +548,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  The newly-created string contains the exact contents of @a __str.
        *  @a __str is a valid, but unspecified string.
-       **/
+       */
       basic_string(basic_string&& __str) noexcept
       : _M_dataplus(_M_local_data(), std::move(__str._M_get_allocator()))
       {
@@ -696,7 +696,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
        *
        *  The contents of @a str are moved into this string (without copying).
        *  @a str is a valid, but unspecified string.
-       **/
+       */
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
       // 2063. Contradictory requirements for string move assignment
       basic_string&
@@ -3073,6 +3073,20 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
       { return __sv_type(this->data(), this->size()).ends_with(__x); }
 #endif // C++20
 
+#if __cplusplus > 202002L
+      bool
+      contains(basic_string_view<_CharT, _Traits> __x) const noexcept
+      { return __sv_type(this->data(), this->size()).contains(__x); }
+
+      bool
+      contains(_CharT __x) const noexcept
+      { return __sv_type(this->data(), this->size()).contains(__x); }
+
+      bool
+      contains(const _CharT* __x) const noexcept
+      { return __sv_type(this->data(), this->size()).contains(__x); }
+#endif // C++23
+
       // Allow basic_stringbuf::__xfer_bufptrs to call _M_length:
       template<typename, typename, typename> friend class basic_stringbuf;
     };
@@ -3563,14 +3577,20 @@ _GLIBCXX_END_NAMESPACE_CXX11
        *  @brief  Construct an empty string using allocator @a a.
        */
       explicit
-      basic_string(const _Alloc& __a);
+      basic_string(const _Alloc& __a)
+      : _M_dataplus(_S_construct(size_type(), _CharT(), __a), __a)
+      { }
 
       // NB: per LWG issue 42, semantics different from IS:
       /**
        *  @brief  Construct string with copy of value of @a str.
        *  @param  __str  Source string.
        */
-      basic_string(const basic_string& __str);
+      basic_string(const basic_string& __str)
+      : _M_dataplus(__str._M_rep()->_M_grab(_Alloc(__str.get_allocator()),
+					    __str.get_allocator()),
+		    __str.get_allocator())
+      { }
 
       // _GLIBCXX_RESOLVE_LIB_DEFECTS
       // 2583. no way to supply an allocator for basic_string(str, pos)
@@ -3611,20 +3631,34 @@ _GLIBCXX_END_NAMESPACE_CXX11
        *  has no special meaning.
        */
       basic_string(const _CharT* __s, size_type __n,
-		   const _Alloc& __a = _Alloc());
+		   const _Alloc& __a = _Alloc())
+      : _M_dataplus(_S_construct(__s, __s + __n, __a), __a)
+      { }
+
       /**
        *  @brief  Construct string as copy of a C string.
        *  @param  __s  Source C string.
        *  @param  __a  Allocator to use (default is default allocator).
        */
-      basic_string(const _CharT* __s, const _Alloc& __a = _Alloc());
+#if __cpp_deduction_guides && ! defined _GLIBCXX_DEFINING_STRING_INSTANTIATIONS
+      // _GLIBCXX_RESOLVE_LIB_DEFECTS
+      // 3076. basic_string CTAD ambiguity
+      template<typename = _RequireAllocator<_Alloc>>
+#endif
+      basic_string(const _CharT* __s, const _Alloc& __a = _Alloc())
+      : _M_dataplus(_S_construct(__s, __s ? __s + traits_type::length(__s) :
+				 __s + npos, __a), __a)
+      { }
+
       /**
        *  @brief  Construct string as multiple characters.
        *  @param  __n  Number of characters.
        *  @param  __c  Character to use.
        *  @param  __a  Allocator to use (default is default allocator).
        */
-      basic_string(size_type __n, _CharT __c, const _Alloc& __a = _Alloc());
+      basic_string(size_type __n, _CharT __c, const _Alloc& __a = _Alloc())
+      : _M_dataplus(_S_construct(__n, __c, __a), __a)
+      { }
 
 #if __cplusplus >= 201103L
       /**
@@ -3633,7 +3667,7 @@ _GLIBCXX_END_NAMESPACE_CXX11
        *
        *  The newly-created string contains the exact contents of @a __str.
        *  @a __str is a valid, but unspecified string.
-       **/
+       */
       basic_string(basic_string&& __str)
 #if _GLIBCXX_FULLY_DYNAMIC_STRING == 0
       noexcept // FIXME C++11: should always be noexcept.
@@ -3652,7 +3686,9 @@ _GLIBCXX_END_NAMESPACE_CXX11
        *  @param  __l  std::initializer_list of characters.
        *  @param  __a  Allocator to use (default is default allocator).
        */
-      basic_string(initializer_list<_CharT> __l, const _Alloc& __a = _Alloc());
+      basic_string(initializer_list<_CharT> __l, const _Alloc& __a = _Alloc())
+      : _M_dataplus(_S_construct(__l.begin(), __l.end(), __a), __a)
+      { }
 
       basic_string(const basic_string& __str, const _Alloc& __a)
       : _M_dataplus(__str._M_rep()->_M_grab(__a, __str.get_allocator()), __a)
@@ -3682,7 +3718,9 @@ _GLIBCXX_END_NAMESPACE_CXX11
        */
       template<class _InputIterator>
         basic_string(_InputIterator __beg, _InputIterator __end,
-		     const _Alloc& __a = _Alloc());
+		     const _Alloc& __a = _Alloc())
+	: _M_dataplus(_S_construct(__beg, __end, __a), __a)
+	{ }
 
 #if __cplusplus >= 201703L
       /**
@@ -3751,7 +3789,7 @@ _GLIBCXX_END_NAMESPACE_CXX11
        *
        *  The contents of @a str are moved into this string (without copying).
        *  @a str is a valid, but unspecified string.
-       **/
+       */
       basic_string&
       operator=(basic_string&& __str)
       _GLIBCXX_NOEXCEPT_IF(allocator_traits<_Alloc>::is_always_equal::value)
@@ -5973,6 +6011,21 @@ _GLIBCXX_END_NAMESPACE_CXX11
       ends_with(const _CharT* __x) const noexcept
       { return __sv_type(this->data(), this->size()).ends_with(__x); }
 #endif // C++20
+
+#if __cplusplus >= 202011L \
+  || (__cplusplus == 202002L && !defined __STRICT_ANSI__)
+      bool
+      contains(basic_string_view<_CharT, _Traits> __x) const noexcept
+      { return __sv_type(this->data(), this->size()).contains(__x); }
+
+      bool
+      contains(_CharT __x) const noexcept
+      { return __sv_type(this->data(), this->size()).contains(__x); }
+
+      bool
+      contains(const _CharT* __x) const noexcept
+      { return __sv_type(this->data(), this->size()).contains(__x); }
+#endif // C++23
 
 # ifdef _GLIBCXX_TM_TS_INTERNAL
       friend void

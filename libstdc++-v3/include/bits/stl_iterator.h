@@ -1,6 +1,6 @@
 // Iterators -*- C++ -*-
 
-// Copyright (C) 2001-2020 Free Software Foundation, Inc.
+// Copyright (C) 2001-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -61,6 +61,7 @@
 #define _STL_ITERATOR_H 1
 
 #include <bits/cpp_type_traits.h>
+#include <bits/stl_iterator_base_types.h>
 #include <ext/type_traits.h>
 #include <bits/move.h>
 #include <bits/ptr_traits.h>
@@ -361,6 +362,31 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _GLIBCXX17_CONSTEXPR reference
       operator[](difference_type __n) const
       { return *(*this + __n); }
+
+#if __cplusplus > 201703L && __cpp_lib_concepts
+      friend constexpr iter_rvalue_reference_t<_Iterator>
+      iter_move(const reverse_iterator& __i)
+      noexcept(is_nothrow_copy_constructible_v<_Iterator>
+	       && noexcept(ranges::iter_move(--std::declval<_Iterator&>())))
+      {
+	auto __tmp = __i.base();
+	return ranges::iter_move(--__tmp);
+      }
+
+      template<indirectly_swappable<_Iterator> _Iter2>
+	friend constexpr void
+	iter_swap(const reverse_iterator& __x,
+		  const reverse_iterator<_Iter2>& __y)
+	noexcept(is_nothrow_copy_constructible_v<_Iterator>
+		 && is_nothrow_copy_constructible_v<_Iter2>
+		 && noexcept(ranges::iter_swap(--std::declval<_Iterator&>(),
+					       --std::declval<_Iter2&>())))
+	{
+	  auto __xtmp = __x.base();
+	  auto __ytmp = __y.base();
+	  ranges::iter_swap(--__xtmp, --__ytmp);
+	}
+#endif
 
     private:
       template<typename _Tp>
@@ -1379,7 +1405,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       _GLIBCXX17_CONSTEXPR reference
       operator*() const
+#if __cplusplus > 201703L && __cpp_lib_concepts
+      { return ranges::iter_move(_M_current); }
+#else
       { return static_cast<reference>(*_M_current); }
+#endif
 
       _GLIBCXX17_CONSTEXPR pointer
       operator->() const
@@ -1445,7 +1475,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
       _GLIBCXX17_CONSTEXPR reference
       operator[](difference_type __n) const
+#if __cplusplus > 201703L && __cpp_lib_concepts
+      { return ranges::iter_move(_M_current + __n); }
+#else
       { return std::move(_M_current[__n]); }
+#endif
 
 #if __cplusplus > 201703L && __cpp_lib_concepts
       template<sentinel_for<_Iterator> _Sent>

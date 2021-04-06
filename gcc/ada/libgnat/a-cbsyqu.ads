@@ -71,6 +71,14 @@ is
 
       --  Need proper heap data structure here ???
 
+      --  We suppress warnings here, which might otherwise be triggered
+      --  by the box initialization of the Elements array below. This
+      --  initialization is needed to preserve constraints, such as
+      --  discriminant values, that the actual for Element_Type might
+      --  carry.
+
+      pragma Warnings (Off);
+
       type Element_Array is
         array (Count_Type range <>) of Queue_Interfaces.Element_Type;
 

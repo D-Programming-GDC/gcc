@@ -1,6 +1,6 @@
 // Allocator that wraps operator new -*- C++ -*-
 
-// Copyright (C) 2001-2020 Free Software Foundation, Inc.
+// Copyright (C) 2001-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -102,8 +102,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       _GLIBCXX_NODISCARD _Tp*
       allocate(size_type __n, const void* = static_cast<const void*>(0))
       {
-	if (__n > this->_M_max_size())
-	  std::__throw_bad_alloc();
+	if (__builtin_expect(__n > this->_M_max_size(), false))
+	  {
+	    // _GLIBCXX_RESOLVE_LIB_DEFECTS
+	    // 3190. allocator::allocate sometimes returns too little storage
+	    if (__n > (std::size_t(-1) / sizeof(_Tp)))
+	      std::__throw_bad_array_new_length();
+	    std::__throw_bad_alloc();
+	  }
 
 #if __cpp_aligned_new
 	if (alignof(_Tp) > __STDCPP_DEFAULT_NEW_ALIGNMENT__)

@@ -1,6 +1,6 @@
 // class template regex -*- C++ -*-
 
-// Copyright (C) 2010-2020 Free Software Foundation, Inc.
+// Copyright (C) 2010-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -973,11 +973,12 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	  if (const size_t __n = std::min(_M_len, __s._M_len))
 	    if (int __ret = traits_type::compare(_M_data, __s._M_data, __n))
 	      return __ret;
+	  using __limits = __gnu_cxx::__int_traits<int>;
 	  const difference_type __diff = _M_len - __s._M_len;
-	  if (__diff > std::numeric_limits<int>::max())
-	    return std::numeric_limits<int>::max();
-	  if (__diff < std::numeric_limits<int>::min())
-	    return std::numeric_limits<int>::min();
+	  if (__diff > __limits::__max)
+	    return __limits::__max;
+	  if (__diff < __limits::__min)
+	    return __limits::__min;
 	  return static_cast<int>(__diff);
 	}
 
@@ -993,7 +994,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
 	_M_str() const noexcept
 	{
 	  if (this->matched)
-	    if (auto __len = this->second - this->first)
+	    if (size_t __len = this->second - this->first)
 	      return { std::__addressof(*this->first), __len };
 	  return {};
 	}

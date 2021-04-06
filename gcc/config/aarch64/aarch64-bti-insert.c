@@ -1,5 +1,5 @@
 /* Branch Target Identification for AArch64 architecture.
-   Copyright (C) 2019-2020 Free Software Foundation, Inc.
+   Copyright (C) 2019-2021 Free Software Foundation, Inc.
    Contributed by Arm Ltd.
 
    This file is part of GCC.
@@ -95,7 +95,7 @@ static bool
 aarch64_pac_insn_p (rtx x)
 {
   if (!INSN_P (x))
-    return x;
+    return false;
 
   subrtx_var_iterator::array_type array;
   FOR_EACH_SUBRTX_VAR (iter, array, PATTERN (x), ALL)

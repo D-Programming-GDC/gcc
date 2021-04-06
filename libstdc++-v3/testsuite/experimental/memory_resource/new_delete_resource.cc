@@ -1,4 +1,4 @@
-// Copyright (C) 2018-2020 Free Software Foundation, Inc.
+// Copyright (C) 2018-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -20,6 +20,7 @@
 
 #include <experimental/memory_resource>
 #include <cstdlib>
+#include <cstdint>
 #include <testsuite_hooks.h>
 
 #if (defined __sun__ || defined __VXWORKS__) && defined __i386__

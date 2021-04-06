@@ -22,12 +22,13 @@ from itertools import takewhile
 
 from dateutil.parser import parse
 
-from git_commit import GitCommit, GitInfo
+from git_commit import GitCommit, GitInfo, decode_path
 
-from unidiff import PatchSet
+from unidiff import PatchSet, PatchedFile
 
 DATE_PREFIX = 'Date: '
 FROM_PREFIX = 'From: '
+unidiff_supports_renaming = hasattr(PatchedFile(), 'is_rename')
 
 
 class GitEmail(GitCommit):
@@ -51,21 +52,21 @@ class GitEmail(GitCommit):
         modified_files = []
         for f in diff:
             # Strip "a/" and "b/" prefixes
-            source = f.source_file[2:]
-            target = f.target_file[2:]
+            source = decode_path(f.source_file)[2:]
+            target = decode_path(f.target_file)[2:]
 
             if f.is_added_file:
                 t = 'A'
             elif f.is_removed_file:
                 t = 'D'
-            elif f.is_rename:
+            elif unidiff_supports_renaming and f.is_rename:
                 # Consider that renamed files are two operations: the deletion
                 # of the original name and the addition of the new one.
                 modified_files.append((source, 'D'))
                 t = 'A'
             else:
                 t = 'M'
-            modified_files.append((target, t))
+            modified_files.append((target if t != 'D' else source, t))
         git_info = GitInfo(None, date, author, body, modified_files)
         super().__init__(git_info, strict=strict,
                          commit_to_info_hook=lambda x: None)

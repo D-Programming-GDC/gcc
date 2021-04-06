@@ -293,23 +293,29 @@ package Exp_Util is
    --  type is frozen.
 
    function Build_DIC_Call
-     (Loc    : Source_Ptr;
-      Obj_Id : Entity_Id;
-      Typ    : Entity_Id) return Node_Id;
-   --  Build a call to the DIC procedure of type Typ with Obj_Id as the actual
+     (Loc      : Source_Ptr;
+      Obj_Name : Node_Id;
+      Typ      : Entity_Id) return Node_Id;
+   --  Build a call to the DIC procedure for Typ with Obj_Name as the actual
    --  parameter.
 
    procedure Build_DIC_Procedure_Body
-     (Typ        : Entity_Id;
-      For_Freeze : Boolean := False);
+     (Typ         : Entity_Id;
+      Partial_DIC : Boolean := False);
    --  Create the body of the procedure which verifies the assertion expression
-   --  of pragma Default_Initial_Condition at run time. Flag For_Freeze should
-   --  be set when the body is constructed as part of the freezing actions for
-   --  Typ.
+   --  of pragma Default_Initial_Condition at run time. Partial_DIC indicates
+   --  that a partial DIC-checking procedure body should be built, for checking
+   --  a DIC associated with the type's partial view, and which will be called
+   --  by the main DIC procedure.
 
-   procedure Build_DIC_Procedure_Declaration (Typ : Entity_Id);
+   procedure Build_DIC_Procedure_Declaration
+     (Typ         : Entity_Id;
+      Partial_DIC : Boolean := False);
    --  Create the declaration of the procedure which verifies the assertion
-   --  expression of pragma Default_Initial_Condition at run time.
+   --  expression of pragma Default_Initial_Condition at run time. Partial_DIC
+   --  indicates that a partial DIC-checking procedure should be declared,
+   --  for checking a DIC associated with the type's partial view, and which
+   --  will be called by the main DIC procedure.
 
    procedure Build_Invariant_Procedure_Body
      (Typ               : Entity_Id;
@@ -426,11 +432,6 @@ package Exp_Util is
    --  above). The processing for record and array assignment indirectly checks
    --  for trouble using this function and, if so, the assignment is expanded
    --  component-wise, which the back end is required to handle correctly.
-
-   function Containing_Package_With_Ext_Axioms
-     (E : Entity_Id) return Entity_Id;
-   --  Returns the package entity with an external axiomatization containing E,
-   --  if any, or Empty if none.
 
    procedure Convert_To_Actual_Subtype (Exp : Node_Id);
    --  The Etype of an expression is the nominal type of the expression,
@@ -687,10 +688,6 @@ package Exp_Util is
    --  of entity E, in all upper case, with an ASCII.NUL appended at the end
    --  of the name if Append_NUL is True.
 
-   procedure Generate_Poll_Call (N : Node_Id);
-   --  If polling is active, then a call to the Poll routine is built,
-   --  and then inserted before the given node N and analyzed.
-
    procedure Get_Current_Value_Condition
      (Var : Node_Id;
       Op  : out Node_Kind;
@@ -734,12 +731,6 @@ package Exp_Util is
    function Has_Access_Constraint (E : Entity_Id) return Boolean;
    --  Given object or type E, determine if a discriminant is of an access type
 
-   function Has_Annotate_Pragma_For_External_Axiomatization
-     (E : Entity_Id) return Boolean;
-   --  Returns whether E is a package entity, for which the initial list of
-   --  pragmas at the start of the package declaration contains
-   --    pragma Annotate (GNATprove, External_Axiomatization);
-
    function Homonym_Number (Subp : Entity_Id) return Pos;
    --  Here subp is the entity for a subprogram. This routine returns the
    --  homonym number used to disambiguate overloaded subprograms in the same
@@ -761,10 +752,9 @@ package Exp_Util is
    --  unconditionally executed, i.e. it is not within a loop or a conditional
    --  or a case statement etc.
 
-   function Is_All_Null_Statements (L : List_Id) return Boolean;
-   --  Return True if all the items of the list are N_Null_Statement nodes.
-   --  False otherwise. True for an empty list. It is an error to call this
-   --  routine with No_List as the argument.
+   function Integer_Type_For (S : Uint; Uns : Boolean) return Entity_Id;
+   --  Return a suitable standard integer type containing at least S bits and
+   --  of the signedness given by Uns.
 
    function Is_Displacement_Of_Object_Or_Function_Result
      (Obj_Id : Entity_Id) return Boolean;
@@ -875,11 +865,6 @@ package Exp_Util is
    --  list. If Warn is True, a warning will be output at the start of N
    --  indicating the deletion of the code.
 
-   function Known_Non_Negative (Opnd : Node_Id) return Boolean;
-   --  Given a node for a subexpression, determines if it represents a value
-   --  that cannot possibly be negative, and if so returns True. A value of
-   --  False means that it is not known if the value is positive or negative.
-
    function Make_Invariant_Call (Expr : Node_Id) return Node_Id;
    --  Generate a call to the Invariant_Procedure associated with the type of
    --  expression Expr. Expr is passed as an actual parameter in the call.
@@ -909,6 +894,15 @@ package Exp_Util is
    --  expression E. Unc_Typ is an unconstrained array or record, or a class-
    --  wide type. Set Related_Id to request an external name for the subtype
    --  rather than an internal temporary.
+
+   function Make_Variant_Comparison
+     (Loc      : Source_Ptr;
+      Mode     : Name_Id;
+      Curr_Val : Node_Id;
+      Old_Val  : Node_Id) return Node_Id;
+   --  Subsidiary to the expansion of pragmas Loop_Variant and
+   --  Subprogram_Variant. Generate a comparison between Curr_Val and Old_Val
+   --  depending on the variant mode (Increases / Decreases).
 
    procedure Map_Types (Parent_Type : Entity_Id; Derived_Type : Entity_Id);
    --  Establish the following mapping between the attributes of tagged parent
@@ -951,11 +945,6 @@ package Exp_Util is
    --  consist of constants, when the object has a nontrivial initialization
    --  or is controlled.
 
-   function Non_Limited_Designated_Type (T : Entity_Id) return Entity_Id;
-   --  An anonymous access type may designate a limited view. Check whether
-   --  non-limited view is available during expansion, to examine components
-   --  or other characteristics of the full type.
-
    function OK_To_Do_Constant_Replacement (E : Entity_Id) return Boolean;
    --  This function is used when testing whether or not to replace a reference
    --  to entity E by a known constant value. Such replacement must be done
@@ -981,6 +970,11 @@ package Exp_Util is
    --  2**K, where K is in the range 1 .. M, where the Esize of N is 2**(M+1).
    --  If so, returns the value K, otherwise returns zero. The caller checks
    --  that N is of an integer type.
+
+   function Predicate_Check_In_Scope (N : Node_Id) return Boolean;
+   --  Return True if predicate checks should be generated in the current
+   --  scope on the given node. Will return False for example when the current
+   --  scope is a predefined primitive operation.
 
    procedure Process_Statements_For_Controlled_Objects (N : Node_Id);
    --  N is a node which contains a non-handled statement list. Inspect the
@@ -1165,14 +1159,9 @@ package Exp_Util is
    --  True..True, where a raise of a Constraint_Error exception is required
    --  (RM 4.5.6(6)) and ACATS-tested.
 
-   function Target_Has_Fixed_Ops
-     (Left_Typ   : Entity_Id;
-      Right_Typ  : Entity_Id;
-      Result_Typ : Entity_Id) return Boolean;
-   --  Returns True if and only if the target machine has direct support
-   --  for fixed-by-fixed multiplications and divisions for the given
-   --  operand and result types. This is called in package Exp_Fixd to
-   --  determine whether to expand such operations.
+   function Small_Integer_Type_For (S : Uint; Uns : Boolean) return Entity_Id;
+   --  Return the smallest standard integer type containing at least S bits and
+   --  of the signedness given by Uns.
 
    function Type_May_Have_Bit_Aligned_Components
      (Typ : Entity_Id) return Boolean;
@@ -1194,11 +1183,6 @@ package Exp_Util is
 
    function Within_Case_Or_If_Expression (N : Node_Id) return Boolean;
    --  Determine whether arbitrary node N is within a case or an if expression
-
-   function Predicate_Check_In_Scope (N : Node_Id) return Boolean;
-   --  Return True if predicate checks should be generated in the current
-   --  scope on the given node. Will return False for example when the current
-   --  scope is a predefined primitive operation.
 
 private
    pragma Inline (Duplicate_Subexpr);

@@ -1,6 +1,6 @@
 /* Write the GIMPLE representation to a file stream.
 
-   Copyright (C) 2009-2020 Free Software Foundation, Inc.
+   Copyright (C) 2009-2021 Free Software Foundation, Inc.
    Contributed by Kenneth Zadeck <zadeck@naturalbridge.com>
    Re-implemented by Diego Novillo <dnovillo@google.com>
 
@@ -2424,7 +2424,7 @@ output_function (struct cgraph_node *node)
   /* As we do not recurse into BLOCK_SUBBLOCKS but only BLOCK_SUPERCONTEXT
      collect block tree leafs and stream those.  */
   auto_vec<tree> block_tree_leafs;
-  if (DECL_INITIAL (function))
+  if (DECL_INITIAL (function) && DECL_INITIAL (function) != error_mark_node)
     collect_block_tree_leafs (DECL_INITIAL (function), block_tree_leafs);
   streamer_write_uhwi (ob, block_tree_leafs.length ());
   for (unsigned i = 0; i < block_tree_leafs.length (); ++i)
@@ -2670,7 +2670,7 @@ produce_lto_section ()
 
   bool slim_object = flag_generate_lto && !flag_fat_lto_objects;
   lto_section s
-    = { LTO_major_version, LTO_minor_version, slim_object, 0 };
+    = { LTO_major_version, LTO_minor_version, slim_object, 0, 0 };
   s.set_compression (compression);
   lto_write_data (&s, sizeof s);
   lto_end_section ();
@@ -2788,7 +2788,8 @@ lto_output (void)
 		  && flag_incremental_link != INCREMENTAL_LINK_LTO)
 	      /* Thunks have no body but they may be synthetized
 		 at WPA time.  */
-	      || DECL_ARGUMENTS (cnode->decl)))
+	      || DECL_ARGUMENTS (cnode->decl)
+	      || cnode->declare_variant_alt))
 	output_function (cnode);
       else if ((vnode = dyn_cast <varpool_node *> (snode))
 	       && (DECL_INITIAL (vnode->decl) != error_mark_node

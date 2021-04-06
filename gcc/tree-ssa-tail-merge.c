@@ -1,5 +1,5 @@
 /* Tail merging for gimple.
-   Copyright (C) 2011-2020 Free Software Foundation, Inc.
+   Copyright (C) 2011-2021 Free Software Foundation, Inc.
    Contributed by Tom de Vries (tom@codesourcery.com)
 
 This file is part of GCC.
@@ -1189,8 +1189,8 @@ gimple_equal_p (same_succ *same_succ, gimple *s1, gimple *s2)
       if (!gimple_operand_equal_value_p (t1, t2))
 	return false;
 
-      code1 = gimple_expr_code (s1);
-      code2 = gimple_expr_code (s2);
+      code1 = gimple_cond_code (s1);
+      code2 = gimple_cond_code (s2);
       inv_cond = (bitmap_bit_p (same_succ->inverse, bb1->index)
 		  != bitmap_bit_p (same_succ->inverse, bb2->index));
       if (inv_cond)

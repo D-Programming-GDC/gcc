@@ -1,5 +1,5 @@
 /* Derivation and subsumption rules for constraints.
-   Copyright (C) 2013-2020 Free Software Foundation, Inc.
+   Copyright (C) 2013-2021 Free Software Foundation, Inc.
    Contributed by Andrew Sutton (andrew.n.sutton@gmail.com)
 
 This file is part of GCC.
@@ -46,21 +46,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "decl.h"
 #include "toplev.h"
 #include "type-utils.h"
-
-/* Hash functions for atomic constrains.  */
-
-struct constraint_hash : default_hash_traits<tree>
-{
-  static hashval_t hash (tree t)
-  {
-    return hash_atomic_constraint (t);
-  }
-
-  static bool equal (tree t1, tree t2)
-  {
-    return atomic_constraints_identical_p (t1, t2);
-  }
-};
 
 /* A conjunctive or disjunctive clause.
 
@@ -219,7 +204,7 @@ struct clause
   }
 
   std::list<tree> m_terms; /* The list of terms.  */
-  hash_set<tree, false, constraint_hash> m_set; /* The set of atomic constraints.  */
+  hash_set<tree, false, atom_hasher> m_set; /* The set of atomic constraints.  */
   iterator m_current; /* The current term.  */
 };
 
@@ -318,9 +303,10 @@ debug (formula& f)
 {
   for (formula::iterator i = f.begin(); i != f.end(); ++i)
     {
-      verbatim ("(((");
+      /* Format punctuators via %s to avoid -Wformat-diag.  */
+      verbatim ("%s", "(((");
       debug (*i);
-      verbatim (")))");
+      verbatim ("%s", ")))");
     }
 }
 

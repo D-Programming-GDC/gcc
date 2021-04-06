@@ -1,6 +1,6 @@
 /* Handle modules, which amounts to loading and saving symbols and
    their attendant structures.
-   Copyright (C) 2000-2020 Free Software Foundation, Inc.
+   Copyright (C) 2000-2021 Free Software Foundation, Inc.
    Contributed by Andy Vaught
 
 This file is part of GCC.
@@ -4548,6 +4548,9 @@ mio_symbol (gfc_symbol *sym)
   mio_lparen ();
 
   mio_symbol_attribute (&sym->attr);
+
+  if (sym->attr.pdt_type)
+    sym->name = gfc_dt_upper_string (sym->name);
 
   /* Note that components are always saved, even if they are supposed
      to be private.  Component access is checked during searching.  */

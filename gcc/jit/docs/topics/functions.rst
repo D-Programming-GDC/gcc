@@ -1,4 +1,4 @@
-.. Copyright (C) 2014-2020 Free Software Foundation, Inc.
+.. Copyright (C) 2014-2021 Free Software Foundation, Inc.
    Originally contributed by David Malcolm <dmalcolm@redhat.com>
 
    This is free software: you can redistribute it and/or modify it
@@ -458,3 +458,6 @@ Statements
        :start-after: /* Quote from here in docs/topics/functions.rst.  */
        :end-before: /* Quote up to here in docs/topics/functions.rst.  */
        :language: c
+
+See also :type:`gcc_jit_extended_asm` for entrypoints for adding inline
+assembler statements to a function.

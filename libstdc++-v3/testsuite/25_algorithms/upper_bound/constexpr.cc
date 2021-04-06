@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2020 Free Software Foundation, Inc.
+// Copyright (C) 2019-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -31,7 +31,7 @@ test()
   const auto out88 = std::upper_bound(ca0.begin(), ca0.end(), 6,
 				      std::less<int>());
 
-  return true;
+  return out77 == (ca0.begin() + 7) && out88 == out77;
 }
 
 static_assert(test());

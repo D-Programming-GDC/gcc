@@ -13,16 +13,10 @@
 -- ware  Foundation;  either version 3,  or (at your option) any later ver- --
 -- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
 -- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
--- or FITNESS FOR A PARTICULAR PURPOSE.                                     --
---                                                                          --
--- As a special exception under Section 7 of GPL version 3, you are granted --
--- additional permissions described in the GCC Runtime Library Exception,   --
--- version 3.1, as published by the Free Software Foundation.               --
---                                                                          --
--- You should have received a copy of the GNU General Public License and    --
--- a copy of the GCC Runtime Library Exception along with this program;     --
--- see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see    --
--- <http://www.gnu.org/licenses/>.                                          --
+-- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+-- for  more details.  You should have  received  a copy of the GNU General --
+-- Public License  distributed with GNAT; see file COPYING3.  If not, go to --
+-- http://www.gnu.org/licenses for a complete copy of the license.          --
 --                                                                          --
 -- GNAT was originally developed  by the GNAT team at  New York University. --
 -- Extensive contributions were provided by Ada Core Technologies Inc.      --
@@ -148,9 +142,12 @@ package Snames is
    Name_Dimension_System               : constant Name_Id := N + $;
    Name_Disable_Controlled             : constant Name_Id := N + $;
    Name_Dynamic_Predicate              : constant Name_Id := N + $;
+   Name_Exclusive_Functions            : constant Name_Id := N + $;
+   Name_Full_Access_Only               : constant Name_Id := N + $;
    Name_Integer_Literal                : constant Name_Id := N + $;
    Name_Real_Literal                   : constant Name_Id := N + $;
    Name_Relaxed_Initialization         : constant Name_Id := N + $;
+   Name_Stable_Properties              : constant Name_Id := N + $;
    Name_Static_Predicate               : constant Name_Id := N + $;
    Name_String_Literal                 : constant Name_Id := N + $;
    Name_Synchronization                : constant Name_Id := N + $;
@@ -171,18 +168,24 @@ package Snames is
    Name_uEntry_Bodies                  : constant Name_Id := N + $;
    Name_uExpunge                       : constant Name_Id := N + $;
    Name_uFinalizer                     : constant Name_Id := N + $;
+   Name_uFinalizer_Old                 : constant Name_Id := N + $;
+   Name_uFinalization_Controller       : constant Name_Id := N + $;
    Name_uIdepth                        : constant Name_Id := N + $;
    Name_uInit                          : constant Name_Id := N + $;
+   Name_uInit_Level                    : constant Name_Id := N + $;
    Name_uInvariant                     : constant Name_Id := N + $;
    Name_uMaster                        : constant Name_Id := N + $;
    Name_uObject                        : constant Name_Id := N + $;
    Name_uPost                          : constant Name_Id := N + $;
    Name_uPostconditions                : constant Name_Id := N + $;
+   Name_uPostcond_Enabled              : constant Name_Id := N + $;
    Name_uPre                           : constant Name_Id := N + $;
    Name_uPriority                      : constant Name_Id := N + $;
    Name_uProcess_ATSD                  : constant Name_Id := N + $;
    Name_uRelative_Deadline             : constant Name_Id := N + $;
    Name_uResult                        : constant Name_Id := N + $;
+   Name_uResult_Object_For_Postcond    : constant Name_Id := N + $;
+   Name_uReturn_Success_For_Postcond   : constant Name_Id := N + $;
    Name_uSecondary_Stack               : constant Name_Id := N + $;
    Name_uSecondary_Stack_Size          : constant Name_Id := N + $;
    Name_uService                       : constant Name_Id := N + $;
@@ -195,6 +198,7 @@ package Snames is
    Name_uTask_Name                     : constant Name_Id := N + $;
    Name_uTrace_Sp                      : constant Name_Id := N + $;
    Name_uType_Invariant                : constant Name_Id := N + $;
+   Name_uVariants                      : constant Name_Id := N + $;
 
    --  Names of predefined primitives used in the expansion of dispatching
    --  requeue and select statements, Abort, 'Callable and 'Terminated.
@@ -453,7 +457,6 @@ package Snames is
    Name_Overriding_Renamings           : constant Name_Id := N + $; -- GNAT
    Name_Partition_Elaboration_Policy   : constant Name_Id := N + $; -- Ada 05
    Name_Persistent_BSS                 : constant Name_Id := N + $; -- GNAT
-   Name_Polling                        : constant Name_Id := N + $; -- GNAT
    Name_Prefix_Exception_Messages      : constant Name_Id := N + $; -- GNAT
    Name_Priority_Specific_Dispatching  : constant Name_Id := N + $; -- Ada 05
    Name_Profile                        : constant Name_Id := N + $; -- Ada 05
@@ -668,6 +671,7 @@ package Snames is
    Name_Source_Reference               : constant Name_Id := N + $; -- GNAT
    Name_Static_Elaboration_Desired     : constant Name_Id := N + $; -- GNAT
    Name_Stream_Convert                 : constant Name_Id := N + $; -- GNAT
+   Name_Subprogram_Variant             : constant Name_Id := N + $; -- GNAT
    Name_Subtitle                       : constant Name_Id := N + $; -- GNAT
    Name_Suppress_All                   : constant Name_Id := N + $; -- GNAT
    Name_Suppress_Debug_Info            : constant Name_Id := N + $; -- GNAT
@@ -758,8 +762,9 @@ package Snames is
    Name_DLL                            : constant Name_Id := N + $;
    Name_Win32                          : constant Name_Id := N + $;
 
-   --  Other special names used in processing attributes and pragmas
+   --  Other special names used in processing attributes, aspects, and pragmas
 
+   Name_Aggregate                      : constant Name_Id := N + $;
    Name_Allow                          : constant Name_Id := N + $;
    Name_Amount                         : constant Name_Id := N + $;
    Name_As_Is                          : constant Name_Id := N + $;
@@ -841,9 +846,12 @@ package Snames is
    Name_No_Use_Of_Entity               : constant Name_Id := N + $;
    Name_No_Use_Of_Pragma               : constant Name_Id := N + $;
    Name_No_Unroll                      : constant Name_Id := N + $;
+   Name_No_Unrecognized_Aspects        : constant Name_Id := N + $;
+   Name_No_Unrecognized_Pragmas        : constant Name_Id := N + $;
    Name_No_Vector                      : constant Name_Id := N + $;
    Name_Nominal                        : constant Name_Id := N + $;
    Name_Non_Volatile                   : constant Name_Id := N + $;
+   Name_None                           : constant Name_Id := N + $;
    Name_On                             : constant Name_Id := N + $;
    Name_Optional                       : constant Name_Id := N + $;
    Name_Policy                         : constant Name_Id := N + $;
@@ -983,6 +991,7 @@ package Snames is
    Name_Machine_Size                   : constant Name_Id := N + $; -- GNAT
    Name_Mantissa                       : constant Name_Id := N + $; -- Ada 83
    Name_Max_Alignment_For_Allocation   : constant Name_Id := N + $; -- Ada 12
+   Name_Max_Integer_Size               : constant Name_Id := N + $; -- GNAT
    Name_Max_Size_In_Storage_Elements   : constant Name_Id := N + $;
    Name_Maximum_Alignment              : constant Name_Id := N + $; -- GNAT
    Name_Mechanism_Code                 : constant Name_Id := N + $; -- GNAT
@@ -1020,6 +1029,8 @@ package Snames is
    Name_Signed_Zeros                   : constant Name_Id := N + $;
    Name_Size                           : constant Name_Id := N + $;
    Name_Small                          : constant Name_Id := N + $; -- Ada 83
+   Name_Small_Denominator              : constant Name_Id := N + $; -- GNAT
+   Name_Small_Numerator                : constant Name_Id := N + $; -- GNAT
    Name_Storage_Size                   : constant Name_Id := N + $;
    Name_Storage_Unit                   : constant Name_Id := N + $; -- GNAT
    Name_Stream_Size                    : constant Name_Id := N + $; -- Ada 05
@@ -1188,19 +1199,21 @@ package Snames is
    Name_Signed_16                      : constant Name_Id := N + $; -- GNAT
    Name_Signed_32                      : constant Name_Id := N + $; -- GNAT
    Name_Signed_64                      : constant Name_Id := N + $; -- GNAT
+   Name_Signed_128                     : constant Name_Id := N + $; -- GNAT
    Name_Unsigned_8                     : constant Name_Id := N + $; -- GNAT
    Name_Unsigned_16                    : constant Name_Id := N + $; -- GNAT
    Name_Unsigned_32                    : constant Name_Id := N + $; -- GNAT
    Name_Unsigned_64                    : constant Name_Id := N + $; -- GNAT
+   Name_Unsigned_128                   : constant Name_Id := N + $; -- GNAT
 
    subtype Scalar_Id is Name_Id
-     range Name_Short_Float .. Name_Unsigned_64;
+     range Name_Short_Float .. Name_Unsigned_128;
 
    subtype Float_Scalar_Id is Name_Id
      range Name_Short_Float .. Name_Long_Long_Float;
 
    subtype Integer_Scalar_Id is Name_Id
-     range Name_Signed_8 .. Name_Unsigned_64;
+     range Name_Signed_8 .. Name_Unsigned_128;
 
    --  Names of recognized checks for pragma Suppress
 
@@ -1355,186 +1368,17 @@ package Snames is
 
    Name_Raise_Exception                  : constant Name_Id := N + $;
 
-   --  Additional reserved words and identifiers used in GNAT Project Files
-   --  Note that Name_External is already previously declared.
-
-   --  Names with a -- GB annotation are only used in gprbuild or gprclean
-
-   Name_Active                           : constant Name_Id := N + $;
-   Name_Aggregate                        : constant Name_Id := N + $;
-   Name_Archive_Builder                  : constant Name_Id := N + $;
-   Name_Archive_Builder_Append_Option    : constant Name_Id := N + $;
-   Name_Archive_Indexer                  : constant Name_Id := N + $;
-   Name_Archive_Suffix                   : constant Name_Id := N + $;
-   Name_Artifacts                        : constant Name_Id := N + $;
-   Name_Artifacts_In_Exec_Dir            : constant Name_Id := N + $; -- GB
-   Name_Artifacts_In_Object_Dir          : constant Name_Id := N + $; -- GB
-   Name_Binder                           : constant Name_Id := N + $;
-   Name_Body_Suffix                      : constant Name_Id := N + $;
-   Name_Builder                          : constant Name_Id := N + $;
-   Name_Clean                            : constant Name_Id := N + $;
-   Name_Compiler                         : constant Name_Id := N + $;
-   Name_Compiler_Command                 : constant Name_Id := N + $; -- GB
-   Name_Config_Body_File_Name            : constant Name_Id := N + $;
-   Name_Config_Body_File_Name_Index      : constant Name_Id := N + $;
-   Name_Config_Body_File_Name_Pattern    : constant Name_Id := N + $;
-   Name_Config_File_Switches             : constant Name_Id := N + $;
-   Name_Config_File_Unique               : constant Name_Id := N + $;
-   Name_Config_Spec_File_Name            : constant Name_Id := N + $;
-   Name_Config_Spec_File_Name_Index      : constant Name_Id := N + $;
-   Name_Config_Spec_File_Name_Pattern    : constant Name_Id := N + $;
-   Name_Configuration                    : constant Name_Id := N + $;
-   Name_Cross_Reference                  : constant Name_Id := N + $;
-   Name_Default_Language                 : constant Name_Id := N + $;
-   Name_Default_Switches                 : constant Name_Id := N + $;
-   Name_Dependency_Driver                : constant Name_Id := N + $;
-   Name_Dependency_Kind                  : constant Name_Id := N + $;
-   Name_Dependency_Switches              : constant Name_Id := N + $;
-   Name_Driver                           : constant Name_Id := N + $;
-   Name_Excluded_Source_Dirs             : constant Name_Id := N + $;
-   Name_Excluded_Source_Files            : constant Name_Id := N + $;
-   Name_Excluded_Source_List_File        : constant Name_Id := N + $;
-   Name_Exec_Dir                         : constant Name_Id := N + $;
-   Name_Exec_Subdir                      : constant Name_Id := N + $;
-   Name_Excluded_Patterns                : constant Name_Id := N + $;
-   Name_Executable                       : constant Name_Id := N + $;
-   Name_Executable_Suffix                : constant Name_Id := N + $;
-   Name_Extends                          : constant Name_Id := N + $;
-   Name_External_As_List                 : constant Name_Id := N + $;
-   Name_Externally_Built                 : constant Name_Id := N + $;
-   Name_Finder                           : constant Name_Id := N + $;
-   Name_Global_Compilation_Switches      : constant Name_Id := N + $;
-   Name_Global_Configuration_Pragmas     : constant Name_Id := N + $;
-   Name_Global_Config_File               : constant Name_Id := N + $; -- GB
-   Name_Gnatls                           : constant Name_Id := N + $;
-   Name_Gnatstub                         : constant Name_Id := N + $;
-   Name_Gnu                              : constant Name_Id := N + $;
-   Name_Ide                              : constant Name_Id := N + $;
-   Name_Ignore_Source_Sub_Dirs           : constant Name_Id := N + $;
-   Name_Implementation                   : constant Name_Id := N + $;
-   Name_Implementation_Exceptions        : constant Name_Id := N + $;
-   Name_Implementation_Suffix            : constant Name_Id := N + $;
-   Name_Included_Artifact_Patterns       : constant Name_Id := N + $;
-   Name_Included_Patterns                : constant Name_Id := N + $;
-   Name_Include_Switches                 : constant Name_Id := N + $;
-   Name_Include_Path                     : constant Name_Id := N + $;
-   Name_Include_Path_File                : constant Name_Id := N + $;
-   Name_Inherit_Source_Path              : constant Name_Id := N + $;
-   Name_Install                          : constant Name_Id := N + $;
-   Name_Install_Name                     : constant Name_Id := N + $;
-   Name_Languages                        : constant Name_Id := N + $;
-   Name_Language_Kind                    : constant Name_Id := N + $;
-   Name_Leading_Library_Options          : constant Name_Id := N + $;
-   Name_Leading_Required_Switches        : constant Name_Id := N + $;
-   Name_Leading_Switches                 : constant Name_Id := N + $;
-   Name_Lib_Subdir                       : constant Name_Id := N + $;
-   Name_Link_Lib_Subdir                  : constant Name_Id := N + $;
-   Name_Library                          : constant Name_Id := N + $;
-   Name_Library_Ali_Dir                  : constant Name_Id := N + $;
-   Name_Library_Auto_Init                : constant Name_Id := N + $;
-   Name_Library_Auto_Init_Supported      : constant Name_Id := N + $;
-   Name_Library_Builder                  : constant Name_Id := N + $;
-   Name_Library_Dir                      : constant Name_Id := N + $;
-   Name_Library_GCC                      : constant Name_Id := N + $;
-   Name_Library_Install_Name_Option      : constant Name_Id := N + $;
-   Name_Library_Interface                : constant Name_Id := N + $;
-   Name_Library_Kind                     : constant Name_Id := N + $;
-   Name_Library_Name                     : constant Name_Id := N + $;
-   Name_Library_Major_Minor_Id_Supported : constant Name_Id := N + $;
-   Name_Library_Options                  : constant Name_Id := N + $;
-   Name_Library_Partial_Linker           : constant Name_Id := N + $;
-   Name_Library_Reference_Symbol_File    : constant Name_Id := N + $;
-   Name_Library_Rpath_Options            : constant Name_Id := N + $; -- GB
-   Name_Library_Standalone               : constant Name_Id := N + $;
-   Name_Library_Encapsulated_Options     : constant Name_Id := N + $; -- GB
-   Name_Library_Encapsulated_Supported   : constant Name_Id := N + $; -- GB
-   Name_Library_Src_Dir                  : constant Name_Id := N + $;
-   Name_Library_Support                  : constant Name_Id := N + $;
-   Name_Library_Symbol_File              : constant Name_Id := N + $;
-   Name_Library_Symbol_Policy            : constant Name_Id := N + $;
-   Name_Library_Version                  : constant Name_Id := N + $;
-   Name_Library_Version_Switches         : constant Name_Id := N + $;
-   Name_Linker                           : constant Name_Id := N + $;
-   Name_Linker_Executable_Option         : constant Name_Id := N + $;
-   Name_Linker_Lib_Dir_Option            : constant Name_Id := N + $;
-   Name_Linker_Lib_Name_Option           : constant Name_Id := N + $;
-   Name_Local_Config_File                : constant Name_Id := N + $; -- GB
-   Name_Local_Configuration_Pragmas      : constant Name_Id := N + $;
-   Name_Locally_Removed_Files            : constant Name_Id := N + $;
-   Name_Map_File_Option                  : constant Name_Id := N + $;
-   Name_Mapping_File_Switches            : constant Name_Id := N + $;
-   Name_Mapping_Spec_Suffix              : constant Name_Id := N + $;
-   Name_Mapping_Body_Suffix              : constant Name_Id := N + $;
-   Name_Max_Command_Line_Length          : constant Name_Id := N + $;
-   Name_Metrics                          : constant Name_Id := N + $;
-   Name_Multi_Unit_Object_Separator      : constant Name_Id := N + $;
-   Name_Multi_Unit_Switches              : constant Name_Id := N + $;
-   Name_Naming                           : constant Name_Id := N + $;
-   Name_None                             : constant Name_Id := N + $;
-   Name_Object_Artifact_Extensions       : constant Name_Id := N + $;
-   Name_Object_File_Suffix               : constant Name_Id := N + $;
-   Name_Object_File_Switches             : constant Name_Id := N + $;
-   Name_Object_Generated                 : constant Name_Id := N + $;
-   Name_Object_List                      : constant Name_Id := N + $;
-   Name_Object_Path_Switches             : constant Name_Id := N + $;
-   Name_Objects_Linked                   : constant Name_Id := N + $;
-   Name_Objects_Path                     : constant Name_Id := N + $;
-   Name_Objects_Path_File                : constant Name_Id := N + $;
-   Name_Object_Dir                       : constant Name_Id := N + $;
-   Name_Option_List                      : constant Name_Id := N + $;
-   Name_Path_Syntax                      : constant Name_Id := N + $;
-   Name_Pic_Option                       : constant Name_Id := N + $;
-   Name_Pretty_Printer                   : constant Name_Id := N + $;
-   Name_Prefix                           : constant Name_Id := N + $;
-   Name_Project                          : constant Name_Id := N + $;
-   Name_Project_Dir                      : constant Name_Id := N + $;
-   Name_Project_Files                    : constant Name_Id := N + $;
-   Name_Project_Path                     : constant Name_Id := N + $;
-   Name_Project_Subdir                   : constant Name_Id := N + $;
-   Name_Remote                           : constant Name_Id := N + $;
-   Name_Required_Artifacts               : constant Name_Id := N + $;
-   Name_Response_File_Format             : constant Name_Id := N + $;
-   Name_Response_File_Switches           : constant Name_Id := N + $;
-   Name_Root_Dir                         : constant Name_Id := N + $;
-   Name_Roots                            : constant Name_Id := N + $; -- GB
-   Name_Required_Switches                : constant Name_Id := N + $;
-   Name_Run_Path_Option                  : constant Name_Id := N + $;
-   Name_Run_Path_Origin                  : constant Name_Id := N + $;
-   Name_Separate_Run_Path_Options        : constant Name_Id := N + $;
-   Name_Shared_Library_Minimum_Switches  : constant Name_Id := N + $;
-   Name_Shared_Library_Prefix            : constant Name_Id := N + $;
-   Name_Shared_Library_Suffix            : constant Name_Id := N + $;
-   Name_Separate_Suffix                  : constant Name_Id := N + $;
-   Name_Source_Artifact_Extensions       : constant Name_Id := N + $;
-   Name_Source_Dirs                      : constant Name_Id := N + $;
-   Name_Source_File_Switches             : constant Name_Id := N + $;
-   Name_Source_Files                     : constant Name_Id := N + $;
-   Name_Source_List_File                 : constant Name_Id := N + $;
-   Name_Sources_Subdir                   : constant Name_Id := N + $;
-   Name_Spec                             : constant Name_Id := N + $;
-   Name_Spec_Suffix                      : constant Name_Id := N + $;
-   Name_Specification                    : constant Name_Id := N + $;
-   Name_Specification_Exceptions         : constant Name_Id := N + $;
-   Name_Specification_Suffix             : constant Name_Id := N + $;
-   Name_Stack                            : constant Name_Id := N + $;
-   Name_Switches                         : constant Name_Id := N + $;
-   Name_Symbolic_Link_Supported          : constant Name_Id := N + $;
-   Name_Synchronize                      : constant Name_Id := N + $;
-   Name_Toolchain_Description            : constant Name_Id := N + $;
-   Name_Toolchain_Version                : constant Name_Id := N + $;
-   Name_Trailing_Required_Switches       : constant Name_Id := N + $;
-   Name_Trailing_Switches                : constant Name_Id := N + $;
-   Name_Runtime_Library_Dir              : constant Name_Id := N + $;
-   Name_Runtime_Source_Dir               : constant Name_Id := N + $;
-
    --  Additional names used by the Repinfo unit
 
    Name_Discriminant                     : constant Name_Id := N + $;
    Name_Operands                         : constant Name_Id := N + $;
 
    --  Other miscellaneous names used in front end
+   --  Note that the UP_ prefix means use the rest of the name in uppercase,
+   --  e.g. Name_UP_RESULT corresponds to the name "RESULT".
 
    Name_Unaligned_Valid                  : constant Name_Id := N + $;
+   Name_UP_RESULT                        : constant Name_Id := N + $;
    Name_Suspension_Object                : constant Name_Id := N + $;
    Name_Synchronous_Task_Control         : constant Name_Id := N + $;
 
@@ -1676,6 +1520,7 @@ package Snames is
       Attribute_Machine_Size,
       Attribute_Mantissa,
       Attribute_Max_Alignment_For_Allocation,
+      Attribute_Max_Integer_Size,
       Attribute_Max_Size_In_Storage_Elements,
       Attribute_Maximum_Alignment,
       Attribute_Mechanism_Code,
@@ -1713,6 +1558,8 @@ package Snames is
       Attribute_Signed_Zeros,
       Attribute_Size,
       Attribute_Small,
+      Attribute_Small_Denominator,
+      Attribute_Small_Numerator,
       Attribute_Storage_Size,
       Attribute_Storage_Unit,
       Attribute_Stream_Size,
@@ -1940,7 +1787,6 @@ package Snames is
       Pragma_Overriding_Renamings,
       Pragma_Partition_Elaboration_Policy,
       Pragma_Persistent_BSS,
-      Pragma_Polling,
       Pragma_Prefix_Exception_Messages,
       Pragma_Priority_Specific_Dispatching,
       Pragma_Profile,
@@ -2101,6 +1947,7 @@ package Snames is
       Pragma_Source_Reference,
       Pragma_Static_Elaboration_Desired,
       Pragma_Stream_Convert,
+      Pragma_Subprogram_Variant,
       Pragma_Subtitle,
       Pragma_Suppress_All,
       Pragma_Suppress_Debug_Info,

@@ -1,4 +1,4 @@
-// Copyright (C) 2016-2020 Free Software Foundation, Inc.
+// Copyright (C) 2016-2021 Free Software Foundation, Inc.
 //
 // This file is part of the GNU ISO C++ Library.  This library is free
 // software; you can redistribute it and/or modify it under the
@@ -156,7 +156,7 @@ test04()
   // remove write permission on the directory:
   fs::permissions(dir, fs::perms::owner_read|fs::perms::owner_exec);
   n = fs::remove_all(dir, ec);
-  VERIFY( n == -1 );
+  VERIFY( n == std::uintmax_t(-1) );
   VERIFY( ec == std::errc::permission_denied ); // not ENOTEMPTY
 
   try {
@@ -171,6 +171,8 @@ test04()
   }
 
   fs::permissions(dir, fs::perms::owner_write, fs::perm_options::add);
+  fs::remove_all(dir, ec);
+  f.path.clear();
 #endif
 }
 

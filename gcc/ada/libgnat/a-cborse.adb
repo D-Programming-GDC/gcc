@@ -41,6 +41,7 @@ pragma Elaborate_All
   (Ada.Containers.Red_Black_Trees.Generic_Bounded_Set_Operations);
 
 with System; use type System.Address;
+with System.Put_Images;
 
 package body Ada.Containers.Bounded_Ordered_Sets with
   SPARK_Mode => Off
@@ -548,6 +549,17 @@ is
       return Position.Container.Nodes (Position.Node).Element;
    end Element;
 
+   -----------
+   -- Empty --
+   -----------
+
+   function Empty (Capacity : Count_Type := 10) return Set is
+   begin
+      return Result : Set (Capacity) do
+         null;
+      end return;
+   end Empty;
+
    -------------------------
    -- Equivalent_Elements --
    -------------------------
@@ -896,7 +908,7 @@ is
       -- Read --
       ----------
 
-      procedure  Read
+      procedure Read
         (Stream : not null access Root_Stream_Type'Class;
          Item   : out Reference_Type)
       is
@@ -1627,6 +1639,31 @@ is
          Process (S.Nodes (Position.Node).Element);
       end;
    end Query_Element;
+
+   ---------------
+   -- Put_Image --
+   ---------------
+
+   procedure Put_Image
+     (S : in out Ada.Strings.Text_Output.Sink'Class; V : Set)
+   is
+      First_Time : Boolean := True;
+      use System.Put_Images;
+   begin
+      Array_Before (S);
+
+      for X of V loop
+         if First_Time then
+            First_Time := False;
+         else
+            Simple_Array_Between (S);
+         end if;
+
+         Element_Type'Put_Image (S, X);
+      end loop;
+
+      Array_After (S);
+   end Put_Image;
 
    ----------
    -- Read --

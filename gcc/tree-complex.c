@@ -1,5 +1,5 @@
 /* Lower complex number operations to scalar operations.
-   Copyright (C) 2004-2020 Free Software Foundation, Inc.
+   Copyright (C) 2004-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -318,7 +318,7 @@ complex_propagate::visit_stmt (gimple *stmt, edge *taken_edge_p ATTRIBUTE_UNUSED
 
   lhs = gimple_get_lhs (stmt);
   /* Skip anything but GIMPLE_ASSIGN and GIMPLE_CALL with a lhs.  */
-  if (!lhs)
+  if (!lhs || SSA_NAME_OCCURS_IN_ABNORMAL_PHI (lhs))
     return SSA_PROP_VARYING;
 
   /* These conditions should be satisfied due to the initial filter
@@ -416,6 +416,9 @@ complex_propagate::visit_phi (gphi *phi)
   /* This condition should be satisfied due to the initial filter
      set up in init_dont_simulate_again.  */
   gcc_assert (TREE_CODE (TREE_TYPE (lhs)) == COMPLEX_TYPE);
+
+  if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (lhs))
+    return SSA_PROP_VARYING;
 
   /* We've set up the lattice values such that IOR neatly models PHI meet.  */
   new_l = UNINITIALIZED;
@@ -569,7 +572,8 @@ set_component_ssa_name (tree ssa_name, bool imag_p, tree value)
     {
       /* Replace an anonymous base value with the variable from cvc_lookup.
 	 This should result in better debug info.  */
-      if (SSA_NAME_VAR (ssa_name)
+      if (!SSA_NAME_IS_DEFAULT_DEF (value)
+	  && SSA_NAME_VAR (ssa_name)
 	  && (!SSA_NAME_VAR (value) || DECL_IGNORED_P (SSA_NAME_VAR (value)))
 	  && !DECL_IGNORED_P (SSA_NAME_VAR (ssa_name)))
 	{

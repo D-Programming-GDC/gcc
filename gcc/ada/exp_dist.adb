@@ -902,7 +902,7 @@ package body Exp_Dist is
    -- Local variables and structures --
    ------------------------------------
 
-   RCI_Cache : Node_Id;
+   RCI_Cache : Node_Id := Empty;
    --  Needs comments ???
 
    Output_From_Constrained : constant array (Boolean) of Name_Id :=
@@ -5296,7 +5296,7 @@ package body Exp_Dist is
 
    function Hash (F : Name_Id) return Hash_Index is
    begin
-      return Hash_Index (Natural (F) mod Positive (Hash_Index'Last + 1));
+      return Hash_Index (Integer (F) mod Positive (Hash_Index'Last + 1));
    end Hash;
 
    --------------------------

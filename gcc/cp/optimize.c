@@ -1,5 +1,5 @@
 /* Perform optimizations on tree structure.
-   Copyright (C) 1998-2020 Free Software Foundation, Inc.
+   Copyright (C) 1998-2021 Free Software Foundation, Inc.
    Written by Mark Michell (mark@codesourcery.com).
 
 This file is part of GCC.
@@ -512,7 +512,7 @@ maybe_clone_body (tree fn)
       DECL_DLLIMPORT_P (clone) = DECL_DLLIMPORT_P (fn);
       DECL_ATTRIBUTES (clone) = copy_list (DECL_ATTRIBUTES (fn));
       DECL_DISREGARD_INLINE_LIMITS (clone) = DECL_DISREGARD_INLINE_LIMITS (fn);
-      set_decl_section_name (clone, DECL_SECTION_NAME (fn));
+      set_decl_section_name (clone, fn);
 
       /* Adjust the parameter names and locations.  */
       parm = DECL_ARGUMENTS (fn);

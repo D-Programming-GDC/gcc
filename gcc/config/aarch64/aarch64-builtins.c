@@ -1,5 +1,5 @@
 /* Builtins' description for AArch64 SIMD architecture.
-   Copyright (C) 2011-2020 Free Software Foundation, Inc.
+   Copyright (C) 2011-2021 Free Software Foundation, Inc.
    Contributed by ARM Ltd.
 
    This file is part of GCC.
@@ -132,6 +132,8 @@ const unsigned int FLAG_AUTO_FP = 1U << 5;
 const unsigned int FLAG_FP = FLAG_READ_FPCR | FLAG_RAISE_FP_EXCEPTIONS;
 const unsigned int FLAG_ALL = FLAG_READ_FPCR | FLAG_RAISE_FP_EXCEPTIONS
   | FLAG_READ_MEMORY | FLAG_PREFETCH_MEMORY | FLAG_WRITE_MEMORY;
+const unsigned int FLAG_STORE = FLAG_WRITE_MEMORY | FLAG_AUTO_FP;
+const unsigned int FLAG_LOAD = FLAG_READ_MEMORY | FLAG_AUTO_FP;
 
 typedef struct
 {
@@ -265,6 +267,11 @@ static enum aarch64_type_qualifiers
 aarch64_types_unsigned_shift_qualifiers[SIMD_MAX_BUILTIN_ARGS]
   = { qualifier_unsigned, qualifier_unsigned, qualifier_immediate };
 #define TYPES_USHIFTIMM (aarch64_types_unsigned_shift_qualifiers)
+#define TYPES_USHIFT2IMM (aarch64_types_ternopu_imm_qualifiers)
+static enum aarch64_type_qualifiers
+aarch64_types_shift2_to_unsigned_qualifiers[SIMD_MAX_BUILTIN_ARGS]
+  = { qualifier_unsigned, qualifier_unsigned, qualifier_none, qualifier_immediate };
+#define TYPES_SHIFT2IMM_UUSS (aarch64_types_shift2_to_unsigned_qualifiers)
 
 static enum aarch64_type_qualifiers
 aarch64_types_ternop_s_imm_p_qualifiers[SIMD_MAX_BUILTIN_ARGS]
@@ -276,6 +283,7 @@ aarch64_types_ternop_s_imm_qualifiers[SIMD_MAX_BUILTIN_ARGS]
 #define TYPES_SETREG (aarch64_types_ternop_s_imm_qualifiers)
 #define TYPES_SHIFTINSERT (aarch64_types_ternop_s_imm_qualifiers)
 #define TYPES_SHIFTACC (aarch64_types_ternop_s_imm_qualifiers)
+#define TYPES_SHIFT2IMM (aarch64_types_ternop_s_imm_qualifiers)
 
 static enum aarch64_type_qualifiers
 aarch64_types_ternop_p_imm_qualifiers[SIMD_MAX_BUILTIN_ARGS]
@@ -1855,10 +1863,10 @@ aarch64_expand_fcmla_builtin (tree exp, rtx target, int fcode)
      only need to know the order in a V2mode.  */
   lane_idx = aarch64_endian_lane_rtx (V2DImode, lane);
 
-  if (!target)
+  if (!target
+      || !REG_P (target)
+      || GET_MODE (target) != d->mode)
     target = gen_reg_rtx (d->mode);
-  else
-    target = force_reg (d->mode, target);
 
   rtx pat = NULL_RTX;
 
@@ -1946,7 +1954,7 @@ aarch64_expand_rng_builtin (tree exp, rtx target, int fcode, int ignore)
     return target;
 
   rtx cc_reg = gen_rtx_REG (CC_Zmode, CC_REGNUM);
-  rtx cmp_rtx = gen_rtx_fmt_ee (NE, SImode, cc_reg, const0_rtx);
+  rtx cmp_rtx = gen_rtx_fmt_ee (EQ, SImode, cc_reg, const0_rtx);
   emit_insn (gen_aarch64_cstoresi (target, cmp_rtx, cc_reg));
   return target;
 }

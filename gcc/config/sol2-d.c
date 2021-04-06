@@ -1,5 +1,5 @@
 /* Solaris support needed only by D front-end.
-   Copyright (C) 2018-2020 Free Software Foundation, Inc.
+   Copyright (C) 2018-2021 Free Software Foundation, Inc.
 
 GCC is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free
@@ -33,19 +33,7 @@ solaris_d_os_builtins (void)
   d_add_builtin_version ("Solaris");			\
 }
 
-/* Implement TARGET_D_CRITSEC_SIZE for Solaris targets.  */
-
-static unsigned
-solaris_d_critsec_size (void)
-{
-  /* This is the sizeof pthread_mutex_t.  */
-  return 24;
-}
-
 #undef TARGET_D_OS_VERSIONS
 #define TARGET_D_OS_VERSIONS solaris_d_os_builtins
-
-#undef TARGET_D_CRITSEC_SIZE
-#define TARGET_D_CRITSEC_SIZE solaris_d_critsec_size
 
 struct gcc_targetdm targetdm = TARGETDM_INITIALIZER;

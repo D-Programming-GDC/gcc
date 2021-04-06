@@ -1,4 +1,4 @@
-/* Copyright (C) 2015-2020 Free Software Foundation, Inc.
+/* Copyright (C) 2015-2021 Free Software Foundation, Inc.
    Contributed by Mentor Embedded.
 
    This file is part of the GNU Offloading and Multi Processing Library
@@ -40,6 +40,12 @@ omp_get_default_device (void)
 }
 
 int
+omp_get_initial_device (void)
+{
+  return GOMP_DEVICE_HOST_FALLBACK;
+}
+
+int
 omp_get_num_devices (void)
 {
   return 0;
@@ -66,6 +72,7 @@ omp_is_initial_device (void)
 
 ialias (omp_set_default_device)
 ialias (omp_get_default_device)
+ialias (omp_get_initial_device)
 ialias (omp_get_num_devices)
 ialias (omp_get_num_teams)
 ialias (omp_get_team_num)

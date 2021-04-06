@@ -1,5 +1,5 @@
 /* Loop splitting.
-   Copyright (C) 2015-2020 Free Software Foundation, Inc.
+   Copyright (C) 2015-2021 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -976,6 +976,9 @@ ssa_semi_invariant_p (struct loop *loop, tree name,
   /* An SSA name defined outside loop is definitely semi-invariant.  */
   if (!def_bb || !flow_bb_inside_loop_p (loop, def_bb))
     return true;
+
+  if (SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name))
+    return false;
 
   return stmt_semi_invariant_p_1 (loop, def, skip_head, stmt_stat);
 }

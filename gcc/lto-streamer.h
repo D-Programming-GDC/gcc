@@ -1,7 +1,7 @@
 /* Data structures and declarations used for reading and writing
    GIMPLE to a file stream.
 
-   Copyright (C) 2009-2020 Free Software Foundation, Inc.
+   Copyright (C) 2009-2021 Free Software Foundation, Inc.
    Contributed by Doug Kwan <dougkwan@google.com>
 
 This file is part of GCC.
@@ -369,6 +369,7 @@ struct lto_section
   int16_t major_version;
   int16_t minor_version;
   unsigned char slim_object;
+  unsigned char _padding;
 
   /* Flags is a private field that is not defined publicly.  */
   uint16_t flags;
@@ -926,6 +927,12 @@ bool reachable_from_this_partition_p (struct cgraph_node *,
 				      lto_symtab_encoder_t);
 lto_symtab_encoder_t compute_ltrans_boundary (lto_symtab_encoder_t encoder);
 void select_what_to_stream (void);
+
+/* In omp-general.c.  */
+void omp_lto_output_declare_variant_alt (lto_simple_output_block *,
+					 cgraph_node *, lto_symtab_encoder_t);
+void omp_lto_input_declare_variant_alt (lto_input_block *, cgraph_node *,
+					vec<symtab_node *>);
 
 /* In options-save.c.  */
 void cl_target_option_stream_out (struct output_block *, struct bitpack_d *,

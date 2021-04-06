@@ -1,6 +1,6 @@
 /* Gimple IR support functions.
 
-   Copyright (C) 2007-2020 Free Software Foundation, Inc.
+   Copyright (C) 2007-2021 Free Software Foundation, Inc.
    Contributed by Aldy Hernandez <aldyh@redhat.com>
 
 This file is part of GCC.
@@ -45,6 +45,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "asan.h"
 #include "langhooks.h"
+#include "attr-fnspec.h"
+#include "ipa-modref-tree.h"
+#include "ipa-modref.h"
 
 
 /* All the tuples have their operand vector (if present) at the very bottom
@@ -387,6 +390,10 @@ gimple_build_call_from_tree (tree t, tree fnptrtype)
       && fndecl_built_in_p (fndecl, BUILT_IN_NORMAL)
       && ALLOCA_FUNCTION_CODE_P (DECL_FUNCTION_CODE (fndecl)))
     gimple_call_set_alloca_for_var (call, CALL_ALLOCA_FOR_VAR_P (t));
+  else if (fndecl
+	   && (DECL_IS_OPERATOR_NEW_P (fndecl)
+	       || DECL_IS_OPERATOR_DELETE_P (fndecl)))
+    gimple_call_set_from_new_or_delete (call, CALL_FROM_NEW_OR_DELETE_P (t));
   else
     gimple_call_set_from_thunk (call, CALL_FROM_THUNK_P (t));
   gimple_call_set_va_arg_pack (call, CALL_EXPR_VA_ARG_PACK (t));
@@ -605,10 +612,6 @@ gimple_build_asm_1 (const char *string, unsigned ninputs, unsigned noutputs,
 {
   gasm *p;
   int size = strlen (string);
-
-  /* ASMs with labels cannot have outputs.  This should have been
-     enforced by the front end.  */
-  gcc_assert (nlabels == 0 || noutputs == 0);
 
   p = as_a <gasm *> (
         gimple_build_with_ops (GIMPLE_ASM, ERROR_MARK,
@@ -1482,23 +1485,44 @@ gimple_call_flags (const gimple *stmt)
 
 /* Return the "fn spec" string for call STMT.  */
 
-static const_tree
+attr_fnspec
 gimple_call_fnspec (const gcall *stmt)
 {
   tree type, attr;
 
   if (gimple_call_internal_p (stmt))
-    return internal_fn_fnspec (gimple_call_internal_fn (stmt));
+    {
+      const_tree spec = internal_fn_fnspec (gimple_call_internal_fn (stmt));
+      if (spec)
+	return spec;
+      else
+	return "";
+    }
 
   type = gimple_call_fntype (stmt);
-  if (!type)
-    return NULL_TREE;
-
-  attr = lookup_attribute ("fn spec", TYPE_ATTRIBUTES (type));
-  if (!attr)
-    return NULL_TREE;
-
-  return TREE_VALUE (TREE_VALUE (attr));
+  if (type)
+    {
+      attr = lookup_attribute ("fn spec", TYPE_ATTRIBUTES (type));
+      if (attr)
+	return TREE_VALUE (TREE_VALUE (attr));
+    }
+  if (gimple_call_builtin_p (stmt, BUILT_IN_NORMAL))
+    return builtin_fnspec (gimple_call_fndecl (stmt));
+  tree fndecl = gimple_call_fndecl (stmt);
+  /* If the call is to a replaceable operator delete and results
+     from a delete expression as opposed to a direct call to
+     such operator, then we can treat it as free.  */
+  if (fndecl
+      && DECL_IS_OPERATOR_DELETE_P (fndecl)
+      && DECL_IS_REPLACEABLE_OPERATOR (fndecl)
+      && gimple_call_from_new_or_delete (stmt))
+    return ".co ";
+  /* Similarly operator new can be treated as malloc.  */
+  if (fndecl
+      && DECL_IS_REPLACEABLE_OPERATOR_NEW_P (fndecl)
+      && gimple_call_from_new_or_delete (stmt))
+    return "mC";
+  return "";
 }
 
 /* Detects argument flags for argument number ARG on call STMT.  */
@@ -1506,33 +1530,48 @@ gimple_call_fnspec (const gcall *stmt)
 int
 gimple_call_arg_flags (const gcall *stmt, unsigned arg)
 {
-  const_tree attr = gimple_call_fnspec (stmt);
+  attr_fnspec fnspec = gimple_call_fnspec (stmt);
+  int flags = 0;
 
-  if (!attr || 1 + arg >= (unsigned) TREE_STRING_LENGTH (attr))
-    return 0;
-
-  switch (TREE_STRING_POINTER (attr)[1 + arg])
+  if (fnspec.known_p ())
     {
-    case 'x':
-    case 'X':
-      return EAF_UNUSED;
-
-    case 'R':
-      return EAF_DIRECT | EAF_NOCLOBBER | EAF_NOESCAPE;
-
-    case 'r':
-      return EAF_NOCLOBBER | EAF_NOESCAPE;
-
-    case 'W':
-      return EAF_DIRECT | EAF_NOESCAPE;
-
-    case 'w':
-      return EAF_NOESCAPE;
-
-    case '.':
-    default:
-      return 0;
+      if (!fnspec.arg_specified_p (arg))
+	;
+      else if (!fnspec.arg_used_p (arg))
+	flags = EAF_UNUSED;
+      else
+	{
+	  if (fnspec.arg_direct_p (arg))
+	    flags |= EAF_DIRECT;
+	  if (fnspec.arg_noescape_p (arg))
+	    flags |= EAF_NOESCAPE | EAF_NODIRECTESCAPE;
+	  if (fnspec.arg_readonly_p (arg))
+	    flags |= EAF_NOCLOBBER;
+	}
     }
+  tree callee = gimple_call_fndecl (stmt);
+  if (callee)
+    {
+      cgraph_node *node = cgraph_node::get (callee);
+      modref_summary *summary = node ? get_modref_function_summary (node)
+				: NULL;
+
+      if (summary && summary->arg_flags.length () > arg)
+	{
+	  int modref_flags = summary->arg_flags[arg];
+
+	  /* We have possibly optimized out load.  Be conservative here.  */
+	  if (!node->binds_to_current_def_p ())
+	    {
+	      if ((modref_flags & EAF_UNUSED) && !(flags & EAF_UNUSED))
+		modref_flags &= ~EAF_UNUSED;
+	      if ((modref_flags & EAF_DIRECT) && !(flags & EAF_DIRECT))
+		modref_flags &= ~EAF_DIRECT;
+	    }
+	  flags |= modref_flags;
+	}
+    }
+  return flags;
 }
 
 /* Detects return flags for the call STMT.  */
@@ -1540,30 +1579,18 @@ gimple_call_arg_flags (const gcall *stmt, unsigned arg)
 int
 gimple_call_return_flags (const gcall *stmt)
 {
-  const_tree attr;
-
   if (gimple_call_flags (stmt) & ECF_MALLOC)
     return ERF_NOALIAS;
 
-  attr = gimple_call_fnspec (stmt);
-  if (!attr || TREE_STRING_LENGTH (attr) < 1)
-    return 0;
+  attr_fnspec fnspec = gimple_call_fnspec (stmt);
 
-  switch (TREE_STRING_POINTER (attr)[0])
-    {
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-      return ERF_RETURNS_ARG | (TREE_STRING_POINTER (attr)[0] - '1');
+  unsigned int arg_no;
+  if (fnspec.returns_arg (&arg_no))
+    return ERF_RETURNS_ARG | arg_no;
 
-    case 'm':
-      return ERF_NOALIAS;
-
-    case '.':
-    default:
-      return 0;
-    }
+  if (fnspec.returns_noalias_p ())
+    return ERF_NOALIAS;
+  return 0;
 }
 
 
@@ -2713,12 +2740,12 @@ gimple_builtin_call_types_compatible_p (const gimple *stmt, tree fndecl)
 /* Return true when STMT is operator a replaceable delete call.  */
 
 bool
-gimple_call_replaceable_operator_delete_p (const gcall *stmt)
+gimple_call_operator_delete_p (const gcall *stmt)
 {
   tree fndecl;
 
   if ((fndecl = gimple_call_fndecl (stmt)) != NULL_TREE)
-    return DECL_IS_REPLACEABLE_OPERATOR_DELETE_P (fndecl);
+    return DECL_IS_OPERATOR_DELETE_P (fndecl);
   return false;
 }
 
