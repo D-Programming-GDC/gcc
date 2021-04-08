@@ -1055,7 +1055,7 @@ struct processor_costs power8_cost = {
   COSTS_N_INSNS (17),	/* ddiv */
   128,			/* cache line size */
   32,			/* l1 cache */
-  256,			/* l2 cache */
+  512,			/* l2 cache */
   12,			/* prefetch streams */
   COSTS_N_INSNS (3),	/* SF->DF convert */
 };
@@ -1340,6 +1340,10 @@ static const struct attribute_spec rs6000_attribute_table[] =
 #undef TARGET_ASM_ASSEMBLE_VISIBILITY
 #define TARGET_ASM_ASSEMBLE_VISIBILITY rs6000_assemble_visibility
 #endif
+
+#undef TARGET_ASM_PRINT_PATCHABLE_FUNCTION_ENTRY
+#define TARGET_ASM_PRINT_PATCHABLE_FUNCTION_ENTRY \
+  rs6000_print_patchable_function_entry
 
 #undef TARGET_SET_UP_BY_PROLOGUE
 #define TARGET_SET_UP_BY_PROLOGUE rs6000_set_up_by_prologue
@@ -7026,29 +7030,49 @@ rs6000_expand_vector_set_var_p9 (rtx target, rtx val, rtx idx)
 
   gcc_assert (VECTOR_MEM_VSX_P (mode) && !CONST_INT_P (idx));
 
-  gcc_assert (GET_MODE (idx) == E_SImode);
-
   machine_mode inner_mode = GET_MODE (val);
 
-  rtx tmp = gen_reg_rtx (GET_MODE (idx));
   int width = GET_MODE_SIZE (inner_mode);
 
   gcc_assert (width >= 1 && width <= 8);
 
   int shift = exact_log2 (width);
+
+  machine_mode idx_mode = GET_MODE (idx);
+
+  machine_mode shift_mode;
+  rtx (*gen_ashl)(rtx, rtx, rtx);
+  rtx (*gen_lvsl)(rtx, rtx);
+  rtx (*gen_lvsr)(rtx, rtx);
+
+  if (TARGET_POWERPC64)
+    {
+      shift_mode = DImode;
+      gen_ashl = gen_ashldi3;
+      gen_lvsl = gen_altivec_lvsl_reg_di;
+      gen_lvsr = gen_altivec_lvsr_reg_di;
+    }
+  else
+    {
+      shift_mode = SImode;
+      gen_ashl = gen_ashlsi3;
+      gen_lvsl = gen_altivec_lvsl_reg_si;
+      gen_lvsr = gen_altivec_lvsr_reg_si;
+    }
   /* Generate the IDX for permute shift, width is the vector element size.
      idx = idx * width.  */
-  emit_insn (gen_ashlsi3 (tmp, idx, GEN_INT (shift)));
+  rtx tmp = gen_reg_rtx (shift_mode);
+  idx = convert_modes (shift_mode, idx_mode, idx, 1);
 
-  tmp = convert_modes (DImode, SImode, tmp, 1);
+  emit_insn (gen_ashl (tmp, idx, GEN_INT (shift)));
 
   /*  lvsr    v1,0,idx.  */
   rtx pcvr = gen_reg_rtx (V16QImode);
-  emit_insn (gen_altivec_lvsr_reg (pcvr, tmp));
+  emit_insn (gen_lvsr (pcvr, tmp));
 
   /*  lvsl    v2,0,idx.  */
   rtx pcvl = gen_reg_rtx (V16QImode);
-  emit_insn (gen_altivec_lvsl_reg (pcvl, tmp));
+  emit_insn (gen_lvsl (pcvl, tmp));
 
   rtx sub_target = simplify_gen_subreg (V16QImode, target, mode, 0);
 
@@ -7064,37 +7088,59 @@ rs6000_expand_vector_set_var_p9 (rtx target, rtx val, rtx idx)
 }
 
 /* Insert VAL into IDX of TARGET, VAL size is same of the vector element, IDX
-   is variable and also counts by vector element size for p8.  */
+   is variable and also counts by vector element size for p7 & p8.  */
 
 static void
-rs6000_expand_vector_set_var_p8 (rtx target, rtx val, rtx idx)
+rs6000_expand_vector_set_var_p7 (rtx target, rtx val, rtx idx)
 {
   machine_mode mode = GET_MODE (target);
 
   gcc_assert (VECTOR_MEM_VSX_P (mode) && !CONST_INT_P (idx));
 
-  gcc_assert (GET_MODE (idx) == E_SImode);
-
   machine_mode inner_mode = GET_MODE (val);
   HOST_WIDE_INT mode_mask = GET_MODE_MASK (inner_mode);
 
-  rtx tmp = gen_reg_rtx (GET_MODE (idx));
   int width = GET_MODE_SIZE (inner_mode);
-
   gcc_assert (width >= 1 && width <= 4);
 
-  if (!BYTES_BIG_ENDIAN)
+  int shift = exact_log2 (width);
+
+  machine_mode idx_mode = GET_MODE (idx);
+
+  machine_mode shift_mode;
+  rtx (*gen_ashl)(rtx, rtx, rtx);
+  rtx (*gen_add)(rtx, rtx, rtx);
+  rtx (*gen_sub)(rtx, rtx, rtx);
+  rtx (*gen_lvsl)(rtx, rtx);
+
+  if (TARGET_POWERPC64)
     {
-      /*  idx = idx * width.  */
-      emit_insn (gen_mulsi3 (tmp, idx, GEN_INT (width)));
-      /*  idx = idx + 8.  */
-      emit_insn (gen_addsi3 (tmp, tmp, GEN_INT (8)));
+      shift_mode = DImode;
+      gen_ashl = gen_ashldi3;
+      gen_add = gen_adddi3;
+      gen_sub = gen_subdi3;
+      gen_lvsl = gen_altivec_lvsl_reg_di;
     }
   else
     {
-      emit_insn (gen_mulsi3 (tmp, idx, GEN_INT (width)));
-      emit_insn (gen_subsi3 (tmp, GEN_INT (24 - width), tmp));
+      shift_mode = SImode;
+      gen_ashl = gen_ashlsi3;
+      gen_add = gen_addsi3;
+      gen_sub = gen_subsi3;
+      gen_lvsl = gen_altivec_lvsl_reg_si;
     }
+
+  /*  idx = idx * width.  */
+  rtx tmp = gen_reg_rtx (shift_mode);
+  idx = convert_modes (shift_mode, idx_mode, idx, 1);
+
+  emit_insn (gen_ashl (tmp, idx, GEN_INT (shift)));
+
+  /*  For LE:  idx = idx + 8.  */
+  if (!BYTES_BIG_ENDIAN)
+    emit_insn (gen_add (tmp, tmp, GEN_INT (8)));
+  else
+    emit_insn (gen_sub (tmp, GEN_INT (24 - width), tmp));
 
   /*  lxv vs33, mask.
       DImode: 0xffffffffffffffff0000000000000000
@@ -7121,7 +7167,16 @@ rs6000_expand_vector_set_var_p8 (rtx target, rtx val, rtx idx)
   /*  mtvsrd[wz] f0,tmp_val.  */
   rtx tmp_val = gen_reg_rtx (SImode);
   if (inner_mode == E_SFmode)
-    emit_insn (gen_movsi_from_sf (tmp_val, val));
+    if (TARGET_DIRECT_MOVE_64BIT)
+      emit_insn (gen_movsi_from_sf (tmp_val, val));
+    else
+      {
+	rtx stack = rs6000_allocate_stack_temp (SFmode, false, true);
+	emit_insn (gen_movsf_hardfloat (stack, val));
+	rtx stack2 = copy_rtx (stack);
+	PUT_MODE (stack2, SImode);
+	emit_move_insn (tmp_val, stack2);
+      }
   else
     tmp_val = force_reg (SImode, val);
 
@@ -7144,9 +7199,8 @@ rs6000_expand_vector_set_var_p8 (rtx target, rtx val, rtx idx)
   emit_insn (gen_rtx_SET (val_v16qi, sub_val));
 
   /*  lvsl    13,0,idx.  */
-  tmp = convert_modes (DImode, SImode, tmp, 1);
   rtx pcv = gen_reg_rtx (V16QImode);
-  emit_insn (gen_altivec_lvsl_reg (pcv, tmp));
+  emit_insn (gen_lvsl (pcv, tmp));
 
   /*  vperm 1,1,1,13.  */
   /*  vperm 0,0,0,13.  */
@@ -7187,11 +7241,13 @@ rs6000_expand_vector_set (rtx target, rtx val, rtx elt_rtx)
 	      rs6000_expand_vector_set_var_p9 (target, val, elt_rtx);
 	      return;
 	    }
-	  else if (TARGET_P8_VECTOR && TARGET_DIRECT_MOVE_64BIT)
+	  else if (TARGET_VSX)
 	    {
-	      rs6000_expand_vector_set_var_p8 (target, val, elt_rtx);
+	      rs6000_expand_vector_set_var_p7 (target, val, elt_rtx);
 	      return;
 	    }
+	  else
+	    gcc_assert (CONST_INT_P (elt_rtx));
 	}
 
       rtx insn = NULL_RTX;
@@ -7220,8 +7276,6 @@ rs6000_expand_vector_set (rtx target, rtx val, rtx elt_rtx)
 	  return;
 	}
     }
-
-  gcc_assert (CONST_INT_P (elt_rtx));
 
   /* Simplify setting single element vectors like V1TImode.  */
   if (GET_MODE_SIZE (mode) == GET_MODE_SIZE (inner_mode)
@@ -7856,32 +7910,91 @@ rs6000_special_adjust_field_align_p (tree type, unsigned int computed)
   return false;
 }
 
-/* AIX increases natural record alignment to doubleword if the first
-   field is an FP double while the FP fields remain word aligned.  */
+/* AIX word-aligns FP doubles but doubleword-aligns 64-bit ints.  */
+
+unsigned int
+rs6000_special_adjust_field_align (tree type, unsigned int computed)
+{
+  if (computed <= 32)
+    return computed;
+
+  /* Strip initial arrays.  */
+  while (TREE_CODE (type) == ARRAY_TYPE)
+    type = TREE_TYPE (type);
+
+  /* If RECORD or UNION, recursively find the first field. */
+  while (AGGREGATE_TYPE_P (type))
+    {
+      tree field = TYPE_FIELDS (type);
+
+      /* Skip all non field decls */
+      while (field != NULL
+	     && (TREE_CODE (field) != FIELD_DECL
+		 || DECL_FIELD_ABI_IGNORED (field)))
+	field = DECL_CHAIN (field);
+
+      if (! field)
+	break;
+
+      /* A packed field does not contribute any extra alignment.  */
+      if (DECL_PACKED (field))
+	return computed;
+
+      type = TREE_TYPE (field);
+
+      /* Strip arrays.  */
+      while (TREE_CODE (type) == ARRAY_TYPE)
+	type = TREE_TYPE (type);
+    }
+
+  if (! AGGREGATE_TYPE_P (type) && type != error_mark_node
+      && (TYPE_MODE (type) == DFmode || TYPE_MODE (type) == DCmode))
+    computed = MIN (computed, 32);
+
+  return computed;
+}
+
+/* AIX increases natural record alignment to doubleword if the innermost first
+   field is an FP double while the FP fields remain word aligned.
+   Only called if TYPE initially is a RECORD or UNION.  */
 
 unsigned int
 rs6000_special_round_type_align (tree type, unsigned int computed,
 				 unsigned int specified)
 {
   unsigned int align = MAX (computed, specified);
-  tree field = TYPE_FIELDS (type);
 
-  /* Skip all non field decls */
-  while (field != NULL
-	 && (TREE_CODE (field) != FIELD_DECL
-	     || DECL_FIELD_ABI_IGNORED (field)))
-    field = DECL_CHAIN (field);
+  if (TYPE_PACKED (type) || align >= 64)
+    return align;
 
-  if (field != NULL && field != type)
+  /* If RECORD or UNION, recursively find the first field. */
+  do
     {
+      tree field = TYPE_FIELDS (type);
+
+      /* Skip all non field decls */
+      while (field != NULL
+	     && (TREE_CODE (field) != FIELD_DECL
+		 || DECL_FIELD_ABI_IGNORED (field)))
+	field = DECL_CHAIN (field);
+
+      if (! field)
+	break;
+
+      /* A packed field does not contribute any extra alignment.  */
+      if (DECL_PACKED (field))
+	return align;
+
       type = TREE_TYPE (field);
+
+      /* Strip arrays.  */
       while (TREE_CODE (type) == ARRAY_TYPE)
 	type = TREE_TYPE (type);
+    } while (AGGREGATE_TYPE_P (type));
 
-      if (type != error_mark_node
-	  && (TYPE_MODE (type) == DFmode || TYPE_MODE (type) == DCmode))
-	align = MAX (align, 64);
-    }
+  if (! AGGREGATE_TYPE_P (type) && type != error_mark_node
+      && (TYPE_MODE (type) == DFmode || TYPE_MODE (type) == DCmode))
+    align = MAX (align, 64);
 
   return align;
 }
@@ -8971,26 +9084,6 @@ rs6000_output_dwarf_dtprel (FILE *file, int size, rtx x)
   output_addr_const (file, x);
   if (TARGET_ELF)
     fputs ("@dtprel+0x8000", file);
-  else if (TARGET_XCOFF && SYMBOL_REF_P (x))
-    {
-      switch (SYMBOL_REF_TLS_MODEL (x))
-	{
-	case 0:
-	  break;
-	case TLS_MODEL_LOCAL_EXEC:
-	  fputs ("@le", file);
-	  break;
-	case TLS_MODEL_INITIAL_EXEC:
-	  fputs ("@ie", file);
-	  break;
-	case TLS_MODEL_GLOBAL_DYNAMIC:
-	case TLS_MODEL_LOCAL_DYNAMIC:
-	  fputs ("@m", file);
-	  break;
-	default:
-	  gcc_unreachable ();
-	}
-    }
 }
 
 /* Return true if X is a symbol that refers to real (rather than emulated)
@@ -10579,7 +10672,7 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
     case E_OOmode:
     case E_XOmode:
       if (CONST_INT_P (operands[1]) && INTVAL (operands[1]) != 0)
-	error ("%qs is an opaque type, and you can't set it to other values.",
+	error ("%qs is an opaque type, and you cannot set it to other values",
 	       (mode == OOmode) ? "__vector_pair" : "__vector_quad");
       break;
 
@@ -14605,6 +14698,30 @@ rs6000_assemble_visibility (tree decl, int vis)
     default_assemble_visibility (decl, vis);
 }
 #endif
+
+/* Write PATCH_AREA_SIZE NOPs into the asm outfile FILE around a function
+   entry.  If RECORD_P is true and the target supports named sections,
+   the location of the NOPs will be recorded in a special object section
+   called "__patchable_function_entries".  This routine may be called
+   twice per function to put NOPs before and after the function
+   entry.  */
+
+void
+rs6000_print_patchable_function_entry (FILE *file,
+				       unsigned HOST_WIDE_INT patch_area_size,
+				       bool record_p)
+{
+  unsigned int flags = SECTION_WRITE | SECTION_RELRO;
+  /* When .opd section is emitted, the function symbol
+     default_print_patchable_function_entry_1 is emitted into the .opd section
+     while the patchable area is emitted into the function section.
+     Don't use SECTION_LINK_ORDER in that case.  */
+  if (!(TARGET_64BIT && DEFAULT_ABI != ABI_ELFv2)
+      && HAVE_GAS_SECTION_LINK_ORDER)
+    flags |= SECTION_LINK_ORDER;
+  default_print_patchable_function_entry_1 (file, patch_area_size, record_p,
+					    flags);
+}
 
 enum rtx_code
 rs6000_reverse_condition (machine_mode mode, enum rtx_code code)
@@ -20052,7 +20169,7 @@ rs6000_handle_altivec_attribute (tree *node,
   else if (TREE_CODE (type) == COMPLEX_TYPE)
     error ("use of %<complex%> in AltiVec types is invalid");
   else if (DECIMAL_FLOAT_MODE_P (mode))
-    error ("use of decimal floating point types in AltiVec types is invalid");
+    error ("use of decimal floating-point types in AltiVec types is invalid");
   else if (!TARGET_VSX)
     {
       if (type == long_unsigned_type_node || type == long_integer_type_node)
@@ -26307,7 +26424,9 @@ static bool prepend_p_to_next_insn;
 void
 rs6000_final_prescan_insn (rtx_insn *insn, rtx [], int)
 {
-  prepend_p_to_next_insn = (get_attr_prefixed (insn) != PREFIXED_NO);
+  prepend_p_to_next_insn = (get_attr_maybe_prefixed (insn)
+			    == MAYBE_PREFIXED_YES
+			    && get_attr_prefixed (insn) == PREFIXED_YES);
   return;
 }
 

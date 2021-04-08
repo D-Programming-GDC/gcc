@@ -410,8 +410,7 @@ valid_address_p (rtx op, struct address_info *ad,
      Need to extract memory from op for special memory constraint,
      i.e. bcst_mem_operand in i386 backend.  */
   if (MEM_P (extract_mem_from_operand (op))
-      && (insn_extra_memory_constraint (constraint)
-	  || insn_extra_special_memory_constraint (constraint))
+      && insn_extra_relaxed_memory_constraint (constraint)
       && constraint_satisfied_p (op, constraint))
     return true;
 
@@ -2418,6 +2417,7 @@ process_alt_operands (int only_alternative)
 		      break;
 
 		    case CT_MEMORY:
+		    case CT_RELAXED_MEMORY:
 		      if (MEM_P (op)
 			  && satisfies_memory_constraint_p (op, cn))
 			win = true;
@@ -4370,7 +4370,8 @@ curr_insn_transform (bool check_only_p)
 	      {
 		enum constraint_num cn = lookup_constraint (constraint);
 		if ((insn_extra_memory_constraint (cn)
-		     || insn_extra_special_memory_constraint (cn))
+		     || insn_extra_special_memory_constraint (cn)
+		     || insn_extra_relaxed_memory_constraint (cn))
 		    && satisfies_memory_constraint_p (tem, cn))
 		  break;
 	      }
@@ -5795,12 +5796,11 @@ split_reg (bool before_p, int original_regno, rtx_insn *insn,
       nregs = 1;
       mode = lra_reg_info[hard_regno].biggest_mode;
       machine_mode reg_rtx_mode = GET_MODE (regno_reg_rtx[hard_regno]);
-      /* A reg can have a biggest_mode of VOIDmode if it was only ever seen
-	 as part of a multi-word register.  In that case, or if the biggest
-	 mode was larger than a register, just use the reg_rtx.  Otherwise,
-	 limit the size to that of the biggest access in the function.  */
-      if (mode == VOIDmode
-	  || paradoxical_subreg_p (mode, reg_rtx_mode))
+      /* A reg can have a biggest_mode of VOIDmode if it was only ever seen as
+	 part of a multi-word register.  In that case, just use the reg_rtx.
+	 Otherwise, limit the size to that of the biggest access in the
+	 function.  */
+      if (mode == VOIDmode)
 	{
 	  original_reg = regno_reg_rtx[hard_regno];
 	  mode = reg_rtx_mode;

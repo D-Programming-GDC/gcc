@@ -249,6 +249,55 @@ vn_reference_hasher::equal (const vn_reference_s *v, const vn_reference_s *c)
 typedef hash_table<vn_reference_hasher> vn_reference_table_type;
 typedef vn_reference_table_type::iterator vn_reference_iterator_type;
 
+/* Pretty-print OPS to OUTFILE.  */
+
+void
+print_vn_reference_ops (FILE *outfile, const vec<vn_reference_op_s> ops)
+{
+  vn_reference_op_t vro;
+  unsigned int i;
+  fprintf (outfile, "{");
+  for (i = 0; ops.iterate (i, &vro); i++)
+    {
+      bool closebrace = false;
+      if (vro->opcode != SSA_NAME
+	  && TREE_CODE_CLASS (vro->opcode) != tcc_declaration)
+	{
+	  fprintf (outfile, "%s", get_tree_code_name (vro->opcode));
+	  if (vro->op0)
+	    {
+	      fprintf (outfile, "<");
+	      closebrace = true;
+	    }
+	}
+      if (vro->op0)
+	{
+	  print_generic_expr (outfile, vro->op0);
+	  if (vro->op1)
+	    {
+	      fprintf (outfile, ",");
+	      print_generic_expr (outfile, vro->op1);
+	    }
+	  if (vro->op2)
+	    {
+	      fprintf (outfile, ",");
+	      print_generic_expr (outfile, vro->op2);
+	    }
+	}
+      if (closebrace)
+	fprintf (outfile, ">");
+      if (i != ops.length () - 1)
+	fprintf (outfile, ",");
+    }
+  fprintf (outfile, "}");
+}
+
+DEBUG_FUNCTION void
+debug_vn_reference_ops (const vec<vn_reference_op_s> ops)
+{
+  print_vn_reference_ops (stderr, ops);
+  fputc ('\n', stderr);
+}
 
 /* The set of VN hashtables.  */
 
@@ -1002,22 +1051,26 @@ ao_ref_init_from_vn_reference (ao_ref *ref,
   poly_offset_int size = -1;
   tree size_tree = NULL_TREE;
 
-  /* First get the final access size from just the outermost expression.  */
+  machine_mode mode = TYPE_MODE (type);
+  if (mode == BLKmode)
+    size_tree = TYPE_SIZE (type);
+  else
+    size = GET_MODE_BITSIZE (mode);
+  if (size_tree != NULL_TREE
+      && poly_int_tree_p (size_tree))
+    size = wi::to_poly_offset (size_tree);
+
+  /* Lower the final access size from the outermost expression.  */
   op = &ops[0];
+  size_tree = NULL_TREE;
   if (op->opcode == COMPONENT_REF)
     size_tree = DECL_SIZE (op->op0);
   else if (op->opcode == BIT_FIELD_REF)
     size_tree = op->op0;
-  else
-    {
-      machine_mode mode = TYPE_MODE (type);
-      if (mode == BLKmode)
-	size_tree = TYPE_SIZE (type);
-      else
-	size = GET_MODE_BITSIZE (mode);
-    }
   if (size_tree != NULL_TREE
-      && poly_int_tree_p (size_tree))
+      && poly_int_tree_p (size_tree)
+      && (!known_size_p (size)
+	  || known_lt (wi::to_poly_offset (size_tree), size)))
     size = wi::to_poly_offset (size_tree);
 
   /* Initially, maxsize is the same as the accessed element size.
@@ -5199,6 +5252,8 @@ visit_phi (gimple *phi, bool *inserted, bool backedges_varying_p)
       {
 	tree def = PHI_ARG_DEF_FROM_EDGE (phi, e);
 
+	if (def == PHI_RESULT (phi))
+	  continue;
 	++n_executable;
 	if (TREE_CODE (def) == SSA_NAME)
 	  {

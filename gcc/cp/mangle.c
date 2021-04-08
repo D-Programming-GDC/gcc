@@ -1628,6 +1628,7 @@ write_literal_operator_name (tree identifier)
 static void
 write_compact_number (int num)
 {
+  gcc_checking_assert (num >= 0);
   if (num > 0)
     write_unsigned_number (num - 1);
   write_char ('_');
@@ -2027,15 +2028,7 @@ write_local_name (tree function, const tree local_entity,
   /* For this purpose, parameters are numbered from right-to-left.  */
   if (parm)
     {
-      tree t;
-      int i = 0;
-      for (t = DECL_ARGUMENTS (function); t; t = DECL_CHAIN (t))
-	{
-	  if (t == parm)
-	    i = 1;
-	  else if (i)
-	    ++i;
-	}
+      int i = list_length (parm);
       write_char ('d');
       write_compact_number (i - 1);
     }
@@ -3119,16 +3112,14 @@ write_expression (tree expr)
     {
       if (!ALIGNOF_EXPR_STD_P (expr))
 	{
-	  if (abi_warn_or_compat_version_crosses (15))
+	  if (abi_warn_or_compat_version_crosses (16))
 	    G.need_abi_warning = true;
-	  if (abi_version_at_least (15))
+	  if (abi_version_at_least (16))
 	    {
 	      /* We used to mangle __alignof__ like alignof.  */
-	      write_string ("v111__alignof__");
-	      if (TYPE_P (TREE_OPERAND (expr, 0)))
-		write_type (TREE_OPERAND (expr, 0));
-	      else
-		write_expression (TREE_OPERAND (expr, 0));
+	      write_string ("u11__alignof__");
+	      write_template_arg (TREE_OPERAND (expr, 0));
+	      write_char ('E');
 	      return;
 	    }
 	}
@@ -3352,9 +3343,9 @@ write_expression (tree expr)
       tree name = dependent_name (expr);
       if (IDENTIFIER_ANY_OP_P (name))
 	{
-	  if (abi_version_at_least (15))
+	  if (abi_version_at_least (16))
 	    write_string ("on");
-	  if (abi_warn_or_compat_version_crosses (15))
+	  if (abi_warn_or_compat_version_crosses (16))
 	    G.need_abi_warning = 1;
 	}
       write_unqualified_id (name);

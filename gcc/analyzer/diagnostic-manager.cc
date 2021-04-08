@@ -791,7 +791,7 @@ diagnostic_manager::diagnostic_manager (logger *logger, engine *eng,
 
 void
 diagnostic_manager::add_diagnostic (const state_machine *sm,
-				    const exploded_node *enode,
+				    exploded_node *enode,
 				    const supernode *snode, const gimple *stmt,
 				    stmt_finder *finder,
 				    tree var,
@@ -809,16 +809,17 @@ diagnostic_manager::add_diagnostic (const state_machine *sm,
     = new saved_diagnostic (sm, enode, snode, stmt, finder, var, sval,
 			    state, d, m_saved_diagnostics.length ());
   m_saved_diagnostics.safe_push (sd);
+  enode->add_diagnostic (sd);
   if (get_logger ())
-    log ("adding saved diagnostic %i at SN %i: %qs",
+    log ("adding saved diagnostic %i at SN %i to EN %i: %qs",
 	 sd->get_index (),
-	 snode->m_index, d->get_kind ());
+	 snode->m_index, enode->m_index, d->get_kind ());
 }
 
 /* Queue pending_diagnostic D at ENODE for later emission.  */
 
 void
-diagnostic_manager::add_diagnostic (const exploded_node *enode,
+diagnostic_manager::add_diagnostic (exploded_node *enode,
 				    const supernode *snode, const gimple *stmt,
 				    stmt_finder *finder,
 				    pending_diagnostic *d)
@@ -2080,7 +2081,7 @@ diagnostic_manager::prune_interproc_events (checker_path *path) const
   do
     {
       changed = false;
-      int idx = path->num_events () - 1;
+      int idx = (signed)path->num_events () - 1;
       while (idx >= 0)
 	{
 	  /* Prune [..., call, function-entry, return, ...] triples.  */
@@ -2199,7 +2200,9 @@ diagnostic_manager::consolidate_conditions (checker_path *path) const
   if (flag_analyzer_verbose_edges)
     return;
 
-  for (unsigned start_idx = 0; start_idx < path->num_events () - 1; start_idx++)
+  for (int start_idx = 0;
+       start_idx < (signed)path->num_events () - 1;
+       start_idx++)
     {
       if (path->cfg_edge_pair_at_p (start_idx))
 	{
@@ -2230,7 +2233,7 @@ diagnostic_manager::consolidate_conditions (checker_path *path) const
 	       [start_idx, next_idx)
 	     where all apart from the final event are on the same line,
 	     and all are either TRUE or FALSE edges, matching the initial.  */
-	  unsigned next_idx = start_idx + 2;
+	  int next_idx = start_idx + 2;
 	  while (path->cfg_edge_pair_at_p (next_idx)
 		 && same_line_as_p (start_exp_loc, path, next_idx))
 	    {

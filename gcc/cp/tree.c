@@ -1722,6 +1722,15 @@ strip_typedefs (tree t, bool *remove_attributes, unsigned int flags)
 			     remove_attributes, flags);
       result = finish_underlying_type (type);
       break;
+    case TYPE_PACK_EXPANSION:
+      type = strip_typedefs (PACK_EXPANSION_PATTERN (t),
+			     remove_attributes, flags);
+      if (type != PACK_EXPANSION_PATTERN (t))
+	{
+	  result = copy_node (t);
+	  PACK_EXPANSION_PATTERN (result) = type;
+	}
+      break;
     default:
       break;
     }
@@ -3126,6 +3135,48 @@ bot_manip (tree* tp, int* walk_subtrees, void* data_)
 			     (splay_tree_key)*tp,
 			     (splay_tree_value)*tp);
 	}
+      return NULL_TREE;
+    }
+  if (TREE_CODE (*tp) == DECL_EXPR
+      && VAR_P (DECL_EXPR_DECL (*tp))
+      && DECL_ARTIFICIAL (DECL_EXPR_DECL (*tp))
+      && !TREE_STATIC (DECL_EXPR_DECL (*tp)))
+    {
+      tree t;
+      splay_tree_node n
+	= splay_tree_lookup (target_remap,
+			     (splay_tree_key) DECL_EXPR_DECL (*tp));
+      if (n)
+	t = (tree) n->value;
+      else
+	{
+	  t = create_temporary_var (TREE_TYPE (DECL_EXPR_DECL (*tp)));
+	  DECL_INITIAL (t) = DECL_INITIAL (DECL_EXPR_DECL (*tp));
+	  splay_tree_insert (target_remap,
+			     (splay_tree_key) DECL_EXPR_DECL (*tp),
+			     (splay_tree_value) t);
+	}
+      copy_tree_r (tp, walk_subtrees, NULL);
+      DECL_EXPR_DECL (*tp) = t;
+      if (data.clear_location && EXPR_HAS_LOCATION (*tp))
+	SET_EXPR_LOCATION (*tp, input_location);
+      return NULL_TREE;
+    }
+  if (TREE_CODE (*tp) == BIND_EXPR && BIND_EXPR_VARS (*tp))
+    {
+      copy_tree_r (tp, walk_subtrees, NULL);
+      for (tree *p = &BIND_EXPR_VARS (*tp); *p; p = &DECL_CHAIN (*p))
+	{
+	  gcc_assert (VAR_P (*p) && DECL_ARTIFICIAL (*p) && !TREE_STATIC (*p));
+	  tree t = create_temporary_var (TREE_TYPE (*p));
+	  DECL_INITIAL (t) = DECL_INITIAL (*p);
+	  DECL_CHAIN (t) = DECL_CHAIN (*p);
+	  splay_tree_insert (target_remap, (splay_tree_key) *p,
+			     (splay_tree_value) t);
+	  *p = t;
+	}
+      if (data.clear_location && EXPR_HAS_LOCATION (*tp))
+	SET_EXPR_LOCATION (*tp, input_location);
       return NULL_TREE;
     }
 
@@ -5362,6 +5413,11 @@ cp_walk_subtrees (tree *tp, int *walk_subtrees_p, walk_tree_fn func,
 	       arguments.  */
 	    WALK_SUBTREE (TREE_OPERAND (*tp, 1));
 	}
+      break;
+
+    case FUNCTION_TYPE:
+    case METHOD_TYPE:
+      WALK_SUBTREE (TYPE_RAISES_EXCEPTIONS (*tp));
       break;
 
     default:

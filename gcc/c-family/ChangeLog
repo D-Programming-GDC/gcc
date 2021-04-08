@@ -1,3 +1,22 @@
+2021-04-05  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* c-ada-spec.c (is_simple_enum): Minor tweaks.
+	(dump_ada_enum_type): Add TYPE and PARENT parameters.  For non-simple
+	enumeral types use again the type name for the enumeration constants.
+	(dump_ada_node): Adjust call to dump_ada_enum_type.
+	(dump_nested_type): Likewise.
+
+2021-04-01  Jason Merrill  <jason@redhat.com>
+
+	PR c++/98481
+	* c-opts.c (c_common_post_options): Bump latest_abi_version.
+
+2021-03-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/99565
+	* c-warn.c (do_warn_duplicated_branches): Pass also
+	OEP_ADDRESS_OF_SAME_FIELD to operand_equal_p.
+
 2021-03-20  Jakub Jelinek  <jakub@redhat.com>
 
 	PR debug/99230

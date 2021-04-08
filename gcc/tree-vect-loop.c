@@ -4465,7 +4465,7 @@ vect_model_reduction_cost (loop_vec_info loop_vinfo,
 			   vect_reduction_type reduction_type,
 			   int ncopies, stmt_vector_for_cost *cost_vec)
 {
-  int prologue_cost = 0, epilogue_cost = 0, inside_cost;
+  int prologue_cost = 0, epilogue_cost = 0, inside_cost = 0;
   enum tree_code code;
   optab optab;
   tree vectype;
@@ -8202,11 +8202,12 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 	  /* Fill up to the number of vectors we need for the whole group.  */
 	  nivs = least_common_multiple (group_size,
 					const_nunits) / const_nunits;
+	  vec_steps.reserve (nivs-ivn);
 	  for (; ivn < nivs; ++ivn)
 	    {
 	      SLP_TREE_VEC_STMTS (slp_node)
 		.quick_push (SLP_TREE_VEC_STMTS (slp_node)[0]);
-	      vec_steps.safe_push (vec_steps[0]);
+	      vec_steps.quick_push (vec_steps[0]);
 	    }
 	}
 
@@ -9148,6 +9149,7 @@ maybe_set_vectorized_backedge_value (loop_vec_info loop_vinfo,
     if (gphi *phi = dyn_cast <gphi *> (USE_STMT (use_p)))
       if (gimple_bb (phi)->loop_father->header == gimple_bb (phi)
 	  && (phi_info = loop_vinfo->lookup_stmt (phi))
+	  && STMT_VINFO_RELEVANT_P (phi_info)
 	  && VECTORIZABLE_CYCLE_DEF (STMT_VINFO_DEF_TYPE (phi_info))
 	  && STMT_VINFO_REDUC_TYPE (phi_info) != FOLD_LEFT_REDUCTION
 	  && STMT_VINFO_REDUC_TYPE (phi_info) != EXTRACT_LAST_REDUCTION)

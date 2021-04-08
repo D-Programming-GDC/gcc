@@ -1545,9 +1545,9 @@ merge_call_lhs_flags (gcall *call, int arg, int index, bool deref,
       tree lhs = gimple_call_lhs (call);
       analyze_ssa_name_flags (lhs, lattice, depth + 1, ipa);
       if (deref)
-	lattice[index].merge (lattice[SSA_NAME_VERSION (lhs)]);
-      else
 	lattice[index].merge_deref (lattice[SSA_NAME_VERSION (lhs)], false);
+      else
+	lattice[index].merge (lattice[SSA_NAME_VERSION (lhs)]);
     }
   /* In the case of memory store we can do nothing.  */
   else
@@ -1621,7 +1621,7 @@ analyze_ssa_name_flags (tree name, vec<modref_lattice> &lattice, int depth,
       else if (gcall *call = dyn_cast <gcall *> (use_stmt))
 	{
 	  tree callee = gimple_call_fndecl (call);
-	  /* Return slot optiomization would require bit of propagation;
+	  /* Return slot optimization would require bit of propagation;
 	     give up for now.  */
 	  if (gimple_call_return_slot_opt_p (call)
 	      && gimple_call_lhs (call) != NULL_TREE
@@ -1673,7 +1673,7 @@ analyze_ssa_name_flags (tree name, vec<modref_lattice> &lattice, int depth,
 
 			if (!record_ipa)
 			  lattice[index].merge (call_flags);
-			if (record_ipa)
+			else
 			  lattice[index].add_escape_point (call, i,
 			     				   call_flags, true);
 		      }
@@ -1691,8 +1691,8 @@ analyze_ssa_name_flags (tree name, vec<modref_lattice> &lattice, int depth,
 			int call_flags = deref_flags
 			   (gimple_call_arg_flags (call, i), ignore_stores);
 			if (!record_ipa)
-			    lattice[index].merge (call_flags);
-			if (record_ipa)
+			  lattice[index].merge (call_flags);
+			else
 			  lattice[index].add_escape_point (call, i,
 							   call_flags, false);
 		      }

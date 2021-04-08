@@ -1666,8 +1666,9 @@ name_lookup::search_adl (tree fns, vec<tree, va_gc> *args)
 		continue;
 
 	      tree origin = get_originating_module_decl (TYPE_NAME (scope));
-	      if (!DECL_LANG_SPECIFIC (origin)
-		  || !DECL_MODULE_IMPORT_P (origin))
+	      tree not_tmpl = STRIP_TEMPLATE (origin);
+	      if (!DECL_LANG_SPECIFIC (not_tmpl)
+		  || !DECL_MODULE_IMPORT_P (not_tmpl))
 		/* Not imported.  */
 		continue;
 
@@ -3528,6 +3529,7 @@ static tree
 check_module_override (tree decl, tree mvec, bool hiding,
 		       tree scope, tree name)
 {
+  tree match = NULL_TREE;
   bitmap imports = get_import_bitmap ();
   binding_cluster *cluster = BINDING_VECTOR_CLUSTER_BASE (mvec);
   unsigned ix = BINDING_VECTOR_NUM_CLUSTERS (mvec);
@@ -3566,13 +3568,15 @@ check_module_override (tree decl, tree mvec, bool hiding,
 	  bind = STAT_VISIBLE (bind);
 
 	for (ovl_iterator iter (bind); iter; ++iter)
-	  if (iter.using_p ())
-	    ;
-	  else if (tree match = duplicate_decls (decl, *iter, hiding))
-	    return match;
+	  if (!iter.using_p ())
+	    {
+	      match = duplicate_decls (decl, *iter, hiding);
+	      if (match)
+		goto matched;
+	    }
       }
 
-  if (TREE_PUBLIC (scope) && TREE_PUBLIC (decl) && !not_module_p ()
+  if (TREE_PUBLIC (scope) && TREE_PUBLIC (STRIP_TEMPLATE (decl))
       /* Namespaces are dealt with specially in
 	 make_namespace_finish.  */
       && !(TREE_CODE (decl) == NAMESPACE_DECL && !DECL_NAMESPACE_ALIAS (decl)))
@@ -3588,14 +3592,26 @@ check_module_override (tree decl, tree mvec, bool hiding,
 
       for (ovl_iterator iter (mergeable); iter; ++iter)
 	{
-	  tree match = *iter;
-	  
-	  if (duplicate_decls (decl, match, hiding))
-	    return match;
+	  match = duplicate_decls (decl, *iter, hiding);
+	  if (match)
+	    goto matched;
 	}
     }
 
   return NULL_TREE;
+
+ matched:
+  if (match != error_mark_node)
+    {
+      if (named_module_p ())
+	BINDING_VECTOR_PARTITION_DUPS_P (mvec) = true;
+      else
+	BINDING_VECTOR_GLOBAL_DUPS_P (mvec) = true;
+    }
+
+  return match;
+
+  
 }
 
 /* Record DECL as belonging to the current lexical scope.  Check for
@@ -3665,6 +3681,7 @@ do_pushdecl (tree decl, bool hiding)
 	if (iter.using_p ())
 	  ; /* Ignore using decls here.  */
 	else if (iter.hidden_p ()
+		 && TREE_CODE (*iter) == FUNCTION_DECL
 		 && DECL_LANG_SPECIFIC (*iter)
 		 && DECL_MODULE_IMPORT_P (*iter))
 	  ; /* An undeclared builtin imported from elsewhere.  */
@@ -5503,7 +5520,7 @@ push_class_level_binding_1 (tree name, tree x)
 	old_decl = bval;
       else if (TREE_CODE (bval) == USING_DECL
 	       && OVL_P (target_decl))
-	return true;
+	old_decl = bval;
       else if (OVL_P (target_decl)
 	       && OVL_P (target_bval))
 	old_decl = bval;

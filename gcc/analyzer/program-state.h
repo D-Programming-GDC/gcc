@@ -157,6 +157,9 @@ public:
 			  bool is_mutable,
 			  const extrinsic_state &ext_state);
 
+  void purge_state_involving (const svalue *sval,
+			      const extrinsic_state &ext_state);
+
   iterator_t begin () const { return m_map.begin (); }
   iterator_t end () const { return m_map.end (); }
   size_t elements () const { return m_map.elements (); }
@@ -218,12 +221,12 @@ public:
   function * get_current_function () const;
 
   bool on_edge (exploded_graph &eg,
-		const exploded_node &enode,
+		exploded_node *enode,
 		const superedge *succ);
 
   program_state prune_for_point (exploded_graph &eg,
 				 const program_point &point,
-				 const exploded_node *enode_for_diag) const;
+				 exploded_node *enode_for_diag) const;
 
   tree get_representative_tree (const svalue *sval) const;
 

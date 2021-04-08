@@ -1,3 +1,35 @@
+2021-04-05  Florian Weimer  <fweimer@redhat.com>
+	    Michael Meissner   <meissner@linux.ibm.com>
+
+	* config/rs6000/t-float128 (fp128_ppc_funcs): Add decimal floating
+	point functions for $(decimal_float) only.
+
+2021-04-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/97653
+	* config/rs6000/t-linux (IBM128_STATIC_OBJS): Fix spelling, use
+	$(objext) instead of $(object).  Use _floatunditf instead of
+	_floatunsditf.  Add tf <-> ti conversion objects.
+	(IBM128_SHARED_OBJS): Use proper substitution reference syntax.
+
+2021-03-29  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/t-float128 (fp128_decstr_funcs): Delete.
+	(fp128_ppc_funcs): Do not add $(fp128_decstr_funcs).
+	(fp128_decstr_objs): Delete.
+	* dfp-bit.h: Call __sprintfieee128 to do conversions from
+	_Float128 to a Decimal type.  Call __strtoieee128 to do
+	conversions from a Decimal type to _Float128.
+	* config/rs6000/_sprintfkf.c: Delete file.
+	* config/rs6000/_sprintfkf.h: Delete file.
+	* config/rs6000/_strtokf.c: Delete file.
+	* config/rs6000/_strtokf.h: Delete file.
+
+2021-03-23  Marcus Comstedt  <marcus@mc.pp.se>
+
+	* config/riscv/sfp-machine.h (__BYTE_ORDER): Set according
+	to __BYTE_ORDER__.
+
 2021-03-06  Jakub Jelinek  <jakub@redhat.com>
 
 	PR gcov-profile/99406

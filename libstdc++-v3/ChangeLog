@@ -1,3 +1,290 @@
+2021-04-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/99805
+	* src/c++17/fs_path.cc (path::_M_split_cmpts): Do not call
+	non-const member on _M_pathname, to avoid copy-on-write.
+	* testsuite/27_io/filesystem/path/decompose/parent_path.cc:
+	Check construction from strings that might be shared.
+
+2021-04-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/move.h (forward, move, move_if_noexcept)
+	(addressof): Add _GLIBCXX_NODISCARD.
+	* include/bits/ranges_cmp.h (identity::operator()): Add
+	nodiscard attribute.
+	* include/c_global/cstddef (to_integer): Likewise.
+	* include/std/bit (bit_cast): Likewise.
+	* include/std/utility (as_const, to_underlying): Likewise.
+
+2021-04-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/move.h (forward): Change static_assert message
+	to be unambiguous about what must be true.
+	* testsuite/20_util/forward/c_neg.cc: Adjust dg-error.
+	* testsuite/20_util/forward/f_neg.cc: Likewise.
+
+2021-04-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/alloc_traits.h: Use markdown for code font.
+	* include/bits/basic_string.h: Fix @param names.
+	* include/bits/max_size_type.h: Remove period after @file.
+	* include/bits/regex.h: Fix duplicate @retval names, and rename.
+	* include/ext/pb_ds/detail/priority_queue_base_dispatch.hpp: Add
+	group open to match existing group close.
+	* include/ext/pb_ds/priority_queue.hpp: Add blank line before group
+	open.
+
+2021-04-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/tr1/regex:
+
+2021-04-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/atomic_base.h: Fix doxygen group close.
+	* include/bits/basic_ios.h: Likewise.
+	* include/bits/forward_list.h: Likewise.
+	* include/bits/fs_dir.h: Likewise.
+	* include/bits/fs_ops.h: Likewise.
+	* include/bits/fs_path.h: Likewise.
+	* include/bits/functional_hash.h: Likewise.
+	* include/bits/gslice.h: Likewise.
+	* include/bits/gslice_array.h: Likewise.
+	* include/bits/hashtable_policy.h: Likewise.
+	* include/bits/indirect_array.h: Likewise.
+	* include/bits/locale_classes.h: Likewise.
+	* include/bits/locale_facets.h: Likewise.
+	* include/bits/locale_facets_nonio.h: Likewise.
+	* include/bits/mask_array.h: Likewise.
+	* include/bits/refwrap.h: Likewise.
+	* include/bits/regex.h: Likewise.
+	* include/bits/regex_automaton.h: Likewise.
+	* include/bits/regex_compiler.h: Likewise.
+	* include/bits/regex_constants.h: Likewise.
+	* include/bits/regex_error.h: Likewise.
+	* include/bits/regex_executor.h: Likewise.
+	* include/bits/regex_scanner.h: Likewise.
+	* include/bits/shared_ptr.h: Likewise.
+	* include/bits/shared_ptr_atomic.h: Likewise.
+	* include/bits/shared_ptr_base.h: Likewise.
+	* include/bits/slice_array.h: Likewise.
+	* include/bits/specfun.h: Likewise.
+	* include/bits/std_function.h: Likewise.
+	* include/bits/std_mutex.h: Likewise.
+	* include/bits/stl_deque.h: Likewise.
+	* include/bits/stl_iterator.h: Likewise.
+	* include/bits/stl_iterator_base_types.h: Likewise.
+	* include/bits/stl_map.h: Likewise.
+	* include/bits/stl_multimap.h: Likewise.
+	* include/bits/stl_multiset.h: Likewise.
+	* include/bits/stl_numeric.h: Likewise.
+	* include/bits/stl_pair.h: Likewise.
+	* include/bits/stl_set.h: Likewise.
+	* include/bits/stl_uninitialized.h: Likewise.
+	* include/bits/stream_iterator.h: Likewise.
+	* include/bits/streambuf_iterator.h: Likewise.
+	* include/bits/unique_ptr.h: Likewise.
+	* include/bits/unordered_map.h: Likewise.
+	* include/bits/unordered_set.h: Likewise.
+	* include/decimal/decimal: Likewise.
+	* include/experimental/any: Likewise.
+	* include/experimental/array: Likewise.
+	* include/experimental/bits/fs_dir.h: Likewise.
+	* include/experimental/bits/fs_fwd.h: Likewise.
+	* include/experimental/bits/fs_ops.h: Likewise.
+	* include/experimental/bits/fs_path.h: Likewise.
+	* include/experimental/buffer: Likewise.
+	* include/experimental/internet: Likewise.
+	* include/experimental/optional: Likewise.
+	* include/experimental/propagate_const: Likewise.
+	* include/experimental/socket: Likewise.
+	* include/ext/pb_ds/assoc_container.hpp: Likewise.
+	* include/ext/pb_ds/detail/priority_queue_base_dispatch.hpp:
+	Likewise.
+	* include/ext/pb_ds/detail/tree_policy/node_metadata_selector.hpp: Likewise.
+	* include/ext/pb_ds/detail/trie_policy/node_metadata_selector.hpp: Likewise.
+	* include/ext/pb_ds/detail/types_traits.hpp: Likewise.
+	* include/ext/pb_ds/exception.hpp: Likewise.
+	* include/ext/pb_ds/priority_queue.hpp: Likewise.
+	* include/ext/pb_ds/tag_and_trait.hpp: Likewise.
+	* include/ext/random: Likewise.
+	* include/std/any: Likewise.
+	* include/std/atomic: Likewise.
+	* include/std/bitset: Likewise.
+	* include/std/chrono: Likewise.
+	* include/std/complex: Likewise.
+	* include/std/condition_variable: Likewise.
+	* include/std/fstream: Likewise.
+	* include/std/future: Likewise.
+	* include/std/iostream: Likewise.
+	* include/std/istream: Likewise.
+	* include/std/mutex: Likewise.
+	* include/std/numeric: Likewise.
+	* include/std/ostream: Likewise.
+	* include/std/ratio: Likewise.
+	* include/std/shared_mutex: Likewise.
+	* include/std/stdexcept: Likewise.
+	* include/std/streambuf: Likewise.
+	* include/std/system_error: Likewise.
+	* include/std/thread: Likewise.
+	* include/std/valarray: Likewise.
+	* include/std/variant: Likewise.
+	* include/tr1/cmath: Likewise.
+	* include/tr1/regex: Likewise.
+	* include/tr2/dynamic_bitset: Likewise.
+	* libsupc++/atomic_lockfree_defines.h: Likewise.
+	* libsupc++/exception: Likewise.
+	* libsupc++/exception.h: Likewise.
+	* libsupc++/exception_ptr.h: Likewise.
+	* libsupc++/nested_exception.h: Likewise.
+
+2021-03-31  Alexandre Oliva  <oliva@adacore.com>
+
+	* testsuite/30_threads/future/members/poll.cc: Use faster
+	after-ready call in the calibration loop.
+
+2021-03-29  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/status_cxx2017.xml: Adjust link for PSTL.
+	* doc/html/manual/status.html: Regenerate.
+
+2021-03-28  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/debug/forward_list
+	(forward_list(forward_list&&, const allocator_type&)): Add noexcept qualification.
+	* include/debug/list (list(list&&, const allocator_type&)): Likewise and add
+	call to safe container allocator aware move constructor.
+	* include/debug/vector (vector(vector&&, const allocator_type&)):
+	Fix noexcept qualification.
+	* testsuite/23_containers/forward_list/cons/noexcept_move_construct.cc:
+	Add allocator-extended move constructor noexceot qualification check.
+	* testsuite/23_containers/list/cons/noexcept_move_construct.cc: Likewise.
+
+2021-03-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++11/random.cc (USE_LCG): Define when a pseudo-random
+	fallback is needed.
+	[USE_LCG] (bad_seed, construct_lcg_at, destroy_lcg_at, __lcg):
+	New helper functions and callback.
+	(random_device::_M_init): Add 'prng' and 'all' enumerators.
+	Replace switch with fallthrough with a series of 'if' statements.
+	[USE_LCG]: Construct an lcg_type engine and use __lcg when cpuid
+	checks fail.
+	(random_device::_M_init_pretr1) [USE_MT19937]: Accept "prng"
+	token.
+	(random_device::_M_getval): Check for callback unconditionally
+	and always pass _M_file pointer.
+	* testsuite/26_numerics/random/random_device/85494.cc: Remove
+	effective-target check. Use new random_device_available helper.
+	* testsuite/26_numerics/random/random_device/94087.cc: Likewise.
+	* testsuite/26_numerics/random/random_device/cons/default-cow.cc:
+	Remove effective-target check.
+	* testsuite/26_numerics/random/random_device/cons/default.cc:
+	Likewise.
+	* testsuite/26_numerics/random/random_device/cons/token.cc: Use
+	new random_device_available helper. Test "prng" token.
+	* testsuite/util/testsuite_random.h (random_device_available):
+	New helper function.
+
+2021-03-25  François Dumont  <fdumont@gcc.gnu.org>
+
+	* include/debug/string
+	(basic_string(const basic_string&, const _Alloc&)): Define even if !_GLIBCXX_USE_CXX11_ABI.
+	(basic_string(basic_string&&, const _Alloc&)): Likewise and add noexcept qualification.
+	(basic_string<>::erase): Adapt to take __const_iterator.
+	(basic_string(const _CharT*, const _Allocator&)): Remove assign call.
+	(basic_string<>::insert(const_iterator, _InputIte, _InputIte)): Try to
+	remove iterator debug layer even if !_GLIBCXX_USE_CXX11_ABI.
+	[_GLIBCXX_USE_CHAR8_T] (__gnu_debug::u8string): New.
+	(__gnu_debug::u16string, __gnu_debug::u32string): New.
+	(std::hash<__gnu_debug::basic_string<>>): New partial specialization.
+	(std::__is_fast_hash<__gnu_debug::basic_string<>>): Likewise.
+	* testsuite/util/exception/safety.h
+	(erase_base<__gnu_debug::basic_string<>>): New partial specialization.
+	(insert_base<__gnu_debug::basic_string<>>): Likewise.
+	* testsuite/util/testsuite_container_traits.h (traits<__gnu_debug::basic_string<>>):
+	New partial specialization.
+	* testsuite/21_strings/basic_string/hash/debug.cc: New test.
+	* testsuite/21_strings/basic_string/requirements/citerators.cc:
+	Add test on __gnu_debug::string.
+	* testsuite/21_strings/basic_string/requirements/dr438/constructor.cc: Likewise.
+	* testsuite/21_strings/basic_string/requirements/exception/basic.cc: Likewise.
+	* testsuite/21_strings/basic_string/requirements/exception/generation_prohibited.cc:
+	Likewise.
+	* testsuite/21_strings/basic_string/requirements/exception/propagation_consistent.cc:
+	Likewise.
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char/1.cc:
+	Likewise.
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char16_t/1.cc:
+	Likewise.
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char32_t/1.cc:
+	Likewise.
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/char8_t/1.cc:
+	Likewise.
+	* testsuite/21_strings/basic_string/requirements/explicit_instantiation/wchar_t/1.cc:
+	Likewise.
+	* testsuite/21_strings/basic_string/requirements/typedefs.cc: Likewise.
+
+2021-03-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/99672
+	* testsuite/18_support/source_location/consteval.cc (main): Adjust
+	expected column numbers.
+	* testsuite/18_support/source_location/1.cc (main): Likewise.
+
+2021-03-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	* libsupc++/new_opa.cc [!_GLIBCXX_HOSTED]: Declare malloc.
+
+2021-03-25  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/util/exception/safety.h (setup_base::generate):
+	Support seeding random engine.
+	(erase_point, erase_range): Adjust range of random numbers to
+	ensure dereferenceable iterators are used where required.
+	(generation_prohibited::run): Do not try to erase from empty
+	containers.
+	* testsuite/util/testsuite_containergen.h (test_containers):
+	Support seeding random engine.
+
+2021-03-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/std/ranges/adaptors/reverse.cc: Replace duplicated
+	line with a check that uses the const being/end overloads.
+
+2021-03-23  Moritz Sichert  <sichert@in.tum.de>
+
+	* include/std/ranges (reverse_view::begin, reverse_view::end):
+	Qualify make_reverse_iterator calls to avoid ADL.
+	* testsuite/std/ranges/adaptors/reverse.cc: Test that
+	views::reverse works when make_reverse_iterator is defined
+	in an associated namespace.
+
+2021-03-23  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/c++config (_GLIBCXX_LONG_DOUBLE_ALT128_COMPAT):
+	Do not define when compiling with Clang.
+
+2021-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/string_view (basic_string_view(Range&&)): Define new
+	constructor and deduction guide.
+	* testsuite/21_strings/basic_string_view/cons/char/range_c++20.cc: New test.
+	* testsuite/21_strings/basic_string_view/cons/wchar_t/range_c++20.cc: New test.
+
+2021-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/range_access.h (begin(T (&)[N]), end(T (&)[N])):
+	Add missing 'noexcept' as per LWG 2280.
+	(rbegin(T (&)[N]), rend(T (&)[N]), rbegin(initializer_list<T>))
+	(rend(initializer_list<T>)): Add 'noexcept' as per LWG 3537.
+	* testsuite/24_iterators/range_access/range_access.cc: Check for
+	expected noexcept specifiers. Check result types of generic
+	std::begin and std::end overloads.
+	* testsuite/24_iterators/range_access/range_access_cpp14.cc:
+	Check for expected noexcept specifiers.
+	* testsuite/24_iterators/range_access/range_access_cpp17.cc:
+	Likewise.
+
 2021-03-19  Jonathan Wakely  <jwakely@redhat.com>
 
 	* include/std/type_traits (is_scoped_enum): Define.
@@ -124,7 +411,7 @@
 
 2021-03-11  Jonathan Wakely  <jwakely@redhat.com>
 
-	PR libstdc++/99537
+	PR libstdc++/99533
 	* src/c++17/fs_dir.cc (recursive_directory_iterator): Use new
 	helper function to check for permission denied errors.
 	* src/filesystem/dir.cc (recursive_directory_iterator):

@@ -1,3 +1,343 @@
+2021-04-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/41723
+	* parser.c (cp_parser_class_name): Check dependent_scope_p.
+
+2021-04-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/52625
+	* pt.c (maybe_process_partial_specialization): Check
+	DECL_SELF_REFERENCE_P.
+
+2021-04-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/92918
+	* name-lookup.c (push_class_level_binding_1): Do overload a new
+	function with a previous using-declaration.
+
+2021-04-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/96673
+	* init.c (get_nsdmi): Don't defer access checking.
+
+2021-04-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/99901
+	* decl.c (cp_finish_decl): mark_needed an implicitly inline
+	static data member with an out-of-class redeclaration.
+
+2021-04-06  Jason Merrill  <jason@redhat.com>
+
+	PR c++/91241
+	* mangle.c (write_compact_number): Add sanity check.
+	(write_local_name): Use list_length for parm number.
+
+2021-04-06  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/99899
+	* pt.c (do_auto_deduction): Don't exit early when deducing the
+	array type of a structured binding.  Also handle adc_decomp_type
+	during constraint checking.
+
+2021-04-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/96311
+	* typeck.c (check_return_expr): Call mark_exp_read in dependent
+	case.
+
+2021-04-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/98440
+	* typeck.c (build_reinterpret_cast_1): Don't perform
+	temporary materialization.
+
+2021-04-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/95317
+	* pt.c (lookup_template_class_1): Do tsubst_enum when
+	tsubsting a generic lambda.
+
+2021-04-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/95870
+	* pt.c (enclosing_instantiation_of): Compare DECL_SOURCE_LOCATION if
+	there is no enclosing non-lambda function.
+
+2021-04-05  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/99380
+	* module.cc (name_pending_imports): Drop 'atend' parm.  Don't
+	query export when not needed.
+	(preprocess_module, preprocessed_module): Adjust.
+
+2021-04-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/99066
+	* pt.c (mark_decl_instantiated): Set DECL_EXTERNAL.
+
+2021-04-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/99201
+	* pt.c (class el_data): Add visited field.
+	(extract_local_specs): Pass it to cp_walk_tree.
+	(extract_locals_r): Walk into the body of a lambda.
+
+2021-04-05  Jason Merrill  <jason@redhat.com>
+
+	* ptree.c (cxx_print_decl): Check DECL_MODULE_IMPORT_P on
+	template result.
+
+2021-04-04  Jason Merrill  <jason@redhat.com>
+
+	PR c++/99643
+	* typeck2.c (massage_init_elt): Don't strip TARGET_EXPR.
+
+2021-04-03  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/91416
+	* parser.c: Create a GC root for attributes in a decl specifier.
+	(cp_parser_type_specifier): Push/pop ->attributes onto/from it.
+
+2021-04-03  Jason Merrill  <jason@redhat.com>
+
+	PR c++/91217
+	* pt.c (tsubst_lambda_expr): Skip the body block from
+	DECL_SAVED_TREE.
+
+2021-04-03  Jason Merrill  <jason@redhat.com>
+
+	PR c++/90664
+	* cvt.c (can_convert_qual): Check fnptr_conv_p.
+
+2021-04-03  Jason Merrill  <jason@redhat.com>
+
+	PR c++/97900
+	* pt.c (regenerate_decl_from_template): tsubst_decl
+	the parms.
+
+2021-04-02  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/99869
+	* parser.c (do_range_for_auto_deduction): Pass adc_variable_type
+	to do_auto_deduction.
+
+2021-04-02  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/99586
+	* semantics.c (finish_compound_literal): Check
+	template_placeholder_p instead of type_uses_auto.
+
+2021-04-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/97938
+	* cp-tree.h (PACK_EXPANSION_AUTO_P): New.
+	* lambda.c (add_capture): Set it.
+	* pt.c (tsubst_pack_expansion): Handle it.
+
+2021-04-02  Nathan Sidwell  <nathan@acm.org>
+
+	* cp-tree.h (lang_decl_base): Correct module flag comment.
+	* module.cc (trees_in::assert_definition): Break out
+	not_tmpl var.
+	(trees_out::lang_decl_bools): Do not write purview for header units.
+
+2021-04-01  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/99831
+	* method.c (defaulted_late_check): ++ and -- function_depth around
+	the call to synthesize_method.
+	* pt.c: Remove the saved_trees global.
+
+2021-04-01  Jason Merrill  <jason@redhat.com>
+
+	PR c++/99583
+	PR c++/99584
+	* tree.c (cp_walk_subtrees) [FUNCTION_TYPE]: Walk into
+	TYPE_RAISES_EXCEPTIONS.
+
+2021-04-01  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* mapper-client.cc (INCLUDE_MAP): New; require map to be
+	included from system.h.
+	* mapper-resolver.cc (INCLUDE_MAP): Likewise.
+
+2021-04-01  Jason Merrill  <jason@redhat.com>
+
+	PR c++/98481
+	* mangle.c (write_expression): Adjust.
+	* class.c (find_abi_tags_r): Disable PR98481 fix for ABI v14.
+	(mark_abi_tags_r): Likewise.
+
+2021-04-01  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/99283
+	* module.cc (trees_out::decl_node): Adjust importedness reference
+	assert.
+	(module_state::intercluster_seed): New.  Seed both imports and
+	inter-cluster references.  Broken out of ...
+	(module_state::write_cluster): ... here.  Call it.
+
+2021-03-31  Jason Merrill  <jason@redhat.com>
+
+	PR c++/99445
+	* tree.c (strip_typedefs): Handle TYPE_PACK_EXPANSION.
+
+2021-03-31  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/88115
+	* mangle.c (write_expression): Adjust the mangling of
+	__alignof__.
+
+2021-03-31  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/99815
+	* pt.c (placeholder_type_constraint_dependent_p): Expand
+	argument packs to separate the first non-pack argument
+	from the rest.
+
+2021-03-30  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/99283
+	* module.cc (dumper::operator): Make less brittle.
+	(trees_out::core_bools): VAR_DECLs always have a context.
+	(trees_out::key_mergeable): Use same_type_p for asserting.
+	(trees_in::read_var_def): Propagate
+	DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P.
+
+2021-03-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/99790
+	* cp-gimplify.c (cp_gimplify_expr): Handle PTRMEM_CST.
+
+2021-03-26  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/98352
+	* method.c (implicitly_declare_fn): Pass &raises to
+	synthesized_method_walk.
+
+2021-03-26  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/99283
+	* cp-tree.h (DECL_MODULE_CHECK): Ban TEMPLATE_DECL.
+	(SET_TYPE_TEMPLATE_INFO): Restore Alias template setting.
+	* decl.c (duplicate_decls): Remove template_decl module flag
+	propagation.
+	* module.cc (merge_kind_name): Add alias tmpl spec as a thing.
+	(dumper::impl::nested_name): Adjust for template-decl module flag
+	change.
+	(trees_in::assert_definition): Likewise.
+	(trees_in::install_entity): Likewise.
+	(trees_out::decl_value): Likewise.  Remove alias template
+	separation of template and type_decl.
+	(trees_in::decl_value): Likewise.
+	(trees_out::key_mergeable): Likewise,
+	(trees_in::key_mergeable): Likewise.
+	(trees_out::decl_node): Adjust for template-decl module flag
+	change.
+	(depset::hash::make_dependency): Likewise.
+	(get_originating_module, module_may_redeclare): Likewise.
+	(set_instantiating_module, set_defining_module): Likewise.
+	* name-lookup.c (name_lookup::search_adl): Likewise.
+	(do_pushdecl): Likewise.
+	* pt.c (build_template_decl): Likewise.
+	(lookup_template_class_1): Remove special alias_template handling
+	of DECL_TI_TEMPLATE.
+	(tsubst_template_decl): Likewise.
+
+2021-03-26  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/99705
+	* tree.c (bot_manip): Remap artificial automatic temporaries mentioned
+	in DECL_EXPR or in BIND_EXPR_VARS.
+
+2021-03-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/99672
+	* parser.c (cp_parser_postfix_expression): For calls, create
+	combined_loc and temporarily set input_location to it before
+	calling finish_call_expr.
+
+2021-03-25  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/94751
+	* call.c (build_over_call): Maybe call mark_used in case
+	deduce_inheriting_ctor fails and return error_mark_node.
+	* cp-tree.h (deduce_inheriting_ctor): Adjust declaration.
+	* method.c (deduce_inheriting_ctor): Return bool if the deduction
+	fails.
+	(implicitly_declare_fn): If raises is error_mark_node, call
+	synthesized_method_walk with diag being true.
+
+2021-03-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/99745
+	* decl2.c (grokbitfield): Diagnose bitfields containing bare parameter
+	packs and don't set DECL_BIT_FIELD_REPRESENTATIVE in that case.
+
+2021-03-25  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/99331
+	* call.c (build_converted_constant_expr_internal): Don't emit
+	-Wconversion warnings.
+
+2021-03-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/99565
+	* call.c (build_conditional_expr_1): Pass OEP_ADDRESS_OF_SAME_FIELD
+	to operand_equal_p.
+	* cvt.c (convert_to_void): Preserve location_t on COND_EXPR or
+	or COMPOUND_EXPR.
+
+2021-03-23  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/99283
+	* name-lookup.c (check_module_override): Set global or partition
+	DUP on the binding vector.
+
+2021-03-23  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/99318
+	* decl2.c (cp_warn_deprecated_use_scopes): Only call
+	cp_warn_deprecated_use when decl is a namespace, class, or enum.
+
+2021-03-23  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/99239
+	* decl.c (duplicate_decls): Remove assert about maybe-imported
+	artificial decls.
+
+2021-03-23  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/99650
+	* decl.c (cp_finish_decomp): Diagnose void initializers when
+	using tuple_element and get.
+
+2021-03-22  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/99480
+	* module.cc (depset::hash::make_dependency): Propagate flags for
+	partial specialization.
+	(module_may_redeclare): Handle partial specialization.
+
+2021-03-22  Nathan Sidwell  <nathan@acm.org>
+
+	PR c++/99425
+	* cp-tree.h (map_context_from, map_context_to): Delete.
+	(add_mergeable_specialization): Add is_alias parm.
+	* pt.c (add_mergeable_specialization): Add is_alias parm, add them.
+	* module.cc (map_context_from, map_context_to): Delete.
+	(trees_in::decl_value): Add specializations later, adjust call.
+	Drop useless alias lookup. Set duplicate fn parm context.
+	(check_mergeable_decl): Drop context mapping.
+	(trees_in::is_matching_decl): Likewise.
+	(trees_in::read_function_def): Drop parameter context adjustment
+	here.
+
+2021-03-22  Martin Liska  <mliska@suse.cz>
+
+	PR c++/99687
+	* module.cc (fini_modules): Call vec_free instead of delete.
+
 2021-03-20  Jakub Jelinek  <jakub@redhat.com>
 
 	PR debug/99230

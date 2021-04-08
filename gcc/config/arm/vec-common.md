@@ -74,6 +74,11 @@
      {
        if (!REG_P (operands[0]))
 	 operands[1] = force_reg (E_V8HFmode, operands[1]);
+	else if (TARGET_HAVE_MVE_FLOAT && CONSTANT_P (operands[1]))
+	  {
+	    operands[1] = neon_make_constant (operands[1]);
+	    gcc_assert (operands[1] != NULL_RTX);
+	  }
      }
 })
 
@@ -98,7 +103,10 @@
   [(set (match_operand:VDQWH 0 "s_register_operand")
 	(mult:VDQWH (match_operand:VDQWH 1 "s_register_operand")
 		    (match_operand:VDQWH 2 "s_register_operand")))]
-  "ARM_HAVE_<MODE>_ARITH"
+  "ARM_HAVE_<MODE>_ARITH
+   && (!TARGET_REALLY_IWMMXT
+       || <MODE>mode == V4HImode
+       || <MODE>mode == V2SImode)"
 )
 
 (define_expand "smin<mode>3"
@@ -197,13 +205,13 @@
 (define_expand "one_cmpl<mode>2"
   [(set (match_operand:VDQ 0 "s_register_operand")
 	(not:VDQ (match_operand:VDQ 1 "s_register_operand")))]
-  "ARM_HAVE_<MODE>_ARITH"
+  "ARM_HAVE_<MODE>_ARITH && !TARGET_REALLY_IWMMXT"
 )
 
 (define_expand "neg<mode>2"
   [(set (match_operand:VDQWH 0 "s_register_operand" "")
 	(neg:VDQWH (match_operand:VDQWH 1 "s_register_operand" "")))]
-  "ARM_HAVE_<MODE>_ARITH"
+  "ARM_HAVE_<MODE>_ARITH && !TARGET_REALLY_IWMMXT"
 )
 
 (define_expand "cadd<rot><mode>3"
@@ -276,7 +284,8 @@
  [(set (match_operand:VDQX 0 "neon_perm_struct_or_reg_operand")
 	(unspec:VDQX [(match_operand:VDQX 1 "neon_perm_struct_or_reg_operand")]
 	 UNSPEC_MISALIGNED_ACCESS))]
- "ARM_HAVE_<MODE>_LDST && !BYTES_BIG_ENDIAN && unaligned_access"
+ "ARM_HAVE_<MODE>_LDST && !BYTES_BIG_ENDIAN
+  && unaligned_access && !TARGET_REALLY_IWMMXT"
 {
  rtx adjust_mem;
  /* This pattern is not permitted to fail during expansion: if both arguments

@@ -1171,6 +1171,7 @@ See RS/6000 and PowerPC Options.
 -mrelax  -mno-relax @gol
 -mriscv-attribute  -mmo-riscv-attribute @gol
 -malign-data=@var{type} @gol
+-mbig-endian  -mlittle-endian @gol
 +-mstack-protector-guard=@var{guard} -mstack-protector-guard-reg=@var{reg} @gol
 +-mstack-protector-guard-offset=@var{offset}}
 
@@ -14416,6 +14417,14 @@ Use both Advanced SIMD and SVE.  Prefer SVE when the costs are deemed equal.
 @end table
 The default value is 0.
 
+@item aarch64-loop-vect-issue-rate-niters
+The tuning for some AArch64 CPUs tries to take both latencies and issue
+rates into account when deciding whether a loop should be vectorized
+using SVE, vectorized using Advanced SIMD, or not vectorized at all.
+If this parameter is set to @var{n}, GCC will not use this heuristic
+for loops that are known to execute in fewer than @var{n} Advanced
+SIMD iterations.
+
 @end table
 
 @end table
@@ -16163,7 +16172,7 @@ arbitrary signal handlers such as @code{SIGALRM}.
 @opindex fdelete-dead-exceptions
 Consider that instructions that may throw exceptions but don't otherwise
 contribute to the execution of the program can be optimized away.
-This option is enabled by default for the Ada front end, as permitted by
+This option is enabled by default for the Ada compiler, as permitted by
 the Ada language specification.
 Optimization passes that cause dead exceptions to be removed are enabled independently at different optimization levels.
 
@@ -26747,6 +26756,17 @@ Control how GCC aligns variables and constants of array, structure, or union
 types.  Supported values for @var{type} are @samp{xlen} which uses x register
 width as the alignment value, and @samp{natural} which uses natural alignment.
 @samp{xlen} is the default.
+
+@item -mbig-endian
+@opindex mbig-endian
+Generate big-endian code.  This is the default when GCC is configured for a
+@samp{riscv64be-*-*} or @samp{riscv32be-*-*} target.
+
+@item -mlittle-endian
+@opindex mlittle-endian
+Generate little-endian code.  This is the default when GCC is configured for a
+@samp{riscv64-*-*} or @samp{riscv32-*-*} but not a @samp{riscv64be-*-*} or
+@samp{riscv32be-*-*} target.
 
 @item -mstack-protector-guard=@var{guard}
 @itemx -mstack-protector-guard-reg=@var{reg}

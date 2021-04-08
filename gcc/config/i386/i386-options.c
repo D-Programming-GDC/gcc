@@ -721,14 +721,14 @@ static const struct processor_costs *processor_cost_table[] =
   &slm_cost,
   &skylake_cost,
   &skylake_cost,
+  &icelake_cost,
+  &icelake_cost,
+  &icelake_cost,
   &skylake_cost,
+  &icelake_cost,
   &skylake_cost,
-  &skylake_cost,
-  &skylake_cost,
-  &skylake_cost,
-  &skylake_cost,
-  &skylake_cost,
-  &skylake_cost,
+  &icelake_cost,
+  &icelake_cost,
   &intel_cost,
   &geode_cost,
   &k6_cost,
@@ -1861,6 +1861,13 @@ ix86_option_override_internal (bool main_args_p,
   SUBSUBTARGET_OVERRIDE_OPTIONS;
 #endif
 
+#ifdef HAVE_LD_BROKEN_PE_DWARF5
+  /* If the PE linker has broken DWARF 5 support, make
+     DWARF 4 the default.  */
+  if (TARGET_PECOFF)
+    SET_OPTION_IF_UNSET (opts, opts_set, dwarf_version, 4);
+#endif
+
   /* -fPIC is the default for x86_64.  */
   if (TARGET_MACHO && TARGET_64BIT_P (opts->x_ix86_isa_flags))
     opts->x_flag_pic = 2;
@@ -2042,6 +2049,9 @@ ix86_option_override_internal (bool main_args_p,
     sorry ("%i-bit mode not compiled in",
 	   (opts->x_ix86_isa_flags & OPTION_MASK_ISA_64BIT) ? 64 : 32);
 
+  /* Last processor_alias_table must point to "generic" entry.  */
+  gcc_checking_assert (strcmp (processor_alias_table[pta_size - 1].name,
+			       "generic") == 0);
   for (i = 0; i < pta_size; i++)
     if (! strcmp (opts->x_ix86_arch_string, processor_alias_table[i].name))
       {

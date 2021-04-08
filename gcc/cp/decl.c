@@ -2041,8 +2041,6 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
     {
       if (DECL_ARTIFICIAL (olddecl))
 	{
-	  gcc_checking_assert (!(DECL_LANG_SPECIFIC (olddecl)
-				 && DECL_MODULE_IMPORT_P (olddecl)));
 	  if (!(global_purview_p () || not_module_p ()))
 	    error ("declaration %qD conflicts with builtin", newdecl);
 	  else
@@ -2276,10 +2274,6 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 		DECL_CONTEXT (parm) = old_result;
 	    }
 	}
-
-      DECL_MODULE_IMPORT_P (olddecl)
-	= DECL_MODULE_IMPORT_P (old_result)
-	= DECL_MODULE_IMPORT_P (newdecl);
 
       return olddecl;
     }
@@ -2930,19 +2924,6 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 		  sizeof (struct tree_decl_non_common) - sizeof (struct tree_decl_common)
 		  + TREE_CODE_LENGTH (TREE_CODE (newdecl)) * sizeof (char *));
 	  break;
-	}
-    }
-
-  if (DECL_LANG_SPECIFIC (olddecl) && DECL_TEMPLATE_INFO (olddecl))
-    {
-      /* Repropagate the module information to the template.  */
-      tree tmpl = DECL_TI_TEMPLATE (olddecl);
-
-      if (DECL_TEMPLATE_RESULT (tmpl) == olddecl)
-	{
-	  DECL_MODULE_PURVIEW_P (tmpl) = DECL_MODULE_PURVIEW_P (olddecl);
-	  gcc_checking_assert (!DECL_MODULE_IMPORT_P (olddecl));
-	  DECL_MODULE_IMPORT_P (tmpl) = false;
 	}
     }
 
@@ -7712,10 +7693,13 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
   if (asmspec_tree && asmspec_tree != error_mark_node)
     asmspec = TREE_STRING_POINTER (asmspec_tree);
 
-  if (current_class_type
-      && CP_DECL_CONTEXT (decl) == current_class_type
-      && TYPE_BEING_DEFINED (current_class_type)
-      && !CLASSTYPE_TEMPLATE_INSTANTIATION (current_class_type)
+  bool in_class_decl
+    = (current_class_type
+       && CP_DECL_CONTEXT (decl) == current_class_type
+       && TYPE_BEING_DEFINED (current_class_type)
+       && !CLASSTYPE_TEMPLATE_INSTANTIATION (current_class_type));
+
+  if (in_class_decl
       && (DECL_INITIAL (decl) || init))
     DECL_INITIALIZED_IN_CLASS_P (decl) = 1;
 
@@ -8088,6 +8072,13 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 	  if (!flag_weak)
 	    /* Check again now that we have an initializer.  */
 	    maybe_commonize_var (decl);
+	  /* A class-scope constexpr variable with an out-of-class declaration.
+	     C++17 makes them implicitly inline, but still force it out.  */
+	  if (DECL_INLINE_VAR_P (decl)
+	      && !DECL_VAR_DECLARED_INLINE_P (decl)
+	      && !DECL_TEMPLATE_INSTANTIATION (decl)
+	      && !in_class_decl)
+	    mark_needed (decl);
 	}
 
       if (var_definition_p
@@ -8629,6 +8620,12 @@ cp_finish_decomp (tree decl, tree first, unsigned int count)
 			 : get_tuple_element_type (type, i));
 	  input_location = sloc;
 
+	  if (VOID_TYPE_P (eltype))
+	    {
+	      error ("%<std::tuple_element<%u, %T>::type%> is %<void%>",
+		     i, type);
+	      eltype = error_mark_node;
+	    }
 	  if (init == error_mark_node || eltype == error_mark_node)
 	    {
 	      inform (dloc, "in initialization of structured binding "

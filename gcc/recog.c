@@ -2267,6 +2267,7 @@ asm_operand_ok (rtx op, const char *constraint, const char **constraints)
 	      break;
 
 	    case CT_MEMORY:
+	    case CT_RELAXED_MEMORY:
 	      mem = op;
 	      /* Fall through.  */
 	    case CT_SPECIAL_MEMORY:
@@ -2892,6 +2893,7 @@ preprocess_constraints (int n_operands, int n_alternatives,
 
 		    case CT_MEMORY:
 		    case CT_SPECIAL_MEMORY:
+		    case CT_RELAXED_MEMORY:
 		      op_alt[i].memory_ok = 1;
 		      break;
 

@@ -1,3 +1,124 @@
+2021-04-05  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/99906
+	* analyzer.cc (maybe_reconstruct_from_def_stmt): Fix NULL
+	dereference on calls with zero arguments.
+	* sm-malloc.cc (malloc_state_machine::on_stmt): When handling
+	__attribute__((nonnull)), only call get_diagnostic_tree if the
+	result will be used.
+
+2021-04-05  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/99886
+	* diagnostic-manager.cc
+	(diagnostic_manager::prune_interproc_events): Use signed integers
+	when subtracting one from path->num_events ().
+	(diagnostic_manager::consolidate_conditions): Likewise.  Convert
+	next_idx to a signed int.
+
+2021-04-01  David Malcolm  <dmalcolm@redhat.com>
+
+	* diagnostic-manager.cc (diagnostic_manager::add_diagnostic): Make
+	enode param non-constant, and call add_diagnostic on it.  Add
+	enode index to log message.
+	(diagnostic_manager::add_diagnostic): Make enode param
+	non-constant.
+	* diagnostic-manager.h (diagnostic_manager::add_diagnostic):
+	Likewise for both decls.
+	* engine.cc
+	(impl_region_model_context::impl_region_model_context): Likewise
+	for enode_for_diag.
+	(impl_sm_context::impl_sm_context): Likewise.
+	(impl_sm_context::m_enode_for_diag): Likewise.
+	(exploded_node::dump_dot): Don't pass the diagnostic manager
+	to dump_saved_diagnostics.
+	(exploded_node::dump_saved_diagnostics): Drop param.  Iterate
+	directly through all saved diagnostics for the enode, rather
+	than all saved diagnostics in the diagnostic_manager and
+	filtering.
+	(exploded_node::on_stmt): Make non-const.
+	(exploded_node::on_edge): Likewise.
+	(exploded_node::on_longjmp): Likewise.
+	(exploded_node::detect_leaks): Likewise.
+	(exploded_graph::get_or_create_node): Make enode_for_diag param
+	non-const.
+	(exploded_graph_annotator::print_enode): Iterate
+	directly through all saved diagnostics for the enode, rather
+	than all saved diagnostics in the diagnostic_manager and
+	filtering.
+	* exploded-graph.h
+	(impl_region_model_context::impl_region_model_context): Make
+	enode_for_diag param non-constant.
+	(impl_region_model_context::m_enode_for_diag): Likewise.
+	(exploded_node::dump_saved_diagnostics): Drop param.
+	(exploded_node::on_stmt): Make non-const.
+	(exploded_node::on_edge): Likewise.
+	(exploded_node::on_longjmp): Likewise.
+	(exploded_node::detect_leaks): Likewise.
+	(exploded_node::add_diagnostic): New.
+	(exploded_node::get_num_diagnostics): New.
+	(exploded_node::get_saved_diagnostic): New.
+	(exploded_node::m_saved_diagnostics): New.
+	(exploded_graph::get_or_create_node): Make enode_for_diag param
+	non-constant.
+	* feasible-graph.cc (feasible_node::dump_dot): Drop
+	diagnostic_manager from call to dump_saved_diagnostics.
+	* program-state.cc (program_state::on_edge): Convert enode param
+	to non-const pointer.
+	(program_state::prune_for_point): Likewise for enode_for_diag
+	param.
+	* program-state.h (program_state::on_edge): Convert enode param
+	to non-const pointer.
+	(program_state::prune_for_point): Likewise for enode_for_diag
+	param.
+
+2021-03-31  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/99771
+	* analyzer.cc (maybe_reconstruct_from_def_stmt): New.
+	(fixup_tree_for_diagnostic_1): New.
+	(fixup_tree_for_diagnostic): New.
+	* analyzer.h (fixup_tree_for_diagnostic): New decl.
+	* checker-path.cc (call_event::get_desc): Call
+	fixup_tree_for_diagnostic and use it for the call_with_state call.
+	(warning_event::get_desc): Likewise for the final_event and
+	make_label_text calls.
+	* engine.cc (impl_region_model_context::on_state_leak): Likewise
+	for the on_leak and add_diagnostic calls.
+	* region-model.cc (region_model::get_representative_tree):
+	Likewise for the result.
+
+2021-03-30  David Malcolm  <dmalcolm@redhat.com>
+
+	* region.h (region::dump_to_pp): Remove old decl.
+
+2021-03-30  David Malcolm  <dmalcolm@redhat.com>
+
+	* sm-file.cc (fileptr_state_machine::on_stmt): Only call
+	get_diagnostic_tree if the result will be used.
+	* sm-malloc.cc (malloc_state_machine::on_stmt): Likewise.
+	(malloc_state_machine::on_deallocator_call): Likewise.
+	(malloc_state_machine::on_realloc_call): Likewise.
+	(malloc_state_machine::on_realloc_call): Likewise.
+	* sm-sensitive.cc
+	(sensitive_state_machine::warn_for_any_exposure): Likewise.
+	* sm-taint.cc (taint_state_machine::on_stmt): Likewise.
+
+2021-03-25  David Malcolm  <dmalcolm@redhat.com>
+
+	PR analyzer/93695
+	PR analyzer/99044
+	PR analyzer/99716
+	* engine.cc (exploded_node::on_stmt): Clear sm-state involving
+	an SSA name at the def-stmt of that SSA name.
+	* program-state.cc (sm_state_map::purge_state_involving): New.
+	* program-state.h (sm_state_map::purge_state_involving): New decl.
+	* region-model.cc (selftest::test_involves_p): New.
+	(selftest::analyzer_region_model_cc_tests): Call it.
+	* svalue.cc (class involvement_visitor): New class
+	(svalue::involves_p): New.
+	* svalue.h (svalue::involves_p): New decl.
+
 2021-03-19  David Malcolm  <dmalcolm@redhat.com>
 
 	PR analyzer/99614

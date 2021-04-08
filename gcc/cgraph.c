@@ -1860,6 +1860,17 @@ cgraph_node::release_body (bool keep_arguments)
       lto_free_function_in_decl_state_for_node (this);
       lto_file_data = NULL;
     }
+  if (flag_checking && clones)
+    {
+      /* It is invalid to release body before materializing clones except
+	 for thunks that don't really need a body.  Verify also that we do
+	 not leak pointers to the call statements.  */
+      for (cgraph_node *node = clones; node;
+	   node = node->next_sibling_clone)
+	gcc_assert (node->thunk && !node->callees->call_stmt);
+    }
+  remove_callees ();
+  remove_all_references ();
 }
 
 /* Remove function from symbol table.  */

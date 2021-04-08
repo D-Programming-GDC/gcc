@@ -7564,6 +7564,7 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 	    tsubst_flags_t complain = complain_flags (decltype_p);
 	    vec<tree, va_gc> *args;
 	    location_t close_paren_loc = UNKNOWN_LOCATION;
+	    location_t combined_loc = UNKNOWN_LOCATION;
 
             is_member_access = false;
 
@@ -7669,6 +7670,17 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 		  }
 	      }
 
+	    /* Temporarily set input_location to the combined location
+	       with call expression range, as e.g. build_out_target_exprs
+	       called from convert_default_arg relies on input_location,
+	       so updating it only when the call is fully built results
+	       in inconsistencies between location handling in templates
+	       and outside of templates.  */
+	    if (close_paren_loc != UNKNOWN_LOCATION)
+	      combined_loc = make_location (token->location, start_loc,
+					    close_paren_loc);
+	    iloc_sentinel ils (combined_loc);
+
 	    if (TREE_CODE (postfix_expression) == COMPONENT_REF)
 	      {
 		tree instance = TREE_OPERAND (postfix_expression, 0);
@@ -7726,12 +7738,7 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 				    complain);
 
 	    if (close_paren_loc != UNKNOWN_LOCATION)
-	      {
-		location_t combined_loc = make_location (token->location,
-							 start_loc,
-							 close_paren_loc);
-		postfix_expression.set_location (combined_loc);
-	      }
+	      postfix_expression.set_location (combined_loc);
 
 	    /* The POSTFIX_EXPRESSION is certainly no longer an id.  */
 	    idk = CP_ID_KIND_NONE;
@@ -12871,7 +12878,9 @@ do_range_for_auto_deduction (tree decl, tree range_expr)
 					    RO_UNARY_STAR,
 					    tf_warning_or_error);
 	  TREE_TYPE (decl) = do_auto_deduction (TREE_TYPE (decl),
-						iter_decl, auto_node);
+						iter_decl, auto_node,
+						tf_warning_or_error,
+						adc_variable_type);
 	}
     }
 }
@@ -18337,6 +18346,11 @@ cp_parser_explicit_specialization (cp_parser* parser)
   --parser->num_template_parameter_lists;
 }
 
+/* Preserve the attributes across a garbage collect (by making it a GC
+   root), which can occur when parsing a member function.  */
+
+static GTY(()) vec<tree, va_gc> *cp_parser_decl_specs_attrs;
+
 /* Parse a type-specifier.
 
    type-specifier:
@@ -18429,8 +18443,12 @@ cp_parser_type_specifier (cp_parser* parser,
       /* Parse tentatively so that we can back up if we don't find a
 	 class-specifier.  */
       cp_parser_parse_tentatively (parser);
+      if (decl_specs->attributes)
+	vec_safe_push (cp_parser_decl_specs_attrs, decl_specs->attributes);
       /* Look for the class-specifier.  */
       type_spec = cp_parser_class_specifier (parser);
+      if (decl_specs->attributes)
+	cp_parser_decl_specs_attrs->pop ();
       invoke_plugin_callbacks (PLUGIN_FINISH_TYPE, type_spec);
       /* If that worked, we're done.  */
       if (cp_parser_parse_definitely (parser))
@@ -24621,7 +24639,7 @@ cp_parser_class_name (cp_parser *parser,
   const bool typename_p = (typename_keyword_p
 			   && parser->scope
 			   && TYPE_P (parser->scope)
-			   && dependent_type_p (parser->scope));
+			   && dependent_scope_p (parser->scope));
   /* Handle the common case (an identifier, but not a template-id)
      efficiently.  */
   if (token->type == CPP_NAME

@@ -1871,6 +1871,7 @@ ira_setup_alts (rtx_insn *insn)
 			  goto op_success;
 
 			case CT_MEMORY:
+			case CT_RELAXED_MEMORY:
 			  mem = op;
 			  /* Fall through.  */
 			case CT_SPECIAL_MEMORY:
