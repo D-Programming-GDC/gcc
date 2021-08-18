@@ -12,6 +12,8 @@
 
 module rt.lifetime;
 
+import gcc.attribute;
+
 import core.stdc.stdlib;
 import core.stdc.string;
 import core.stdc.stdarg;
@@ -52,6 +54,7 @@ extern (C) void lifetime_init()
 /**
  *
  */
+@attribute("weak")
 extern (C) void* _d_allocmemory(size_t sz)
 {
     return GC.malloc(sz);
@@ -60,6 +63,7 @@ extern (C) void* _d_allocmemory(size_t sz)
 /**
  *
  */
+@attribute("weak")
 extern (C) Object _d_newclass(const ClassInfo ci)
 {
     void* p;
@@ -1087,6 +1091,7 @@ extern (C) void* _d_newitemU(in TypeInfo _ti)
 }
 
 /// Same as above, zero initializes the item.
+@attribute("weak")
 extern (C) void* _d_newitemT(in TypeInfo _ti)
 {
     auto p = _d_newitemU(_ti);
@@ -1095,6 +1100,7 @@ extern (C) void* _d_newitemT(in TypeInfo _ti)
 }
 
 /// Same as above, for item with non-zero initializer.
+@attribute("weak")
 extern (C) void* _d_newitemiT(in TypeInfo _ti)
 {
     auto p = _d_newitemU(_ti);
