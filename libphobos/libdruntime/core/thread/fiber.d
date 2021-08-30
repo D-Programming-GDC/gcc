@@ -1700,7 +1700,7 @@ unittest {
     assert( composed.state == Fiber.State.TERM );
 }
 
-version (unittest)
+version (CoreUnittest)
 {
     class TestFiber : Fiber
     {
