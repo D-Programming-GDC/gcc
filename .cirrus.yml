@@ -59,7 +59,7 @@ task:
 task:
   name: Darwin $TASK_NAME_SUFFIX
   osx_instance:
-    image: catalina-xcode
+    image: big-sur-xcode
   environment:
     matrix:
       - TASK_NAME_SUFFIX: Testsuite

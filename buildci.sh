@@ -238,6 +238,10 @@ environment() {
             build_configure_flags="${build_configure_flags} \
                 --with-sysroot=/Library/Developer/CommandLineTools/SDKs/MacOSX10.15.sdk"
             ;;
+      x86_64-*-darwin20)
+            build_configure_flags="${build_configure_flags} \
+                --with-sysroot=/Library/Developer/CommandLineTools/SDKs/MacOSX11.1.sdk"
+            ;;
       x86_64-*-openbsd*)
             build_configure_flags="${build_configure_flags} \
                 --with-gmp=/usr/local --enable-threads=posix --enable-default-pie"
@@ -290,6 +294,7 @@ installdeps() {
             pkg install -y gcc${host_package} \
                 autogen autoconf automake autotools bison coreutils curl dejagnu flex gmake patch || exit 1
         elif [ "${CIRRUS_OS}" = "darwin" ]; then
+	    brew update-reset
             brew install gcc@${host_package} autogen deja-gnu xz || exit 1
         else
             echo "Unhandled CI environment"
