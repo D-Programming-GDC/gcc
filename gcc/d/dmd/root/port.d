@@ -43,5 +43,15 @@ extern (C++) struct Port
     // Big endian
     static uint readwordBE(scope const void* buffer) pure;
 
-    static void valcpy(scope void *dst, ulong val, size_t size) pure;
+    static void valcpy(scope void *dst, ulong val, size_t size) pure
+    {
+        switch (size)
+        {
+            case 1: *cast(ubyte *)dst = cast(ubyte)val; break;
+            case 2: *cast(ushort *)dst = cast(ushort)val; break;
+            case 4: *cast(uint *)dst = cast(uint)val; break;
+            case 8: *cast(ulong *)dst = cast(ulong)val; break;
+            default: assert(0);
+        }
+    }
 }

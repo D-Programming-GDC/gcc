@@ -139,31 +139,3 @@ Port::readlongBE (const void *buffer)
 	  | ((unsigned) p[2] << 8)
 	  | (unsigned) p[3]);
 }
-
-/* Write an SZ-byte sized VALUE to BUFFER, ignoring endian-ness.  */
-
-void
-Port::valcpy (void *buffer, uint64_t value, size_t sz)
-{
-  switch (sz)
-    {
-    case 1:
-      *(uint8_t *) buffer = (uint8_t) value;
-      break;
-
-    case 2:
-      *(uint16_t *) buffer = (uint16_t) value;
-      break;
-
-    case 4:
-      *(uint32_t *) buffer = (uint32_t) value;
-      break;
-
-    case 8:
-      *(uint64_t *) buffer = (uint64_t) value;
-      break;
-
-    default:
-      gcc_unreachable ();
-    }
-}
