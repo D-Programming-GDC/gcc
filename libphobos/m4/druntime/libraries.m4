@@ -223,9 +223,17 @@ AC_DEFUN([DRUNTIME_LIBRARIES_UCONTEXT],
   case "$target_cpu" in
     aarch64* | \
     arm* | \
-    i[[34567]]86|x86_64 | \
     powerpc)
       druntime_fiber_asm_external=yes
+      ;;
+    i[[34567]]86|x86_64)
+      # x86{,_64} uses the external asm implementations
+      # if CET support isn't turned on
+      if test "$enable_cet" = yes; then
+        druntime_fiber_asm_external=no
+      else
+        druntime_fiber_asm_external=yes
+      fi
       ;;
   esac
   if test "$druntime_fiber_asm_external" = no; then
