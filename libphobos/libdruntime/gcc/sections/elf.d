@@ -82,6 +82,12 @@ else version (Solaris)
     import core.sys.solaris.sys.elf;
     import core.sys.solaris.sys.link;
 }
+else version (Hurd)
+{
+    import core.sys.hurd.dlfcn;
+    import core.sys.hurd.elf;
+    import core.sys.hurd.link;
+}
 else
 {
     static assert(0, "unimplemented");
@@ -777,6 +783,8 @@ version (Shared)
                     strtab = cast(const(char)*)(info.dlpi_addr + dyn.d_un.d_ptr); // relocate
                 else version (Solaris)
                     strtab = cast(const(char)*)(info.dlpi_addr + dyn.d_un.d_ptr); // relocate
+                else version (Hurd)
+                    strtab = cast(const(char)*)(dyn.d_un.d_ptr);
                 else
                     static assert(0, "unimplemented");
                 break;
@@ -912,6 +920,7 @@ bool findDSOInfoForAddr(in void* addr, dl_phdr_info* result=null) nothrow @nogc
     else version (NetBSD)  enum IterateManually = true;
     else version (OpenBSD) enum IterateManually = true;
     else version (Solaris) enum IterateManually = true;
+    else version (Hurd)    enum IterateManually = true;
     else                   enum IterateManually = false;
 
     static if (IterateManually)

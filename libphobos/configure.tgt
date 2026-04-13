@@ -85,6 +85,9 @@ case "${target}" in
   x86_64-*-linux* | i?86-*-linux*)
 	LIBPHOBOS_SUPPORTED=yes
 	;;
+  x86_64-*-gnu* | i?86-*-gnu*)
+	LIBPHOBOS_SUPPORTED=yes
+	;;
   x86_64-*-netbsd* | i?86-*-netbsd*)
 	LIBPHOBOS_SUPPORTED=yes
 	;;
