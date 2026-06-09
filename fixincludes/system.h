@@ -25,10 +25,7 @@ along with GCC; see the file COPYING3.  If not see
 
 /* We must include stdarg.h before stdio.h.  */
 #include <stdarg.h>
-
-#ifdef HAVE_STDDEF_H
-# include <stddef.h>
-#endif
+#include <stddef.h>
 
 #include <stdio.h>
 
@@ -184,9 +181,7 @@ extern int errno;
 # endif
 #endif
 
-#ifdef HAVE_STDLIB_H
-# include <stdlib.h>
-#endif
+#include <stdlib.h>
 
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>

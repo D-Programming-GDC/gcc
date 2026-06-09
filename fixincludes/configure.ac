@@ -87,8 +87,7 @@ AC_DEFINE_UNQUOTED([EXE_EXT], "$ac_exeext",
   [Defined to the executable file extension on the host system])
 
 # Checks for header files.
-AC_CHECK_HEADERS([stddef.h stdlib.h strings.h unistd.h fcntl.h sys/file.h \
-	sys/stat.h])
+AC_CHECK_HEADERS([strings.h unistd.h fcntl.h sys/file.h sys/stat.h])
 define(fixincludes_UNLOCKED_FUNCS, clearerr_unlocked feof_unlocked dnl
   ferror_unlocked fflush_unlocked fgetc_unlocked fgets_unlocked dnl
   fileno_unlocked fprintf_unlocked fputc_unlocked fputs_unlocked dnl
