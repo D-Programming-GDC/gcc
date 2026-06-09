@@ -216,9 +216,6 @@
 /* Define to 1 if you can assemble SSSE3 insns. */
 #undef HAVE_SSSE3
 
-/* Define to 1 if you have the <stddef.h> header file. */
-#undef HAVE_STDDEF_H
-
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
