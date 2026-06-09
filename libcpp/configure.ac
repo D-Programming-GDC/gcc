@@ -57,7 +57,7 @@ AC_HEADER_TIME
 ACX_HEADER_STRING
 
 AC_CHECK_HEADERS(locale.h fcntl.h limits.h stddef.h \
-	stdlib.h strings.h string.h sys/file.h unistd.h)
+	strings.h string.h sys/file.h unistd.h)
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_BIGENDIAN
