@@ -86,7 +86,6 @@ AC_CHECK_DECLS(m4_split(m4_normalize(libcpp_UNLOCKED_FUNCS)))
 
 # Checks for library functions.
 AC_FUNC_ALLOCA
-AC_HEADER_STDC
 AM_LANGINFO_CODESET
 ZW_GNU_GETTEXT_SISTER_DIR
 

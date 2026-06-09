@@ -29,7 +29,6 @@ AC_USE_SYSTEM_EXTENSIONS
 
 
 # Checks for header files.
-AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(limits.h stddef.h string.h strings.h stdlib.h \
                  time.h sys/stat.h wchar.h)

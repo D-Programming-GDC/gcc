@@ -59,9 +59,6 @@ AC_TYPE_OFF_T
 AC_CHECK_SIZEOF(int)
 AC_CHECK_SIZEOF(long)
 
-# Checks for library functions.
-AC_HEADER_STDC
-
 AC_ARG_ENABLE(maintainer-mode,
 [  --enable-maintainer-mode enable rules only needed by maintainers],,
 enable_maintainer_mode=no)

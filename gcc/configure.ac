@@ -1348,7 +1348,6 @@ AC_CHECK_PROG(doc_build_sys, sphinx-build, sphinx, texinfo)
 # works later. *sigh*  This needs to come before all header checks.
 AC_PROG_CPP_WERROR
 
-AC_HEADER_STDC
 AC_HEADER_TIME
 ACX_HEADER_STRING
 AC_HEADER_SYS_WAIT
