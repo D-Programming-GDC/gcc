@@ -324,18 +324,28 @@ interleave_supported_p (vec_perm_indices *indices, tree vectype,
 			       *indices);
 }
 
-/* Try to use permutes to define the masks in DEST_RGM using the masks
-   in SRC_RGM, given that the former has twice as many masks as the
-   latter.  Return true on success, adding any new statements to SEQ.  */
+/* Check if its possible to use permutes to define the masks in DEST_RGM using
+   the masks in SRC_RGM, given that the former has twice as many masks as the
+   latter.  Return true on success.
+
+   Optionally, if SEQ is non-null add new statements for the permutation to SEQ.
+   Additionally, if SRC_MASKS and DST_MASKS are defined, use these instead
+   of the masks from SRC_RGM and DST_RGM.  */
 
 static bool
-vect_maybe_permute_loop_masks (gimple_seq *seq, rgroup_controls *dest_rgm,
-			       rgroup_controls *src_rgm)
+vect_maybe_permute_loop_masks (gimple_seq *seq,
+			       rgroup_controls *dest_rgm,
+			       rgroup_controls *src_rgm,
+			       vec<tree> dst_controls,
+			       vec<tree> src_controls)
 {
   tree src_masktype = src_rgm->type;
   tree dest_masktype = dest_rgm->type;
+  if (!src_masktype && !seq)
+    return false;
   machine_mode src_mode = TYPE_MODE (src_masktype);
   insn_code icode1, icode2;
+
   if (dest_rgm->max_nscalars_per_iter <= src_rgm->max_nscalars_per_iter
       && (icode1 = optab_handler (vec_unpacku_hi_optab,
 				  src_mode)) != CODE_FOR_nothing
@@ -347,10 +357,12 @@ vect_maybe_permute_loop_masks (gimple_seq *seq, rgroup_controls *dest_rgm,
       machine_mode dest_mode = insn_data[icode1].operand[0].mode;
       gcc_assert (dest_mode == insn_data[icode2].operand[0].mode);
       tree unpack_masktype = vect_halve_mask_nunits (src_masktype, dest_mode);
-      for (unsigned int i = 0; i < dest_rgm->controls.length (); ++i)
+      if (!seq)
+	return true;
+      for (unsigned int i = 0; i < dst_controls.length (); ++i)
 	{
-	  tree src = src_rgm->controls[i / 2];
-	  tree dest = dest_rgm->controls[i];
+	  tree src = src_controls[i / 2];
+	  tree dest = dst_controls[i];
 	  tree_code code = ((i & 1) == (BYTES_BIG_ENDIAN ? 0 : 1)
 			    ? VEC_UNPACK_HI_EXPR
 			    : VEC_UNPACK_LO_EXPR);
@@ -375,15 +387,17 @@ vect_maybe_permute_loop_masks (gimple_seq *seq, rgroup_controls *dest_rgm,
       && interleave_supported_p (&indices[0], src_masktype, 0)
       && interleave_supported_p (&indices[1], src_masktype, 1))
     {
+      if (!seq)
+	return true;
       /* The destination requires twice as many mask bits as the source, so
 	 we can use interleaving permutes to double up the number of bits.  */
       tree masks[2];
       for (unsigned int i = 0; i < 2; ++i)
 	masks[i] = vect_gen_perm_mask_checked (src_masktype, indices[i]);
-      for (unsigned int i = 0; i < dest_rgm->controls.length (); ++i)
+      for (unsigned int i = 0; i < dst_controls.length (); ++i)
 	{
-	  tree src = src_rgm->controls[i / 2];
-	  tree dest = dest_rgm->controls[i];
+	  tree src = src_controls[i / 2];
+	  tree dest = dst_controls[i];
 	  gimple *stmt = gimple_build_assign (dest, VEC_PERM_EXPR,
 					      src, src, masks[i & 1]);
 	  gimple_seq_add_stmt (seq, stmt);
@@ -391,6 +405,15 @@ vect_maybe_permute_loop_masks (gimple_seq *seq, rgroup_controls *dest_rgm,
       return true;
     }
   return false;
+}
+
+static bool
+vect_maybe_permute_loop_masks (gimple_seq *seq,
+			       rgroup_controls *dest_rgm,
+			       rgroup_controls *src_rgm)
+{
+  return vect_maybe_permute_loop_masks (seq, dest_rgm, src_rgm,
+					dest_rgm->controls, src_rgm->controls);
 }
 
 /* Populate DEST_RGM->controls, given that they should add up to STEP.
