@@ -108,7 +108,7 @@ CSYM(fiber_switchContext):
 
 # endif /* defined(__ELF__) */
 
-# if defined(__MACH__)
+# if defined(__APPLE__)
 
 #  if defined(__i386__)
 
@@ -177,7 +177,7 @@ LASFDE1:
         .p2align 2,0
 LEFDE1:
 
-#  endif /* defined(__MACH__) && defined(__i386__) */
+#  endif /* defined(__APPLE__) && defined(__i386__) */
 
 #  if defined(__x86_64__) && !defined(__ILP32__)
 
@@ -247,8 +247,8 @@ LASFDE1:
         .p2align 3,0
 LEFDE1:
 
-#  endif /* defined(__MACH__) && defined(__x86_64__) && !defined(__ILP32__) */
+#  endif /* defined(__APPLE__) && defined(__x86_64__) && !defined(__ILP32__) */
 
-# endif /* defined (__MACH__) */
+# endif /* defined(__APPLE__) */
 
 #endif /* !defined(__CET__) */

@@ -89,6 +89,9 @@ AC_DEFUN([DRUNTIME_OS_SOURCES],
       mingw*)  druntime_target_os_parsed="mingw"
              ;;
       *solaris*) druntime_target_os_parsed="solaris"
+            ;;
+      gnu*) druntime_target_os_parsed="hurd"
+            ;;
   esac
   AM_CONDITIONAL([DRUNTIME_OS_AIX],
                  [test "$druntime_target_os_parsed" = "aix"])
@@ -110,6 +113,8 @@ AC_DEFUN([DRUNTIME_OS_SOURCES],
                  [test "$druntime_target_os_parsed" = "mingw"])
   AM_CONDITIONAL([DRUNTIME_OS_SOLARIS],
                  [test "$druntime_target_os_parsed" = "solaris"])
+  AM_CONDITIONAL([DRUNTIME_OS_HURD],
+                 [test "$druntime_target_os_parsed" = "hurd"])
 
   druntime_target_posix="no"
   case "$druntime_cv_target_os" in

@@ -408,6 +408,8 @@ private:
         import core.sys.openbsd.dlfcn;
     else version (Solaris)
         import core.sys.solaris.dlfcn;
+    else version (Hurd)
+        import core.sys.hurd.dlfcn;
     else version (Posix)
         import core.sys.posix.dlfcn;
 

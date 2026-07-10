@@ -39,6 +39,7 @@ ALL_DRUNTIME_INSTALL_DSOURCES = $(DRUNTIME_DSOURCES) \
 	$(DRUNTIME_DSOURCES_LINUX) $(DRUNTIME_DSOURCES_NETBSD) \
 	$(DRUNTIME_DSOURCES_OPENBSD) $(DRUNTIME_DSOURCES_POSIX) \
 	$(DRUNTIME_DSOURCES_SOLARIS) $(DRUNTIME_DSOURCES_WINDOWS) \
+	$(DRUNTIME_DSOURCES_HURD) \
 	$(DRUNTIME_DSOURCES_GENERATED) $(DRUNTIME_DISOURCES) \
 	$(DRUNTIME_DSOURCES_ELF) $(DRUNTIME_DSOURCES_STDCXX)
 
@@ -76,6 +77,9 @@ if DRUNTIME_OS_MINGW
 endif
 if DRUNTIME_OS_SOLARIS
     DRUNTIME_SOURCES_CONFIGURED += $(DRUNTIME_DSOURCES_SOLARIS)
+endif
+if DRUNTIME_OS_HURD
+    DRUNTIME_SOURCES_CONFIGURED += $(DRUNTIME_DSOURCES_HURD)
 endif
 # CPU specific sources
 if DRUNTIME_CPU_AARCH64
@@ -360,6 +364,12 @@ DRUNTIME_DSOURCES_SOLARIS = core/sys/solaris/dlfcn.d \
 	core/sys/solaris/sys/procfs.d core/sys/solaris/sys/procset.d \
 	core/sys/solaris/sys/regset.d core/sys/solaris/sys/types.d \
 	core/sys/solaris/thread.d core/sys/solaris/time.d
+
+DRUNTIME_DSOURCES_HURD = core/sys/hurd/config.d \
+	core/sys/hurd/dlfcn.d core/sys/hurd/elf.d \
+	core/sys/hurd/errno.d core/sys/hurd/execinfo.d \
+	core/sys/hurd/link.d core/sys/hurd/sys/types.d \
+	core/sys/hurd/time.d core/sys/hurd/unistd.d
 
 DRUNTIME_DSOURCES_WINDOWS = core/sys/windows/accctrl.d \
 	core/sys/windows/aclapi.d core/sys/windows/aclui.d \
