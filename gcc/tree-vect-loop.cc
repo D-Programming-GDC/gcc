@@ -10267,12 +10267,16 @@ vectorizable_live_operation (vec_info *vinfo, stmt_vec_info stmt_info,
 
   gcc_assert (slp_index >= 0);
 
-  /* Get the last occurrence of the scalar index from the concatenation of
-     all the slp vectors. Calculate which slp vector it is and the index
-     within.  */
-  int num_scalar = SLP_TREE_LANES (slp_node);
   int num_vec = vect_get_num_copies (vinfo, slp_node);
-  poly_uint64 pos = (num_vec * nunits) - num_scalar + slp_index;
+  poly_uint64 pos = slp_index;
+  if (loop_vinfo)
+    {
+      /* Get the last occurrence of the scalar index from the concatenation of
+	 all the slp vectors. Calculate which slp vector it is and the index
+	 within.  */
+      int num_scalar = SLP_TREE_LANES (slp_node);
+      pos += (num_vec * nunits) - num_scalar;
+    }
 
   /* Calculate which vector contains the result, and which lane of
      that vector we need.  */
