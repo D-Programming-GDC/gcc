@@ -3961,7 +3961,13 @@ namespace __detail
 	  // "23:59:60" to correctly produce a time within a leap second.
 	  auto __ut = utc_clock::from_sys(__p._M_sys_days) + __p._M_time
 			- *__offset;
-	  __tp = __detail::__round<_Duration>(__ut);
+	  // Reject ":60" seconds unless the utc_time is a known leap second.
+	  if (__p._M_is_leap_second
+		&& (chrono::floor<seconds>(__p._M_time - *__offset) != hours(24)
+		      || !chrono::get_leap_second_info(__ut).is_leap_second))
+	    __is.setstate(ios_base::failbit);
+	  else
+	    __tp = __detail::__round<_Duration>(__ut);
 	}
       return __is;
     }
@@ -4769,7 +4775,7 @@ namespace __detail
 		      __h = hours(__val);
 
 		      __val = __read_unsigned(2);
-		      if (__val == -1 || __val > 60) [[unlikely]]
+		      if (__val == -1 || __val > 59) [[unlikely]]
 			if ((_M_need & _ChronoParts::_TimeOfDay) != 0)
 			  {
 			    __err |= ios_base::failbit;
@@ -4802,10 +4808,12 @@ namespace __detail
 				       && !__is_floating)
 		    {
 		      auto __val = __read_unsigned(__num ? __num : 2);
-		      if (0 <= __val && __val <= 59) [[likely]]
+		      if (0 <= __val && __val <= 60) [[likely]]
 			__s = seconds(__val);
 		      else
 			{
+			  // Not a valid second, but we only fail if we're
+			  // parsing into a type that cares about that.
 			  if ((_M_need & _ChronoParts::_TimeOfDay) != 0)
 			    __err |= ios_base::failbit;
 			  break;
@@ -5451,6 +5459,8 @@ namespace __detail
 		    {
 		      __ok = true;
 		      __t += __s;
+		      // Record that we had "60" or "60.ddd" for seconds.
+		      // Caller checks for valid leap second, if needed.
 		      _M_is_leap_second = __s >= seconds(60);
 		    }
 
