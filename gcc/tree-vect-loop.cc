@@ -11272,8 +11272,7 @@ vect_update_ivs_after_vectorizer_for_early_breaks (loop_vec_info loop_vinfo)
   /* Write the adjustments at the end of the iv increment.  */
   bool insert_after;
   gimple_stmt_iterator incr_gsi;
-  vect_iv_increment_position (LOOP_VINFO_MAIN_EXIT (loop_vinfo), &incr_gsi,
-			      &insert_after);
+  standard_iv_increment_position (loop, &incr_gsi, &insert_after);
 
   if (insert_after)
     gsi_insert_seq_after (&incr_gsi, stmts, GSI_NEW_STMT);

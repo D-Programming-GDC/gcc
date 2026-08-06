@@ -617,8 +617,8 @@ vect_set_loop_controls_directly (class loop *loop, loop_vec_info loop_vinfo,
   tree index_before_incr, index_after_incr;
   gimple_stmt_iterator incr_gsi;
   bool insert_after;
-  edge exit_e = LOOP_VINFO_MAIN_EXIT (loop_vinfo);
-  vect_iv_increment_position (exit_e, &incr_gsi, &insert_after);
+  standard_iv_increment_position (loop, &incr_gsi, &insert_after);
+
   if (LOOP_VINFO_USING_DECREMENTING_IV_P (loop_vinfo))
     {
       /* Create an IV that counts down from niters_total and whose step
@@ -688,7 +688,6 @@ vect_set_loop_controls_directly (class loop *loop, loop_vec_info loop_vinfo,
 
   tree zero_index = build_int_cst (compare_type, 0);
   tree test_index, test_limit, first_limit;
-  gimple_stmt_iterator *test_gsi;
   if (might_wrap_p)
     {
       /* In principle the loop should stop iterating once the incremented
@@ -727,7 +726,6 @@ vect_set_loop_controls_directly (class loop *loop, loop_vec_info loop_vinfo,
 				 nitems_total, adjust);
       test_limit = gimple_build (preheader_seq, MINUS_EXPR, compare_type,
 				 test_limit, adjust);
-      test_gsi = &incr_gsi;
 
       /* Get a safe limit for the first iteration.  */
       if (nitems_skip)
@@ -758,7 +756,6 @@ vect_set_loop_controls_directly (class loop *loop, loop_vec_info loop_vinfo,
       if (nitems_skip)
 	test_limit = gimple_build (preheader_seq, PLUS_EXPR, compare_type,
 				   test_limit, nitems_skip);
-      test_gsi = &loop_cond_gsi;
 
       first_limit = test_limit;
     }
@@ -767,7 +764,7 @@ vect_set_loop_controls_directly (class loop *loop, loop_vec_info loop_vinfo,
      a demotion).  */
   gimple_seq test_seq = NULL;
   test_index = gimple_convert (&test_seq, compare_type, test_index);
-  gsi_insert_seq_before (test_gsi, test_seq, GSI_SAME_STMT);
+  gsi_insert_seq_after (&incr_gsi, test_seq, GSI_NEW_STMT);
 
   /* Provide a definition of each control in the group.  */
   tree next_ctrl = NULL_TREE;
@@ -876,14 +873,14 @@ vect_set_loop_controls_directly (class loop *loop, loop_vec_info loop_vinfo,
 	  gimple_seq stmts = NULL;
 	  next_ctrl = vect_gen_while (&stmts, ctrl_type, test_index,
 				      this_test_limit, "next_mask");
-	  gsi_insert_seq_before (test_gsi, stmts, GSI_SAME_STMT);
+	  gsi_insert_seq_after (&incr_gsi, stmts, GSI_SAME_STMT);
 	}
       else
 	{
 	  next_ctrl = make_temp_ssa_name (compare_type, NULL, "next_len");
 	  gimple_seq seq = vect_gen_len (next_ctrl, test_index, this_test_limit,
 					 length_limit);
-	  gsi_insert_seq_before (test_gsi, seq, GSI_SAME_STMT);
+	  gsi_insert_seq_after (&incr_gsi, seq, GSI_SAME_STMT);
 	}
 
       vect_set_loop_control (loop, ctrl, init_ctrl, next_ctrl);
@@ -1196,7 +1193,7 @@ vect_set_loop_condition_partial_vectors_avx512 (class loop *loop,
   gimple_stmt_iterator incr_gsi;
   tree index_before_incr, index_after_incr;
   bool insert_after;
-  vect_iv_increment_position (exit_edge, &incr_gsi, &insert_after);
+  standard_iv_increment_position (loop, &incr_gsi, &insert_after);
 
   /* The iteration step is the vectorization factor.  */
   tree iv_step = gimple_convert (&preheader_seq, iv_type,
@@ -1482,7 +1479,7 @@ vect_set_loop_condition_normal (loop_vec_info loop_vinfo, edge exit_edge,
 	}
     }
 
-  vect_iv_increment_position (exit_edge, &incr_gsi, &insert_after);
+  standard_iv_increment_position (loop, &incr_gsi, &insert_after);
   create_iv (init, PLUS_EXPR, step, NULL_TREE, loop,
 	     &incr_gsi, insert_after,
 	     &indx_before_incr, &indx_after_incr,
