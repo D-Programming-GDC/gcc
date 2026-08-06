@@ -1490,6 +1490,7 @@
 	     (unspec:SVE_PARTIAL_I
 	       [(match_operand:<SVE_PARTIAL_I:VPRED> 2 "register_operand" "Upl")
 		(match_operand:SVE_PARTIAL_I 1 "aarch64_sve_ld<fn>f1_operand" "Ut<fn>")
+		(match_operand:SVE_PARTIAL_I 4 "aarch64_maskload_else_operand")
 		(reg:VNx16BI FFRT_REGNUM)]
 	       SVE_LDFF1_LDNF1))]
 	  UNSPEC_PRED_X))]

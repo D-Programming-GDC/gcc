@@ -1736,23 +1736,7 @@ public:
   gimple *
   fold (gimple_folder &f) const override
   {
-    if (f.vectors_per_tuple () != 1)
-      return nullptr;
-
-    tree vectype = f.vector_type (0);
-
-    /* Get the predicate and base pointer.  */
-    gimple_seq stmts = NULL;
-    tree pred = f.convert_pred (stmts, vectype, 0);
-    tree base = f.fold_contiguous_base (stmts, vectype);
-    tree els = build_zero_cst (vectype);
-    gsi_insert_seq_before (f.gsi, stmts, GSI_SAME_STMT);
-
-    tree cookie = f.load_store_cookie (TREE_TYPE (vectype));
-    gcall *new_call = gimple_build_call_internal (IFN_MASK_LOAD, 4,
-						  base, cookie, pred, els);
-    gimple_call_set_lhs (new_call, f.lhs);
-    return new_call;
+    return f.fold_contiguous_load (IFN_MASK_LOAD);
   }
 
   rtx
@@ -2140,7 +2124,7 @@ public:
 
     insn_code icode = code_for_aarch64_ldf1 (m_unspec, extend_rtx_code (),
 					     mode, e.memory_vector_mode ());
-    rtx res = e.use_contiguous_load_insn (icode);
+    rtx res = e.use_contiguous_load_insn (icode, true);
     /* See the block comment in aarch64-sve.md for details about the
        FFR handling.  */
     emit_ldf1_ffr_update (get_last_insn ());

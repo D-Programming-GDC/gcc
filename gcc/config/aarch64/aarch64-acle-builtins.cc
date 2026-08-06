@@ -2852,6 +2852,30 @@ gimple_folder::fold_contiguous_base (gimple_seq &stmts, tree vectype)
   return base;
 }
 
+/* Common code to fold a contiguous load intrinsic call into a gimple
+   call to IFN_CODE.  */
+gimple *
+gimple_folder::fold_contiguous_load (internal_fn ifn_code)
+{
+  if (vectors_per_tuple () != 1)
+    return nullptr;
+
+  tree vectype = vector_type (0);
+
+  /* Get the predicate and base pointer.  */
+  gimple_seq stmts = NULL;
+  tree pred = convert_pred (stmts, vectype, 0);
+  tree base = fold_contiguous_base (stmts, vectype);
+  tree els = build_zero_cst (vectype);
+  gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
+
+  tree cookie = load_store_cookie (TREE_TYPE (vectype));
+  gcall *new_call = gimple_build_call_internal (ifn_code, 4,
+						base, cookie, pred, els);
+  gimple_call_set_lhs (new_call, lhs);
+  return new_call;
+}
+
 /* Return the alignment and TBAA argument to an internal load or store
    function like IFN_MASK_LOAD or IFN_MASK_STORE, given that it accesses
    memory elements of type TYPE.  */

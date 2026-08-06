@@ -650,6 +650,7 @@ public:
   tree force_vector (gimple_seq &, tree, tree);
   tree convert_pred (gimple_seq &, tree, unsigned int);
   tree fold_contiguous_base (gimple_seq &, tree);
+  gimple *fold_contiguous_load (internal_fn);
   tree load_store_cookie (tree);
 
   gcall *redirect_call (const function_instance &);
