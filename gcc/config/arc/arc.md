@@ -4600,7 +4600,7 @@ archs4x, archs4xd"
   emit_insn
     (gen_rtx_COND_EXEC
       (VOIDmode,
-       gen_rtx_GE (VOIDmode, gen_rtx_REG (CC_ZNmode, CC_REG), const0_rtx),
+       gen_rtx_GT (VOIDmode, gen_rtx_REG (CC_ZNmode, CC_REG), const0_rtx),
        gen_rtx_SET (operands[0], plus_constant (SImode, operands[0], 1))));
   DONE;
 }
@@ -4645,7 +4645,7 @@ archs4x, archs4xd"
     (gen_rtx_COND_EXEC
       (VOIDmode,
        gen_rtx_LT (VOIDmode, gen_rtx_REG (CC_ZNmode, CC_REG), const0_rtx),
-       gen_rtx_SET (operands[0], GEN_INT (32))));
+       gen_rtx_SET (operands[0], GEN_INT (31))));
   emit_insn
     (gen_rtx_COND_EXEC
       (VOIDmode,
