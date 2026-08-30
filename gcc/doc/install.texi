@@ -886,7 +886,7 @@ aix@var{version}, amdhsa, aout, cygwin, darwin@var{version},
 eabi, eabialtivec, eabisim, eabisimaltivec, elf, elf32,
 elfbare, elfoabi, freebsd@var{version}, gnu, hpux, hpux@var{version},
 kfreebsd-gnu, kopensolaris-gnu, linux-androideabi, linux-gnu,
-linux-gnu_altivec, linux-musl, linux-uclibc, lynxos, mingw32, mingw32crt,
+linux-gnu_altivec, linux-musl, linux-uclibc, lynxos, mingw32,
 mmixware, msdosdjgpp, netbsd, netbsdelf@var{version}, nto-qnx, openbsd,
 rtems, solaris@var{version}, symbianelf, tpf, uclinux, uclinux_eabi, vms,
 vxworks, vxworksae, vxworksmils
