@@ -2019,9 +2019,16 @@ private:
        #define NAME 42
      and other bases but not negative numbers, parentheses or e.g.
        #define NAME 1 << 7
-     as doing so would require a parser.  */
-  tree consider_macro (cpp_macro *macro) const
+     as doing so would require a parser.
+     Also handle the case where MACRO's definition is a single identifier
+     that is itself a macro name (e.g. "#define O_CREAT _FCREAT"), by
+     following the chain of aliases.  */
+  tree consider_macro (cpp_macro *macro, int depth = 0) const
   {
+    /* UInteger option variables are stored as int, so "depth" must be signed
+       to avoid a signed/unsigned comparison here. */
+    gcc_assert (depth >= 0);
+
     if (macro->paramc > 0)
       return NULL_TREE;
     if (macro->kind != cmk_macro)
@@ -2029,7 +2036,20 @@ private:
     if (macro->count != 1)
       return NULL_TREE;
     const cpp_token &tok = macro->exp.tokens[0];
-    if (tok.type != CPP_NUMBER)
+    if (tok.type == CPP_NAME)
+      {
+	/* Limit recursion.  */
+	if (depth >= param_analyzer_max_macro_alias_depth)
+	  return NULL_TREE;
+
+	cpp_hashnode *alias = tok.val.node.node;
+	if (cpp_macro_p (alias))
+	  return consider_macro (alias->value.macro, depth + 1);
+
+	/* Not a simple alias.  */
+	return NULL_TREE;
+      }
+    else if (tok.type != CPP_NUMBER)
       return NULL_TREE;
 
     cpp_reader *old_parse_in = parse_in;

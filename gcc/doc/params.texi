@@ -1889,6 +1889,11 @@ the value as unknown.
 The maximum number of infeasible edges to reject before declaring
 a diagnostic as infeasible.
 
+@paindex analyzer-max-macro-alias-depth
+@item analyzer-max-macro-alias-depth
+The maximum number of macro aliases to follow when resolving named constants
+in the analyzer.
+
 @paindex gimple-fe-computed-hot-bb-threshold
 @item gimple-fe-computed-hot-bb-threshold
 The number of executions of a basic block that is considered hot.
