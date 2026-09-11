@@ -8492,7 +8492,7 @@ lookup_elaborated_type (tree name, TAG_how how)
 	     typedef struct C {} C;
 	   correctly.  */
 
-	if (tree type = strip_using_decl (iter->type))
+	if (tree type = iter->type)
 	  {
 	    if (qualify_lookup (type, LOOK_want::TYPE)
 		&& (how != TAG_how::CURRENT_ONLY
@@ -8508,7 +8508,7 @@ lookup_elaborated_type (tree name, TAG_how how)
 	  }
 	else
 	  {
-	    tree value = strip_using_decl (iter->value);
+	    tree value = iter->value;
 	    if (qualify_lookup (value, LOOK_want::TYPE)
 		&& (how != TAG_how::CURRENT_ONLY
 		    || !INHERITED_VALUE_BINDING_P (iter)))
@@ -8548,7 +8548,7 @@ lookup_elaborated_type (tree name, TAG_how how)
       if (bind)
 	{
 	  /* If this is the kind of thing we're looking for, we're done.  */
-	  if (tree type = strip_using_decl (MAYBE_STAT_TYPE (bind)))
+	  if (tree type = MAYBE_STAT_TYPE (bind))
 	    {
 	      if (how != TAG_how::HIDDEN_FRIEND)
 		/* No longer hidden.  */
@@ -8556,7 +8556,7 @@ lookup_elaborated_type (tree name, TAG_how how)
 
 	      return type;
 	    }
-	  else if (tree decl = strip_using_decl (MAYBE_STAT_DECL (bind)))
+	  else if (tree decl = MAYBE_STAT_DECL (bind))
 	    {
 	      if (qualify_lookup (decl, LOOK_want::TYPE))
 		{
@@ -8637,10 +8637,10 @@ lookup_elaborated_type (tree name, TAG_how how)
 		  }
 
 		if (type && qualify_lookup (type, LOOK_want::TYPE))
-		  return strip_using_decl (type);
+		  return type;
 
 		if (bind && qualify_lookup (bind, LOOK_want::TYPE))
-		  return strip_using_decl (bind);
+		  return bind;
 	      }
 
 	  if (!module_purview_p ())

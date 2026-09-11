@@ -18490,6 +18490,20 @@ lookup_and_check_tag (enum tag_types tag_code, tree name,
       || (how != TAG_how::CURRENT_ONLY && DECL_TEMPLATE_TEMPLATE_PARM_P (decl)))
     decl = DECL_TEMPLATE_RESULT (decl);
 
+  if (TREE_CODE (decl) == USING_DECL)
+    {
+      tree u = decl;
+      decl = strip_using_decl (decl);
+      if (how == TAG_how::CURRENT_ONLY)
+	{
+	  auto_diagnostic_group _;
+	  error ("%qD conflicts with a previous declaration", name);
+	  inform (location_of (u), "previous declaration %qD", u);
+	  inform (location_of (decl), "%qD declared here", decl);
+	  return error_mark_node;
+	}
+    }
+
   if (TREE_CODE (decl) != TYPE_DECL)
     /* Found not-a-type.  */
     return NULL_TREE;
