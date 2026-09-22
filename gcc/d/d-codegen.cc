@@ -2119,6 +2119,8 @@ array_bounds_check (void)
 
     case CHECKENABLEsafeonly:
       /* For D2 safe functions only.  */
+      if (d_function_chain == NULL)
+        return false;
       fd = d_function_chain->function;
       if (fd && fd->type->ty == TY::Tfunction)
 	{
