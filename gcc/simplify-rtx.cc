@@ -4119,6 +4119,22 @@ simplify_context::simplify_binary_operation_1 (rtx_code code,
 							XEXP (op0, 1), mode),
 				    op1);
 
+      /* Similarly, convert (xor (ior A B) B) to (and (not B) A).  */
+      else if (GET_CODE (op0) == IOR
+	       && rtx_equal_p (XEXP (op0, 1), op1)
+	       && ! side_effects_p (op1))
+	return simplify_gen_binary (AND, mode,
+				    simplify_gen_unary (NOT, mode,
+							op1, mode),
+				    XEXP (op0, 0));
+      else if (GET_CODE (op0) == IOR
+	       && rtx_equal_p (XEXP (op0, 0), op1)
+	       && ! side_effects_p (op1))
+	return simplify_gen_binary (AND, mode,
+				    simplify_gen_unary (NOT, mode,
+							op1, mode),
+				    XEXP (op0, 1));
+
       /* Given (xor (ior (xor A B) C) D), where B, C and D are
 	 constants, simplify to (xor (ior A C) (B&~C)^D), canceling
 	 out bits inverted twice and not set by C.  Similarly, given
