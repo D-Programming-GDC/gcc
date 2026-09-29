@@ -1635,6 +1635,15 @@ bypass_block (basic_block bb, rtx_insn *setcc, rtx_insn *jump)
 	  }
     }
 
+  /* The source of JUMP with SETCC substituted into it.  JUMP only changes
+     when an edge from BB itself is redirected.  With SETCC that never
+     happens, because DEST is a successor of BB (see the check of
+     find_edge (e->src, dest) below).  Without SETCC, SRC is the source
+     of JUMP itself.  */
+  rtx src = SET_SRC (pc_set (jump));
+  if (setcc != NULL)
+    src = simplify_replace_rtx (src, setcc_dest, setcc_src);
+
   change = false;
   for (ei = ei_start (bb->preds); (e = ei_safe_edge (ei)); )
     {
@@ -1669,7 +1678,7 @@ bypass_block (basic_block bb, rtx_insn *setcc, rtx_insn *jump)
 	  unsigned int regno = REGNO (reg_used);
 	  basic_block dest, old_dest;
 	  struct cprop_expr *set;
-	  rtx src, new_rtx;
+	  rtx new_rtx;
 
 	  set = find_bypass_set (regno, e->src->index);
 
@@ -1679,11 +1688,6 @@ bypass_block (basic_block bb, rtx_insn *setcc, rtx_insn *jump)
 	  /* Check the data flow is valid after edge insertions.  */
 	  if (e->insns.r && reg_killed_on_edge (reg_used, e))
 	    continue;
-
-	  src = SET_SRC (pc_set (jump));
-
-	  if (setcc != NULL)
-	    src = simplify_replace_rtx (src, setcc_dest, setcc_src);
 
 	  new_rtx = simplify_replace_rtx (src, reg_used, set->src);
 
