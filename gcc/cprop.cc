@@ -1457,14 +1457,41 @@ find_implicit_sets (void)
 
 static int bypass_last_basic_block;
 
+/* A find_bypass_set query and its result.  */
+
+struct bypass_set_cache_entry
+{
+  /* The register number of the query, or -1 if there was no query.  */
+  int regno;
+
+  /* The result of the query.  */
+  struct cprop_expr *set;
+};
+
+/* The last find_bypass_set query for each basic block with an index less
+   than bypass_last_basic_block.  Jump bypassing can move an edge past a
+   long chain of blocks, and repeats the query for the source of the edge
+   at each step.  */
+
+static struct bypass_set_cache_entry *bypass_set_cache;
+
 /* Find a set of REGNO to a constant that is available at the end of basic
    block BB.  Return NULL if no such set is found.  Based heavily upon
-   find_avail_set.  */
+   find_avail_set.  The set hash table and CPROP_AVOUT do not change
+   during jump bypassing, so the result is cached in bypass_set_cache.  */
 
 static struct cprop_expr *
 find_bypass_set (int regno, int bb)
 {
   struct cprop_expr *result = 0;
+
+  gcc_checking_assert (bb < bypass_last_basic_block);
+  struct bypass_set_cache_entry *entry = &bypass_set_cache[bb];
+  if (entry->regno == regno)
+    return entry->set;
+
+  /* The loop below changes REGNO when it follows a copy.  */
+  entry->regno = regno;
 
   for (;;)
     {
@@ -1490,6 +1517,8 @@ find_bypass_set (int regno, int bb)
 
       regno = REGNO (src);
     }
+
+  entry->set = result;
   return result;
 }
 
@@ -1746,6 +1775,11 @@ bypass_conditional_jumps (void)
 
   mark_dfs_back_edges ();
 
+  bypass_set_cache = XNEWVEC (struct bypass_set_cache_entry,
+			      bypass_last_basic_block);
+  for (int i = 0; i < bypass_last_basic_block; i++)
+    bypass_set_cache[i].regno = -1;
+
   changed = false;
   FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb->next_bb,
 		  EXIT_BLOCK_PTR_FOR_FN (cfun), next_bb)
@@ -1783,6 +1817,9 @@ bypass_conditional_jumps (void)
 	      break;
 	}
     }
+
+  free (bypass_set_cache);
+  bypass_set_cache = NULL;
 
   /* If we bypassed any register setting insns, we may have inserted
      copies of them on the redirected edges.  These need to be committed.  */
