@@ -1511,6 +1511,39 @@ reg_killed_on_edge (const_rtx reg, const_edge e)
   return false;
 }
 
+/* Subroutine of bypass_block.  Return true if a copy of SETCC, the insn
+   before the jump of a bypassed block, must be placed on an edge that has
+   been redirected to DEST.
+
+   The copy is not needed if SETCC has no side effects, cannot throw, and
+   sets only condition-code registers that are dead on entry to DEST.
+   Setters of other registers are always copied, because debug insns and
+   REG_EQUAL notes, which the liveness information ignores, can refer to
+   them.  The liveness information predates the global propagation and
+   the edge redirections, but neither can make a register set by SETCC
+   live on entry to DEST: hard registers are never propagated, SETCC kills
+   every copy from a pseudo that it sets, and a redirection omits a copy
+   of a setter only if its registers are dead on entry to the new
+   destination.  */
+
+static bool
+bypass_setcc_needed_p (rtx_insn *setcc, basic_block dest)
+{
+  if (side_effects_p (PATTERN (setcc)) || !insn_nothrow_p (setcc))
+    return true;
+
+  /* DEST existed when the DF information was computed.  */
+  gcc_checking_assert (dest->index < bypass_last_basic_block);
+  bitmap live = df_get_live_in (dest);
+  df_ref def;
+  FOR_EACH_INSN_DEF (def, setcc)
+    if (GET_MODE_CLASS (GET_MODE (*DF_REF_REAL_LOC (def))) != MODE_CC
+	|| REGNO_REG_SET_P (live, DF_REF_REGNO (def)))
+      return true;
+
+  return false;
+}
+
 /* Subroutine of bypass_conditional_jumps that attempts to bypass the given
    basic block BB which has more than one predecessor.  If not NULL, SETCC
    is the first instruction of BB, which is immediately followed by JUMP_INSN
@@ -1661,8 +1694,9 @@ bypass_block (basic_block bb, rtx_insn *setcc, rtx_insn *jump)
             {
 	      redirect_edge_and_branch_force (e, dest);
 
-	      /* Copy the register setter to the redirected edge.  */
-	      if (setcc)
+	      /* Copy the register setter to the redirected edge if it is
+		 needed on entry to DEST.  */
+	      if (setcc && bypass_setcc_needed_p (setcc, dest))
 		{
 		  rtx pat = PATTERN (setcc);
 		  insert_insn_on_edge (copy_insn (pat), e);
@@ -1750,8 +1784,8 @@ bypass_conditional_jumps (void)
 	}
     }
 
-  /* If we bypassed any register setting insns, we inserted a
-     copy on the redirected edge.  These need to be committed.  */
+  /* If we bypassed any register setting insns, we may have inserted
+     copies of them on the redirected edges.  These need to be committed.  */
   if (changed)
     commit_edge_insertions ();
 
