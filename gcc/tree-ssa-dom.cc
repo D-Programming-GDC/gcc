@@ -94,6 +94,11 @@ static bool cfg_altered;
 static bitmap need_eh_cleanup;
 static vec<gimple *> need_noreturn_fixup;
 
+/* Bitmap of SSA names that have no use in an assignment or call that
+   defines an SSA name, so back_propagate_equivalences has nothing to do
+   for them.  A bit is cleared when DOM adds such a use.  */
+static bitmap names_without_foldable_uses;
+
 /* Statistics for dominator optimizations.  */
 struct opt_stats_d
 {
@@ -731,6 +736,8 @@ pass_dominator::execute (function *fun)
   class const_and_copies *const_and_copies = new class const_and_copies ();
   need_eh_cleanup = BITMAP_ALLOC (NULL);
   need_noreturn_fixup.create (0);
+  names_without_foldable_uses = BITMAP_ALLOC (NULL);
+  bitmap_tree_view (names_without_foldable_uses);
 
   calculate_dominance_info (CDI_DOMINATORS);
   cfg_altered = false;
@@ -903,6 +910,7 @@ pass_dominator::execute (function *fun)
   /* Free asserted bitmaps and stacks.  */
   BITMAP_FREE (need_eh_cleanup);
   need_noreturn_fixup.release ();
+  BITMAP_FREE (names_without_foldable_uses);
   delete avail_exprs_stack;
   delete const_and_copies;
 
@@ -943,6 +951,14 @@ back_propagate_equivalences (tree lhs, edge e,
   imm_use_iterator iter;
   basic_block dest = e->dest;
   bool domok = (dom_info_state (CDI_DOMINATORS) == DOM_OK);
+  unsigned version = SSA_NAME_VERSION (lhs);
+
+  /* If an earlier walk found no use of LHS that can produce an
+     equivalence, there is nothing to do.  With checking enabled, walk
+     the uses anyway to verify that no such use has been added.  */
+  bool cached_p = bitmap_bit_p (names_without_foldable_uses, version);
+  if (cached_p && !flag_checking)
+    return;
 
   /* Iterate over the uses of LHS to see if any dominate E->dest.
      If so, they may create useful equivalences too.
@@ -950,19 +966,26 @@ back_propagate_equivalences (tree lhs, edge e,
      ???  If the code gets re-organized to a worklist to catch more
      indirect opportunities and it is made to handle PHIs then this
      should only consider use_stmts in basic-blocks we have already visited.  */
+  bool foldable_use_p = false;
   FOR_EACH_IMM_USE_FAST (use_p, iter, lhs)
     {
       gimple *use_stmt = USE_STMT (use_p);
 
+      /* Filter out statements that can never produce a useful
+	 equivalence.  gimple_fold_stmt_to_constant_1 does not fold
+	 PHI nodes.  */
+      if (gimple_code (use_stmt) == GIMPLE_PHI)
+	continue;
+      tree lhs2 = gimple_get_lhs (use_stmt);
+      if (!lhs2 || TREE_CODE (lhs2) != SSA_NAME)
+	continue;
+
+      gcc_checking_assert (!cached_p);
+      foldable_use_p = true;
+
       /* Often the use is in DEST, which we trivially know we can't use.
 	 This is cheaper than the dominator set tests below.  */
       if (dest == gimple_bb (use_stmt))
-	continue;
-
-      /* Filter out statements that can never produce a useful
-	 equivalence.  */
-      tree lhs2 = gimple_get_lhs (use_stmt);
-      if (!lhs2 || TREE_CODE (lhs2) != SSA_NAME)
 	continue;
 
       if (domok)
@@ -989,6 +1012,9 @@ back_propagate_equivalences (tree lhs, edge e,
       if (res && (TREE_CODE (res) == SSA_NAME || is_gimple_min_invariant (res)))
 	record_equality (lhs2, res, const_and_copies);
     }
+
+  if (!foldable_use_p)
+    bitmap_set_bit (names_without_foldable_uses, version);
 }
 
 /* Record into CONST_AND_COPIES and AVAIL_EXPRS_STACK any equivalences implied
@@ -1584,7 +1610,22 @@ dom_opt_dom_walker::before_dom_children (basic_block bb)
       bool removed_p = false;
       taken_edge = this->optimize_stmt (bb, &gsi, &removed_p);
       if (!removed_p)
-	gimple_set_visited (gsi_stmt (gsi), true);
+	{
+	  gimple *stmt = gsi_stmt (gsi);
+	  gimple_set_visited (stmt, true);
+
+	  /* Propagation and folding may have added uses to STMT, which
+	     back_propagate_equivalences has to consider.  */
+	  tree lhs = gimple_get_lhs (stmt);
+	  if (lhs && TREE_CODE (lhs) == SSA_NAME)
+	    {
+	      ssa_op_iter iter;
+	      tree use;
+	      FOR_EACH_SSA_TREE_OPERAND (use, stmt, iter, SSA_OP_USE)
+		bitmap_clear_bit (names_without_foldable_uses,
+				  SSA_NAME_VERSION (use));
+	    }
+	}
 
       /* Go back and visit stmts inserted by folding after substituting
 	 into the stmt at gsi.  */
