@@ -3655,17 +3655,15 @@ ix86_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
    reference.  If nonzero for an argument, a copy of that argument is
    made in memory and a pointer to the argument is passed instead of
    the argument itself.  The pointer is passed in whatever way is
-   appropriate for passing a pointer to that type.  */
+   appropriate for passing a pointer to that type.  CALL_ABI is the
+   calling convention the argument is passed under.  */
 
 static bool
-ix86_pass_by_reference (cumulative_args_t cum_v, const function_arg_info &arg)
+ix86_pass_by_reference_abi (enum calling_abi call_abi,
+			    const function_arg_info &arg)
 {
-  CUMULATIVE_ARGS *cum = get_cumulative_args (cum_v);
-
   if (TARGET_64BIT)
     {
-      enum calling_abi call_abi = cum ? cum->call_abi : ix86_abi;
-
       /* See Windows x64 Software Convention.  */
       if (call_abi == MS_ABI)
 	{
@@ -3693,6 +3691,16 @@ ix86_pass_by_reference (cumulative_args_t cum_v, const function_arg_info &arg)
     }
 
   return false;
+}
+
+/* Implement TARGET_PASS_BY_REFERENCE.  */
+
+static bool
+ix86_pass_by_reference (cumulative_args_t cum_v, const function_arg_info &arg)
+{
+  CUMULATIVE_ARGS *cum = get_cumulative_args (cum_v);
+
+  return ix86_pass_by_reference_abi (cum ? cum->call_abi : ix86_abi, arg);
 }
 
 /* Return true when TYPE should be 128bit aligned for 32bit argument
@@ -4988,7 +4996,7 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
   tree lab_false, lab_over = NULL_TREE;
   tree addr, t2;
   rtx container;
-  int indirect_p = 0;
+  bool indirect_p;
   tree ptrtype;
   machine_mode nat_mode;
   unsigned int arg_boundary;
@@ -4996,7 +5004,17 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
 
   /* Only 64bit target needs something special.  */
   if (is_va_list_char_pointer (TREE_TYPE (valist)))
-    return std_gimplify_va_arg_expr (valist, type, pre_p, post_p);
+    {
+      indirect_p
+	= ix86_pass_by_reference_abi (MS_ABI, function_arg_info (type, false));
+      if (indirect_p)
+	{
+	  type = build_pointer_type (type);
+	  t = std_gimplify_va_arg_expr (valist, type, pre_p, post_p);
+	  return build_va_arg_indirect_ref (t);
+	}
+      return std_gimplify_va_arg_expr (valist, type, pre_p, post_p);
+    }
 
   f_gpr = TYPE_FIELDS (TREE_TYPE (sysv_va_list_type_node));
   f_fpr = DECL_CHAIN (f_gpr);
@@ -5010,7 +5028,8 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
   ovf = build3 (COMPONENT_REF, TREE_TYPE (f_ovf), valist, f_ovf, NULL_TREE);
   sav = build3 (COMPONENT_REF, TREE_TYPE (f_sav), valist, f_sav, NULL_TREE);
 
-  indirect_p = pass_va_arg_by_reference (type);
+  indirect_p
+    = ix86_pass_by_reference_abi (SYSV_ABI, function_arg_info (type, false));
   if (indirect_p)
     type = build_pointer_type (type);
   size = arg_int_size_in_bytes (type);
