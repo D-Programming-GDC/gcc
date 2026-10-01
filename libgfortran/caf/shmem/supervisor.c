@@ -432,8 +432,7 @@ supervisor_main_loop (int *argc __attribute__ ((unused)),
 	     image already.  */
 	  if (m->images[j].status == IMAGE_OK)
 	    {
-	      m->images[j].status = IMAGE_SUCCESS;
-	      atomic_fetch_add (&m->finished_images, 1);
+	      notify_image_terminated (&local->si, j, true);
 	    }
 	}
       else if (!WIFEXITED (chstatus) || WEXITSTATUS (chstatus))
@@ -484,8 +483,7 @@ supervisor_main_loop (int *argc __attribute__ ((unused)),
 		 already, e.g. by a STOP with a non-zero stop code.  */
 	      if (m->images[j].status == IMAGE_OK)
 		{
-		  m->images[j].status = IMAGE_FAILED;
-		  atomic_fetch_add (&m->failed_images, 1);
+		  notify_image_terminated (&local->si, j, false);
 		  /* The image did not leave the barriers of its teams, so do
 		     it for it.  */
 		  update_registered_teams ();
@@ -496,11 +494,6 @@ supervisor_main_loop (int *argc __attribute__ ((unused)),
 		*exit_code = 1;
 	    }
 	}
-      /* Trigger waiting sync images aka sync_table.  */
-      for (j = 0; j < local->total_num_images; j++)
-	caf_shmem_cond_signal (&SHMPTR_AS (caf_shmem_condvar *,
-					   m->sync_shared.sync_images_cond_vars,
-					   &local->sm)[j]);
       counter_barrier_add (&m->num_active_images, -1);
 #elif defined(WIN32)
       DWORD res = WaitForMultipleObjects (count_waiting, waiting_handles, FALSE,

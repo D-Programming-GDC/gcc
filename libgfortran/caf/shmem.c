@@ -528,23 +528,6 @@ _gfortran_caf_sync_images (int count, int images[], int *stat, char *errmsg,
 	  if (images[c] > 0 && images[c] <= max_id)
 	    {
 	      mapped_images[c] = map[images[c] - 1];
-	      switch (this_image.supervisor->images[mapped_images[c]].status)
-		{
-		case IMAGE_SUCCESS:
-		  caf_internal_error ("SYNC IMAGES: Image %d is stopped", stat,
-				      errmsg, errmsg_len, images[c]);
-		  /* We can come here only, when stat is non-NULL.  */
-		  *stat = CAF_STAT_STOPPED_IMAGE;
-		  return;
-		case IMAGE_FAILED:
-		  caf_internal_error ("SYNC IMAGES: Image %d has failed", stat,
-				      errmsg, errmsg_len, images[c]);
-		  /* We can come here only, when stat is non-NULL.  */
-		  *stat = CAF_STAT_FAILED_IMAGE;
-		  return;
-		default:
-		  break;
-		}
 	      for (int i = 0; i < c; ++i)
 		if (mapped_images[c] == mapped_images[i])
 		  {
@@ -570,8 +553,12 @@ _gfortran_caf_sync_images (int count, int images[], int *stat, char *errmsg,
     HEALTH_CHECK (stat, errmsg, errmsg_len);
 
   __asm__ __volatile__ ("" ::: "memory");
-  sync_table (&local->si, mapped_images, count);
-  if (count > 0)
+  if (!sync_table (&local->si, mapped_images, count))
+    {
+      if (stat)
+	*stat = 0;
+    }
+  else if (count > 0)
     check_health (mapped_images, count, stat, errmsg, errmsg_len);
   else
     HEALTH_CHECK (stat, errmsg, errmsg_len);
@@ -589,11 +576,7 @@ mark_stopped (void)
     return;
 
   if (this_image.supervisor->images[this_image.image_num].status == IMAGE_OK)
-    {
-      this_image.supervisor->images[this_image.image_num].status
-	= IMAGE_SUCCESS;
-      atomic_fetch_add (&this_image.supervisor->finished_images, 1);
-    }
+    notify_image_terminated (&local->si, this_image.image_num, true);
   leave_teams (true);
 }
 
@@ -657,8 +640,7 @@ void
 _gfortran_caf_fail_image (void)
 {
   fputs ("IMAGE FAILED!\n", stderr);
-  this_image.supervisor->images[this_image.image_num].status = IMAGE_FAILED;
-  atomic_fetch_add (&this_image.supervisor->failed_images, 1);
+  notify_image_terminated (&local->si, this_image.image_num, false);
   leave_teams (false);
   exit (0);
 }
