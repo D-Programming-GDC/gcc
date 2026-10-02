@@ -33,9 +33,6 @@ along with GCC; see the file COPYING3.  If not see
 #include "tree-cfg.h"
 #include "gimple-iterator.h"
 
-// Internal construct to help facilitate debugging of solver.
-#define DEBUG_SOLVER (dump_file && (param_threader_debug == THREADER_DEBUG_ALL))
-
 path_range_query::path_range_query (gimple_ranger &ranger,
 				    const vec<basic_block> &path,
 				    const bitmap_head *dependencies,
@@ -327,7 +324,7 @@ path_range_query::range_defined_in_block (vrange &r, tree name, basic_block bb)
   if (bb && POINTER_TYPE_P (TREE_TYPE (name)))
     infer_oracle ().maybe_adjust_range (r, name, bb);
 
-  if (DEBUG_SOLVER && (bb || !r.varying_p ()))
+  if (DEBUG_PATH_RANGER && (bb || !r.varying_p ()))
     {
       fprintf (dump_file, "range_defined_in_block (BB%d) for ", bb ? bb->index : -1);
       print_generic_expr (dump_file, name, TDF_SLIM);
@@ -419,7 +416,7 @@ path_range_query::compute_ranges_in_block (basic_block bb)
 
   if (m_resolve && relations_may_be_invalidated (e))
     {
-      if (DEBUG_SOLVER)
+      if (DEBUG_PATH_RANGER)
 	fprintf (dump_file,
 		 "Resetting relations as they may be invalidated in %d->%d.\n",
 		 e->src->index, e->dest->index);
@@ -443,7 +440,7 @@ path_range_query::compute_ranges_in_block (basic_block bb)
 	    r.intersect (cached_range);
 
 	  m_cache.set_range (name, r);
-	  if (DEBUG_SOLVER)
+	  if (DEBUG_PATH_RANGER)
 	    {
 	      fprintf (dump_file, "edge_range_p for ");
 	      print_generic_expr (dump_file, name, TDF_SLIM);
@@ -571,7 +568,7 @@ path_range_query::compute_exit_dependencies (bitmap dependencies)
 void
 path_range_query::compute_ranges (const bitmap_head *dependencies)
 {
-  if (DEBUG_SOLVER)
+  if (DEBUG_PATH_RANGER)
     fprintf (dump_file, "\n==============================================\n");
 
   if (dependencies)
@@ -603,7 +600,7 @@ path_range_query::compute_ranges (const bitmap_head *dependencies)
       }
   }
 
-  if (DEBUG_SOLVER)
+  if (DEBUG_PATH_RANGER)
     {
       fprintf (dump_file, "path_range_query: compute_ranges for path: ");
       for (unsigned i = m_path.length (); i > 0; --i)
@@ -629,7 +626,7 @@ path_range_query::compute_ranges (const bitmap_head *dependencies)
       move_next ();
     }
 
-  if (DEBUG_SOLVER)
+  if (DEBUG_PATH_RANGER)
     {
       get_path_oracle ()->dump (dump_file);
       dump (dump_file);

@@ -21,6 +21,10 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_TREE_SSA_THREADSOLVER_H
 #define GCC_TREE_SSA_THREADSOLVER_H
 
+// Internal construct to help facilitate debugging of the path solver.
+#define DEBUG_PATH_RANGER \
+  (dump_file && (param_threader_debug == THREADER_DEBUG_ALL))
+
 // This class is a basic block path solver.  Given a set of BBs
 // indicating a path through the CFG, range_of_expr and range_of_stmt
 // will calculate the range of an SSA or STMT as if the BBs in the
