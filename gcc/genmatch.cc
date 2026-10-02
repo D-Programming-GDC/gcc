@@ -2539,6 +2539,7 @@ lower (vec<simplify *>& simplifiers, bool gimple)
    simplifies and has those as its leafs.  */
 
 class dt_simplify;
+class fn_splitter;
 
 /* A hash-map collecting semantically equivalent leafs in the decision
    tree for splitting out to separate functions.  */
@@ -2594,11 +2595,12 @@ public:
 
   virtual void gen (FILE *, int, bool, int) {}
 
-  void gen_kids (FILE *, int, bool, int, bool);
+  void gen_kids (FILE *, int, bool, int, bool, fn_splitter * = NULL);
   void gen_kids_1 (FILE *, int, bool, int,
 		   const vec<dt_operand *> &, const vec<dt_operand *> &,
 		   const vec<dt_operand *> &, const vec<dt_operand *> &,
-		   const vec<dt_operand *> &, const vec<dt_node *> &, bool);
+		   const vec<dt_operand *> &, const vec<dt_node *> &, bool,
+		   fn_splitter * = NULL);
 
   void analyze (sinfo_map_t &);
 };
@@ -4322,11 +4324,395 @@ emit_fn_group (FILE *f, int indent, bool gimple, int depth,
   fprintf_indent (f, indent, "  break;\n");
 }
 
-/* Generate matching code for the children of the decision tree node.  */
+/* A split matcher packs its alternatives into functions of about
+   1 / MATCHER_FN_FILE_FRACTION of the decision-tree nodes that one output
+   file receives on average.  Smaller functions spread more evenly across the
+   files, but each one costs a declaration and a call.  */
+
+static const unsigned int MATCHER_FN_FILE_FRACTION = 10;
+
+/* A run of alternatives no larger than 1 / MATCHER_FN_MIN_RUN_FRACTION of
+   that size stays in the entry function.  */
+
+static const unsigned int MATCHER_FN_MIN_RUN_FRACTION = 4;
+
+/* Return true if GROUP is the GENERIC group whose only case is SSA_NAME and
+   GIMPLE_MATCH_P says that the matcher also has GIMPLE alternatives.  Such a
+   matcher emits the group inside its own SSA_NAME case, not as a case of the
+   GENERIC dispatch.  */
+
+static bool
+ssa_name_group_p (const dt_operand_group *group, bool gimple_match_p)
+{
+  return (gimple_match_p
+	  && group->cases.length () == 1
+	  && *group->cases[0] == SSA_NAME);
+}
+
+/* Return true if GROUP of GIMPLE alternatives holds a COND_EXPR that also
+   matches a PHI.  The function that dispatches on the definition emits the
+   PHI form of such an alternative itself.  */
+
+static bool
+phi_cond_group_p (const dt_operand_group *group)
+{
+  for (auto op : group->operands)
+    {
+      expr *e = as_a <expr *> (op->op);
+      if (*e->operation == COND_EXPR && e->match_phi)
+	return true;
+    }
+  return false;
+}
+
+/* Split a generated matcher across functions.  The entry function keeps the
+   dispatch that selects between the top-level alternatives, and calls the
+   function that holds the selected group in place of the group's body.  */
+
+class fn_splitter
+{
+public:
+  /* The categories of alternatives that can move to another function, in the
+     order gen_kids_1 emits them.  ALT_COUNT is their number.  */
+  enum alt_cat
+  {
+    ALT_GIMPLE_EXPRS,
+    ALT_FNS,
+    ALT_GENERIC_EXPRS,
+    ALT_GENERIC_FNS,
+    ALT_COUNT
+  };
+
+  /* One complete group from category CAT at INDEX.  NODES estimates the
+     amount of generated code for the group.  */
+  struct alt_unit
+  {
+    alt_cat cat;
+    unsigned index;
+    unsigned nodes;
+  };
+
+  fn_splitter (vec<FILE *> &files_, FILE *f_, const char *fname_,
+	       bool gimple_, unsigned nops_, unsigned budget_)
+    : f (f_), files (files_), fname (fname_), gimple (gimple_),
+      nops (nops_), budget (budget_), nchunks (0), dispatching (false)
+  {
+    gcc_checking_assert (budget);
+  }
+
+  void emit_alternatives (dt_node *, int, int,
+			  const vec<dt_operand *> &,
+			  const vec<dt_operand *> &,
+			  const vec<dt_operand *> &,
+			  const vec<dt_operand *> &,
+			  const vec<dt_operand *> &,
+			  const vec<dt_node *> &);
+  bool emit_dispatch (FILE *, int, alt_cat, unsigned);
+
+  /* Return true if, while the entry function is being emitted, group INDEX
+     of category CAT is held by another function.  */
+  bool split_out_p (alt_cat cat, unsigned index) const
+  {
+    return dispatching && index < owner[cat].length () && owner[cat][index];
+  }
+
+  /* Return true if groups A and B of category CAT go to the same function,
+     so that the labels of A can fall through to the call emitted for B.  */
+  bool same_chunk_p (alt_cat cat, unsigned a, unsigned b) const
+  {
+    return (split_out_p (cat, a)
+	    && split_out_p (cat, b)
+	    && owner[cat][a] == owner[cat][b]);
+  }
+
+private:
+  /* Return true if adding MORE nodes to a function that holds HAVE nodes
+     would take it over the budget.  An empty function accepts any one
+     group.  */
+  bool full (unsigned have, unsigned more) const
+  {
+    return have && have + more > budget;
+  }
+
+  void print_params (FILE *);
+  void print_args (FILE *);
+  FILE *open_chunk (unsigned);
+  void close_chunk (FILE *);
+  FILE *choose_chunk_file ();
+
+  /* The output file for the entry function.  */
+  FILE *f;
+  /* All output files used for the generated matcher.  */
+  vec<FILE *> &files;
+  /* The base name for new functions.  */
+  const char *fname;
+  /* True for GIMPLE matching and false for GENERIC matching.  */
+  bool gimple;
+  /* The number of operands passed to each function.  */
+  unsigned nops;
+  /* The target maximum number of nodes accumulated in one function.  */
+  unsigned budget;
+  /* The number of new functions.  */
+  unsigned nchunks;
+  /* True while the entry function is being emitted, when the body of a
+     group is replaced by a call to the function that holds it.  */
+  bool dispatching;
+  /* For each category, the function holding each group, or zero for the
+     entry function.  */
+  auto_vec<unsigned> owner[ALT_COUNT];
+};
+
+/* Print the parameter list of a new function to TO.  Also print its
+   declaration to the generated header.  */
 
 void
-dt_node::gen_kids (FILE *f, int indent, bool gimple, int depth, bool in_gcond)
+fn_splitter::print_params (FILE *to)
 {
+  if (gimple)
+    fp_decl (to, " (gimple_match_op *ARG_UNUSED (res_op),"
+		 " gimple_seq *ARG_UNUSED (seq),\n"
+		 "\t\t tree (*valueize)(tree) ATTRIBUTE_UNUSED,\n"
+		 "\t\t code_helper ARG_UNUSED (code),"
+		 " tree ARG_UNUSED (type)");
+  else
+    fp_decl (to, " (location_t ARG_UNUSED (loc),"
+		 " enum tree_code ARG_UNUSED (code),\n"
+		 "\t\t     const tree ARG_UNUSED (type)");
+  for (unsigned i = 0; i < nops; ++i)
+    fp_decl (to, ", tree ARG_UNUSED (_p%d)", i);
+  fp_decl (to, ")");
+}
+
+/* Print to TO the arguments that forward the current matcher state to a new
+   function.  */
+
+void
+fn_splitter::print_args (FILE *to)
+{
+  fputs (gimple
+	 ? " (res_op, seq, valueize, code, type"
+	 : " (loc, code, type", to);
+  for (unsigned i = 0; i < nops; ++i)
+    fprintf (to, ", _p%d", i);
+  fputs (")", to);
+}
+
+/* Return the shortest output file that is not the one the entry function is
+   being written to, which must not receive another function while it is
+   open.  */
+
+FILE *
+fn_splitter::choose_chunk_file ()
+{
+  FILE *best = NULL;
+  long best_len = 0;
+  for (FILE *cand : files)
+    {
+      if (cand == f)
+	continue;
+      long len = ftell (cand);
+      if (!best || len < best_len)
+	{
+	  best = cand;
+	  best_len = len;
+	}
+    }
+  /* Splitting is only enabled with more than one output file.  */
+  gcc_assert (best);
+  return best;
+}
+
+/* Open the function holding chunk N and return its output file.  */
+
+FILE *
+fn_splitter::open_chunk (unsigned n)
+{
+  /* Multiple output files require a header, which also carries the
+     declarations for functions emitted in a different file.  */
+  gcc_assert (header_file);
+
+  FILE *cf = choose_chunk_file ();
+  fp_decl (cf, "\n%s\n%s_chunk_%u", gimple ? "bool" : "tree", fname, n);
+  print_params (cf);
+  fp_decl_done (cf, "");
+  fputs ("{\n", cf);
+  fprintf_indent (cf, 2, "const bool debug_dump = "
+			 "dump_file && (dump_flags & TDF_FOLDING);\n");
+  return cf;
+}
+
+/* Close the function being written to CF.  */
+
+void
+fn_splitter::close_chunk (FILE *cf)
+{
+  fprintf (cf, gimple ? "  return false;\n}\n" : "  return NULL_TREE;\n}\n");
+}
+
+/* Called by gen_kids_1 in place of emitting the body of group INDEX of
+   category CAT to TO at INDENT.  If another function holds the group, emit a
+   call to it and return true.  Otherwise return false, and gen_kids_1 emits
+   the body.  */
+
+bool
+fn_splitter::emit_dispatch (FILE *to, int indent, alt_cat cat, unsigned index)
+{
+  if (!split_out_p (cat, index))
+    return false;
+
+  fprintf_indent (to, indent, "  {\n");
+  if (gimple)
+    {
+      fprintf_indent (to, indent, "    if (%s_chunk_%u", fname,
+		      owner[cat][index]);
+      print_args (to);
+      fprintf (to, ")\n");
+      fprintf_indent (to, indent, "      return true;\n");
+    }
+  else
+    {
+      fprintf_indent (to, indent, "    if (tree _chunk_res = %s_chunk_%u",
+		      fname, owner[cat][index]);
+      print_args (to);
+      fprintf (to, ")\n");
+      fprintf_indent (to, indent, "      return _chunk_res;\n");
+    }
+  fprintf_indent (to, indent, "    break;\n");
+  fprintf_indent (to, indent, "  }\n");
+  return true;
+}
+
+/* Append to UNITS the operand GROUPS of category CAT that can move to
+   another function.  GIMPLE_MATCH_P says whether the matcher has GIMPLE
+   alternatives.  */
+
+static void
+collect_alt_units (vec<fn_splitter::alt_unit> &units,
+		   fn_splitter::alt_cat cat,
+		   const vec<dt_operand_group *> &groups, bool gimple_match_p)
+{
+  for (unsigned i = 0; i < groups.length (); ++i)
+    {
+      /* gen_kids_1 emits these groups, or a form of them, in the entry
+	 function whichever function holds them.  */
+      if ((cat == fn_splitter::ALT_GENERIC_EXPRS
+	   && ssa_name_group_p (groups[i], gimple_match_p))
+	  || (cat == fn_splitter::ALT_GIMPLE_EXPRS
+	      && phi_cond_group_p (groups[i])))
+	continue;
+      /* Only alternatives with a level-one parent inspect a parameter of the
+	 matcher entry function.  */
+      unsigned nodes = 0;
+      for (auto op : groups[i]->operands)
+	{
+	  gcc_assert (op->parent && op->parent->level == 1);
+	  nodes += op->total_size;
+	}
+      units.safe_push (fn_splitter::alt_unit { cat, i, nodes });
+    }
+}
+
+/* Emit the alternatives of NODE at INDENT and DEPTH.  GIMPLE_EXPRS,
+   GENERIC_EXPRS, FNS, GENERIC_FNS, PREDS and OTHERS are the vectors that
+   gen_kids_1 accepts.  Unless the whole run is small, the groups of the first
+   four move to new functions, packed in order up to the budget.  The entry
+   function keeps the dispatch, PREDS and OTHERS.  Groups reached from one
+   dispatch have disjoint cases, so selecting one is what trying them in turn
+   does.  */
+
+void
+fn_splitter::emit_alternatives (dt_node *node, int indent, int depth,
+				const vec<dt_operand *> &gimple_exprs,
+				const vec<dt_operand *> &generic_exprs,
+				const vec<dt_operand *> &fns,
+				const vec<dt_operand *> &generic_fns,
+				const vec<dt_operand *> &preds,
+				const vec<dt_node *> &others)
+{
+  auto_delete_vec<dt_operand_group> group_storage[ALT_COUNT];
+  collect_operand_groups (gimple_exprs, group_storage[ALT_GIMPLE_EXPRS]);
+  collect_operand_groups (fns, group_storage[ALT_FNS]);
+  collect_operand_groups (generic_exprs, group_storage[ALT_GENERIC_EXPRS]);
+  collect_operand_groups (generic_fns, group_storage[ALT_GENERIC_FNS]);
+
+  const bool gimple_match_p = gimple_exprs.length () || fns.length ();
+  auto_vec<alt_unit> units;
+  for (unsigned cat = ALT_GIMPLE_EXPRS; cat < ALT_COUNT; ++cat)
+    collect_alt_units (units, (alt_cat) cat, group_storage[cat],
+		       gimple_match_p);
+
+  /* Decide which function holds each group.  Zero keeps it in the entry,
+     which is where a group stays when nothing has to be split out.  */
+  for (unsigned cat = ALT_GIMPLE_EXPRS; cat < ALT_COUNT; ++cat)
+    {
+      owner[cat].truncate (0);
+      owner[cat].safe_grow_cleared (group_storage[cat].length ());
+    }
+
+  /* An order-preserving barrier ends a run of alternatives, so a matcher
+     reaches here once per run, and a function never holds groups of two
+     runs.  A small run moves too little weight between the output files to
+     pay for a function, a declaration and a call, so leave it in the entry
+     function.  */
+  unsigned total = 0;
+  for (auto &u : units)
+    total += u.nodes;
+  if (total * MATCHER_FN_MIN_RUN_FRACTION <= budget)
+    units.truncate (0);
+
+  const unsigned first_chunk = nchunks + 1;
+  unsigned have = 0;
+  bool split_p = false;
+  for (auto &u : units)
+    {
+      if (!split_p || full (have, u.nodes))
+	{
+	  ++nchunks;
+	  have = 0;
+	  split_p = true;
+	}
+      owner[u.cat][u.index] = nchunks;
+      have += u.nodes;
+    }
+
+  /* The entry function: the dispatch, and whatever cannot be reached
+     through it.  */
+  dispatching = true;
+  node->gen_kids_1 (f, indent, gimple, depth, gimple_exprs, generic_exprs,
+		    fns, generic_fns, preds, others, false, this);
+  dispatching = false;
+
+  /* Each new function, with the groups it holds.  */
+  for (unsigned n = first_chunk; n <= nchunks; ++n)
+    {
+      auto_vec<dt_operand *> sub[ALT_COUNT];
+      for (unsigned cat = ALT_GIMPLE_EXPRS; cat < ALT_COUNT; ++cat)
+	for (unsigned i = 0; i < owner[cat].length (); ++i)
+	  if (owner[cat][i] == n)
+	    for (auto op : group_storage[cat][i]->operands)
+	      sub[cat].safe_push (op);
+
+      FILE *cf = open_chunk (n);
+      auto_vec<dt_operand *> no_preds;
+      auto_vec<dt_node *> no_others;
+      node->gen_kids_1 (cf, 2, gimple, depth, sub[ALT_GIMPLE_EXPRS],
+			sub[ALT_GENERIC_EXPRS], sub[ALT_FNS],
+			sub[ALT_GENERIC_FNS], no_preds, no_others, false);
+      close_chunk (cf);
+    }
+}
+
+/* Generate matching code for the children of the decision tree node.  If SP
+   is not null, it splits the matcher between functions.  */
+
+void
+dt_node::gen_kids (FILE *f, int indent, bool gimple, int depth, bool in_gcond,
+		   fn_splitter *sp)
+{
+  /* A gcond matcher starts inside an open scope and is not a valid function
+     boundary.  */
+  gcc_assert (!sp || !in_gcond);
+
   auto_vec<dt_operand *> gimple_exprs;
   auto_vec<dt_operand *> generic_exprs;
   auto_vec<dt_operand *> fns;
@@ -4395,10 +4781,23 @@ dt_node::gen_kids (FILE *f, int indent, bool gimple, int depth, bool in_gcond)
 	     Like DT_TRUE, DT_MATCH serves as a barrier as it can cause
 	     dependent matches to get out-of-order.  Generate code now
 	     for what we have collected sofar.  */
-	  gen_kids_1 (f, indent, gimple, depth, gimple_exprs, generic_exprs,
-		      fns, generic_fns, preds, others, in_gcond);
+	  if (sp)
+	    sp->emit_alternatives (this, indent, depth, gimple_exprs,
+				   generic_exprs, fns, generic_fns, preds,
+				   others);
+	  else
+	    gen_kids_1 (f, indent, gimple, depth, gimple_exprs,
+			generic_exprs, fns, generic_fns, preds, others,
+			in_gcond);
 	  /* And output the true operand itself.  */
-	  kids[i]->gen (f, indent, gimple, depth);
+	  if (sp && kids[i]->type == dt_node::DT_TRUE)
+	    {
+	      /* A DT_TRUE node emits no code and opens no scope.  Its children
+		 remain valid function-level split points.  */
+	      kids[i]->gen_kids (f, indent, gimple, depth, false, sp);
+	    }
+	  else
+	    kids[i]->gen (f, indent, gimple, depth);
 	  gimple_exprs.truncate (0);
 	  generic_exprs.truncate (0);
 	  fns.truncate (0);
@@ -4411,11 +4810,17 @@ dt_node::gen_kids (FILE *f, int indent, bool gimple, int depth, bool in_gcond)
     }
 
   /* Generate code for the remains.  */
-  gen_kids_1 (f, indent, gimple, depth, gimple_exprs, generic_exprs,
-	      fns, generic_fns, preds, others, in_gcond);
+  if (sp)
+    sp->emit_alternatives (this, indent, depth, gimple_exprs, generic_exprs,
+			   fns, generic_fns, preds, others);
+  else
+    gen_kids_1 (f, indent, gimple, depth, gimple_exprs, generic_exprs,
+		fns, generic_fns, preds, others, in_gcond);
 }
 
-/* Generate matching code for the children of the decision tree node.  */
+/* Generate matching code for the children of the decision tree node.  If SP
+   is not null, call the function that holds a group in place of emitting its
+   body.  */
 
 void
 dt_node::gen_kids_1 (FILE *f, int indent, bool gimple, int depth,
@@ -4425,7 +4830,7 @@ dt_node::gen_kids_1 (FILE *f, int indent, bool gimple, int depth,
 		     const vec<dt_operand *> &generic_fns,
 		     const vec<dt_operand *> &preds,
 		     const vec<dt_node *> &others,
-		     bool in_gcond)
+		     bool in_gcond, fn_splitter *sp)
 {
   char buf[128];
   char *kid_opname = buf;
@@ -4493,10 +4898,23 @@ dt_node::gen_kids_1 (FILE *f, int indent, bool gimple, int depth,
 	  char code[64];
 	  snprintf (code, sizeof (code),
 		    "gimple_assign_rhs_code (_a%d)", depth);
-	  for (auto group : gimple_expr_groups)
+	  for (unsigned gi = 0; gi < gimple_expr_groups.length (); ++gi)
 	    {
-	      emit_group_labels (f, indent, group);
-	      emit_expr_group (f, indent, true, depth, code, group);
+	      /* The PHI form is emitted below, so a function holding the
+		 group would carry a second copy of it.  */
+	      gcc_checking_assert (!sp
+				   || !phi_cond_group_p (gimple_expr_groups[gi])
+				   || !sp->split_out_p
+					 (fn_splitter::ALT_GIMPLE_EXPRS, gi));
+	      emit_group_labels (f, indent, gimple_expr_groups[gi]);
+	      if (sp
+		  && sp->same_chunk_p (fn_splitter::ALT_GIMPLE_EXPRS, gi,
+				       gi + 1))
+		continue;
+	      if (!sp || !sp->emit_dispatch (f, indent,
+					     fn_splitter::ALT_GIMPLE_EXPRS, gi))
+		emit_expr_group (f, indent, true, depth, code,
+				 gimple_expr_groups[gi]);
 	    }
 	  fprintf_indent (f, indent, "default:;\n");
 	  fprintf_indent (f, indent, "}\n");
@@ -4538,10 +4956,15 @@ dt_node::gen_kids_1 (FILE *f, int indent, bool gimple, int depth,
 	  char code[64];
 	  snprintf (code, sizeof (code),
 		    "gimple_call_combined_fn (_c%d)", depth);
-	  for (auto group : fn_groups)
+	  for (unsigned fi = 0; fi < fn_groups.length (); ++fi)
 	    {
-	      emit_group_labels (f, indent, group);
-	      emit_fn_group (f, indent, true, depth, NULL, code, group);
+	      emit_group_labels (f, indent, fn_groups[fi]);
+	      if (sp && sp->same_chunk_p (fn_splitter::ALT_FNS, fi, fi + 1))
+		continue;
+	      if (!sp || !sp->emit_dispatch (f, indent, fn_splitter::ALT_FNS,
+					     fi))
+		emit_fn_group (f, indent, true, depth, NULL, code,
+			       fn_groups[fi]);
 	    }
 	  fprintf_indent (f, indent, "default:;\n");
 	  fprintf_indent (f, indent, "}\n");
@@ -4553,11 +4976,16 @@ dt_node::gen_kids_1 (FILE *f, int indent, bool gimple, int depth,
       fprintf_indent (f, indent, "    }\n");
       /* See if there is SSA_NAME among generic_exprs and if yes, emit it
 	 here rather than in the next loop.  */
-      for (auto group : generic_expr_groups)
-	for (auto id : group->cases)
+      for (unsigned gei = 0; gei < generic_expr_groups.length (); ++gei)
+	for (auto id : generic_expr_groups[gei]->cases)
 	  if (*id == SSA_NAME)
 	    {
+	      dt_operand_group *group = generic_expr_groups[gei];
 	      gcc_checking_assert (group->cases.length () == 1);
+	      /* A function holding the group would run it a second time.  */
+	      gcc_checking_assert (!sp
+				   || !sp->split_out_p
+					 (fn_splitter::ALT_GENERIC_EXPRS, gei));
 	      for (auto op : group->operands)
 		{
 		  fprintf_indent (f, indent + 4, "{\n");
@@ -4574,14 +5002,27 @@ dt_node::gen_kids_1 (FILE *f, int indent, bool gimple, int depth,
       char generic_code[160];
       snprintf (generic_code, sizeof (generic_code), "TREE_CODE (%s)",
 		kid_opname);
-      for (auto group : generic_expr_groups)
+      /* The SSA_NAME group was emitted above, so it is not here to fall
+	 through to, and a run of labels must not be merged across it.  */
+      auto emitted_above_p = [&] (unsigned i)
 	{
-	  if (gimple_match_p
-	      && group->cases.length () == 1
-	      && *group->cases[0] == SSA_NAME)
+	  return ssa_name_group_p (generic_expr_groups[i], gimple_match_p);
+	};
+      for (unsigned gei = 0; gei < generic_expr_groups.length (); ++gei)
+	{
+	  dt_operand_group *group = generic_expr_groups[gei];
+	  if (emitted_above_p (gei))
 	    continue;
 	  emit_group_labels (f, indent, group);
-	  emit_expr_group (f, indent, gimple, depth, generic_code, group);
+	  if (sp
+	      && gei + 1 < generic_expr_groups.length ()
+	      && !emitted_above_p (gei + 1)
+	      && sp->same_chunk_p (fn_splitter::ALT_GENERIC_EXPRS, gei,
+				   gei + 1))
+	    continue;
+	  if (!sp || !sp->emit_dispatch (f, indent,
+					 fn_splitter::ALT_GENERIC_EXPRS, gei))
+	    emit_expr_group (f, indent, gimple, depth, generic_code, group);
 	}
     }
 
@@ -4599,10 +5040,16 @@ dt_node::gen_kids_1 (FILE *f, int indent, bool gimple, int depth,
       char code[160];
       snprintf (code, sizeof (code), "get_call_combined_fn (%s)",
 		kid_opname);
-      for (auto group : generic_fn_groups)
+      for (unsigned gfi = 0; gfi < generic_fn_groups.length (); ++gfi)
 	{
-	  emit_group_labels (f, indent, group);
-	  emit_fn_group (f, indent, false, depth, kid_opname, code, group);
+	  emit_group_labels (f, indent, generic_fn_groups[gfi]);
+	  if (sp && sp->same_chunk_p (fn_splitter::ALT_GENERIC_FNS, gfi,
+				      gfi + 1))
+	    continue;
+	  if (!sp || !sp->emit_dispatch (f, indent,
+					 fn_splitter::ALT_GENERIC_FNS, gfi))
+	    emit_fn_group (f, indent, false, depth, kid_opname, code,
+			   generic_fn_groups[gfi]);
 	}
       fprintf_indent (f, indent, "default:;\n");
 
@@ -5387,6 +5834,15 @@ decision_tree::gen (vec <FILE *> &files, bool gimple)
     }
   fprintf (stderr, "removed %u duplicate tails\n", rcnt);
 
+  /* A file receives about ROOT->TOTAL_SIZE / NFILES decision-tree nodes.
+     Keep matcher functions small enough to spread them across the files.
+     A function split out of a matcher goes to a file other than the one
+     that holds the matcher, so a single file splits nothing.  */
+  unsigned nfiles = files.length ();
+  unsigned budget = (nfiles > 1
+		     ? root->total_size / nfiles / MATCHER_FN_FILE_FRACTION
+		     : 0);
+
   for (unsigned n = 1; n <= 7; ++n)
     {
       bool has_kids_p = false;
@@ -5429,7 +5885,17 @@ decision_tree::gen (vec <FILE *> &files, bool gimple)
 	  fprintf (f, "{\n");
 	  fprintf_indent (f, 2, "const bool debug_dump = "
 				"dump_file && (dump_flags & TDF_FOLDING);\n");
-	  dop->gen_kids (f, 2, gimple, 0, false);
+	  if (budget && dop->total_size > budget)
+	    {
+	      char *fname = xasprintf ("genmatch_%s_simplify_%s",
+					 gimple ? "gimple" : "generic",
+					 e->operation->id);
+	      fn_splitter sp (files, f, fname, gimple, n, budget);
+	      dop->gen_kids (f, 2, gimple, 0, false, &sp);
+	      free (fname);
+	    }
+	  else
+	    dop->gen_kids (f, 2, gimple, 0, false);
 	  if (gimple)
 	    fprintf (f, "  return false;\n");
 	  else
