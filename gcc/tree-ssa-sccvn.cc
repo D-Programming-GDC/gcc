@@ -8819,6 +8819,18 @@ struct unwind_state
   vn_avail *avail_top;
 };
 
+/* Record in TO the RPO VN state do_unwind unwinds to.  */
+
+static void
+record_unwind_state (unwind_state *to)
+{
+  to->ob_top = obstack_alloc (&vn_tables_obstack, 0);
+  to->ref_top = last_inserted_ref;
+  to->phi_top = last_inserted_phi;
+  to->nary_top = last_inserted_nary;
+  to->avail_top = last_pushed_avail ? last_pushed_avail->avail : NULL;
+}
+
 /* Unwind the RPO VN state for iteration.  */
 
 static void
@@ -9070,14 +9082,7 @@ do_rpo_vn_1 (function *fn, edge entry, bitmap exit_bbs,
 	   not iterate where we then handle PHIs conservatively.  We do that
 	   heuristically to reduce compile-time for degenerate cases.  */
 	if (rpo_state[idx].iterate)
-	  {
-	    rpo_state[idx].ob_top = obstack_alloc (&vn_tables_obstack, 0);
-	    rpo_state[idx].ref_top = last_inserted_ref;
-	    rpo_state[idx].phi_top = last_inserted_phi;
-	    rpo_state[idx].nary_top = last_inserted_nary;
-	    rpo_state[idx].avail_top
-	      = last_pushed_avail ? last_pushed_avail->avail : NULL;
-	  }
+	  record_unwind_state (&rpo_state[idx]);
 
 	if (!(bb->flags & BB_EXECUTABLE))
 	  {
