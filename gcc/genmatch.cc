@@ -3864,11 +3864,12 @@ capture::gen_transform (FILE *f, int indent, const char *dest, bool gimple,
       /* If substituting elsewhere we might need to decompose it.  */
       else if (cond_handling == 2)
 	{
-	  /* ???  Returning false here will also not allow any other patterns
-	     to match unless this generator was split out.  */
+	  /* Without a sequence the comparison cannot be built, so give up on
+	     this pattern and go on to the next one.  */
+	  gcc_assert (fail_label);
 	  fprintf_indent (f, indent, "if (COMPARISON_CLASS_P (%s))\n", dest);
 	  fprintf_indent (f, indent, "  {\n");
-	  fprintf_indent (f, indent, "    if (!seq) return false;\n");
+	  fprintf_indent (f, indent, "    if (!seq) goto %s;\n", fail_label);
 	  fprintf_indent (f, indent, "    %s = gimple_build (seq,"
 			  " TREE_CODE (%s),"
 			  " TREE_TYPE (%s), TREE_OPERAND (%s, 0),"
