@@ -2273,7 +2273,20 @@ contains_id (operand *o, user_id *id)
 	    || (ife->falseexpr && contains_id (ife->falseexpr, id)));
 
   if (c_expr *ce = dyn_cast<c_expr *> (o))
-    return ce->capture_ids && ce->capture_ids->get (id->id);
+    {
+      /* Check whether any CPP_NAME token in the inline C code spells id->id.
+	 gen_transform looks up CPP_NAME tokens in the id substitution table,
+	 so the same check here determines whether the table needs an entry.  */
+      for (unsigned i = 0; i < ce->code.length (); ++i)
+	{
+	  const cpp_token *t = &ce->code[i];
+	  if (t->type == CPP_NAME
+	      && strcmp ((const char *) NODE_NAME (t->val.node.node),
+			 id->id) == 0)
+	    return true;
+	}
+      return false;
+    }
 
   return false;
 }
@@ -2454,8 +2467,8 @@ lower_for (simplify *sin, vec<simplify *>& simplifiers)
 		  if (sin->kind == simplify::SIMPLIFY
 		      || !can_delay_subst)
 		    match_op = replace_id (match_op, id, oper);
-		  if (result_op
-		      && !can_delay_subst)
+		  if (result_op && !can_delay_subst
+		      && contains_id (result_op, id))
 		    result_op = replace_id (result_op, id, oper);
 		}
 	      if (skip)
