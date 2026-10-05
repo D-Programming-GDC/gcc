@@ -1544,8 +1544,14 @@ avr_prologue_setup_frame (HOST_WIDE_INT size, HARD_REG_SET set)
 		   && !isr_p
 		   && !AVR_TINY);
 
+  // Small frame sizes can be realized by RCALL . + PUSH tmp_reg.  Get the
+  // respective insn count, and only use prologue_saves when it is profitable.
+  const int pc_size = AVR_2_BYTE_PC ? 2 : 3;
+  const int n_insns = 2 + live_seq + size / pc_size + size % pc_size;
+  const int n_mini_insns = 5 + AVR_HAVE_JMP_CALL;
+
   if (minimize
-      && (frame_pointer_needed
+      && ((frame_pointer_needed && n_mini_insns < n_insns)
 	  || avr_outgoing_args_size () > 8
 	  || (AVR_2_BYTE_PC && live_seq > 6)
 	  || live_seq > 7))
