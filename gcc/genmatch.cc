@@ -2839,8 +2839,16 @@ nodes_overlap_p (dt_node *n1, dt_node *n2)
   if (n1->type == dt_node::DT_MATCH || n2->type == dt_node::DT_MATCH)
     return true;
 
-  return operand_cases_overlap_p (as_a <dt_operand *> (n1)->op,
-				  as_a <dt_operand *> (n2)->op);
+  operand *op1 = as_a <dt_operand *> (n1)->op;
+  operand *op2 = as_a <dt_operand *> (n2)->op;
+  /* A GIMPLE expression and a GENERIC expression are dispatched through
+     separate paths (SSA_NAME case vs. operand TREE_CODE) and cannot
+     match the same input.  */
+  expr *e1 = op1 ? dyn_cast <expr *> (op1) : NULL;
+  expr *e2 = op2 ? dyn_cast <expr *> (op2) : NULL;
+  if (e1 && e2 && e1->is_generic != e2->is_generic)
+    return false;
+  return operand_cases_overlap_p (op1, op2);
 }
 
 /* Search OPS for a decision tree node like P and return it if found.  */
