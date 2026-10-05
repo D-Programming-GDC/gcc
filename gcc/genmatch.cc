@@ -2851,6 +2851,19 @@ nodes_overlap_p (dt_node *n1, dt_node *n2)
   return operand_cases_overlap_p (op1, op2);
 }
 
+/* Return true if N or any node in its subtree has type DT_MATCH.  */
+
+static bool
+subtree_has_match_p (dt_node *n)
+{
+  if (n->type == dt_node::DT_MATCH)
+    return true;
+  for (auto kid : n->kids)
+    if (subtree_has_match_p (kid))
+      return true;
+  return false;
+}
+
 /* Search OPS for a decision tree node like P and return it if found.  */
 
 dt_node *
@@ -2878,10 +2891,28 @@ decision_tree::find_node (vec<dt_node *>& ops, dt_node *p)
 	{
 	  /* Unless we are processing the same pattern or the blocking
 	     pattern is before the one we are going to merge with.  */
-	  if ((true_node
-	       && true_node->for_id != current_id
-	       && true_node->for_id > as_a <dt_operand *> (ops[i])->for_id)
-	      || overlap_node)
+	  bool refused = overlap_node != NULL;
+	  if (!refused
+	      && true_node
+	      && true_node->for_id != current_id
+	      && true_node->for_id > as_a <dt_operand *> (ops[i])->for_id)
+	    {
+	      /* Refuse only when an intermediate sibling has a DT_MATCH
+		 descendant.  Such a sibling can match any input, and its
+		 ordering relative to p must be preserved.  When no
+		 intermediate sibling has a DT_MATCH descendant, every
+		 sibling matches a disjoint set of inputs, so the ordering
+		 of p's subtree with respect to those siblings does not
+		 affect which pattern fires.  */
+	      for (int k = i + 1; k < (int) ops.length (); ++k)
+		if (ops[k]->type != dt_node::DT_TRUE
+		    && subtree_has_match_p (ops[k]))
+		  {
+		    refused = true;
+		    break;
+		  }
+	    }
+	  if (refused)
 	    {
 	      if (verbose >= 1)
 		{
