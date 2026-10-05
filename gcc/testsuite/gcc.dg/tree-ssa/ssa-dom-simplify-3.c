@@ -86,6 +86,7 @@ by_range_min (int a, int b)
   return 0;
 }
 
-/* { dg-final { scan-tree-dump "if \\(x_1\\(D\\) == 4\\)" "dom2" } } */
-/* { dg-final { scan-tree-dump "if \\(i_1\\(D\\) == j_2\\(D\\)\\)" "dom2" } } */
+/* DOM leaves the relationals alone.  */
+/* { dg-final { scan-tree-dump-not "if \\(x_1\\(D\\) == 4\\)" "dom2" } } */
+/* { dg-final { scan-tree-dump-not "if \\(i_1\\(D\\) == j_2\\(D\\)\\)" "dom2" } } */
 /* { dg-final { scan-tree-dump-not "MIN_EXPR" "dom2" } } */

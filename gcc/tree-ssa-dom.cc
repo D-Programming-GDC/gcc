@@ -694,7 +694,7 @@ private:
 
   void set_global_ranges_from_unreachable_edges (basic_block);
 
-  void simplify_stmt (gimple_stmt_iterator *);
+  void fold_cond (gimple *);
   void record_equivalences_from_incoming_edge (basic_block);
   void eliminate_redundant_computations (gimple_stmt_iterator *);
   void record_equivalences_from_stmt (gimple *, int);
@@ -1983,32 +1983,18 @@ cprop_operand (gimple *stmt, use_operand_p op_p, range_query *query)
     }
 }
 
-/* Attempt to simplify the statement in GSI with range info.  */
+/* Fold the conditional STMT with range info.  */
 
 void
-dom_opt_dom_walker::simplify_stmt (gimple_stmt_iterator *gsi)
+dom_opt_dom_walker::fold_cond (gimple *stmt)
 {
-  gimple *stmt = gsi_stmt (*gsi);
-
-  /* Avoid switches as touching those could remove edges mid-walk.  */
-  if (gimple_code (stmt) == GIMPLE_SWITCH)
+  gcond *cond = dyn_cast <gcond *> (stmt);
+  if (!cond)
     return;
 
-  gimple_stmt_iterator i = *gsi;
-  gsi_prev (&i);
-  gimple *before = gsi_end_p (i) ? NULL : gsi_stmt (i);
   simplify_using_ranges simplify (m_ranger);
-  if (!simplify.simplify (gsi))
-    return;
-
-  stmt = gsi_stmt (*gsi);
-  gimple_set_modified (stmt, true);
-
-  /* Our main loop will go back over the statements inserted in front of STMT,
-     so mark those as visited to avoid looking at them again.  */
-  i = *gsi;
-  for (gsi_prev (&i); !gsi_end_p (i) && gsi_stmt (i) != before; gsi_prev (&i))
-    gimple_set_visited (gsi_stmt (i), true);
+  if (simplify.fold_cond (cond))
+    gimple_set_modified (cond, true);
 }
 
 /* CONST_AND_COPIES is a table which maps an SSA_NAME to the current
@@ -2269,8 +2255,7 @@ dom_opt_dom_walker::optimize_stmt (basic_block bb, gimple_stmt_iterator *si,
 	 it, which may in turn allow other part of DOM or other passes to do
 	 a better job.  */
       if (!gimple_modified_p (stmt))
-	simplify_stmt (si);
-      stmt = gsi_stmt (*si);
+	fold_cond (stmt);
     }
 
   /* Record any additional equivalences created by this statement.  */
