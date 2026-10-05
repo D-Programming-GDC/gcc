@@ -1653,10 +1653,15 @@ vect_truncate_gather_scatter_offset (stmt_vec_info stmt_info, tree vectype,
      Start with the maximum vectorization factor.  */
   unsigned HOST_WIDE_INT count = vect_max_vf (loop_vinfo) - 1;
 
-  /* Try lowering COUNT to the number of scalar latch iterations.  */
+  /* Try lowering COUNT to the number of scalar latch iterations.  Peeling
+     for alignment by masking shifts the active lanes up, and we cannot tell
+     yet whether peeling will be done by masking, or whether masks will be
+     needed at all, so be conservative and do not lower COUNT when peeling
+     for alignment.  */
   class loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
   widest_int max_iters;
-  if (max_loop_iterations (loop, &max_iters)
+  if (!LOOP_VINFO_PEELING_FOR_ALIGNMENT (loop_vinfo)
+      && max_loop_iterations (loop, &max_iters)
       && max_iters < count)
     count = max_iters.to_shwi ();
 
