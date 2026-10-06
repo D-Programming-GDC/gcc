@@ -6988,10 +6988,12 @@ push_using_decl_bindings (tree name, tree value)
   push_using_decl_bindings (nullptr, name, value);
 }
 
-/* Process a using declaration in non-class scope.  */
+/* Process a using declaration in non-class scope.  TYPENAME_P is true if
+   the using decl had the typename keyword; this is important to record for
+   a block-scope using declaration with a dependent scope (using a splice).  */
 
 void
-finish_nonmember_using_decl (tree scope, tree name)
+finish_nonmember_using_decl (tree scope, tree name, bool typename_p/*=false*/)
 {
   gcc_checking_assert (current_binding_level->kind != sk_class);
 
@@ -7003,6 +7005,9 @@ finish_nonmember_using_decl (tree scope, tree name)
   tree using_decl = lookup_using_decl (scope, lookup);
   if (!using_decl)
     return;
+
+  if (typename_p)
+    USING_DECL_TYPENAME_P (using_decl) = true;
 
   /* Emit debug info.  */
   if (!processing_template_decl)

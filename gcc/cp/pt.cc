@@ -19919,7 +19919,8 @@ tsubst_stmt (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 				"class, namespace, or enumeration", scope);
 		    return error_mark_node;
 		  }
-		finish_nonmember_using_decl (scope, DECL_NAME (decl));
+		finish_nonmember_using_decl (scope, DECL_NAME (decl),
+					     USING_DECL_TYPENAME_P (decl));
 	      }
 	    else
 	      {
