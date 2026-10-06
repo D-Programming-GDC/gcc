@@ -2446,7 +2446,17 @@ lower_for (simplify *sin, vec<simplify *>& simplifiers)
       for (unsigned si = worklist_start; si < worklist_end; ++si)
 	{
 	  simplify *s = worklist[si];
-	  for (unsigned j = 0; j < max_n_opers; ++j)
+	  /* If none of the for-level ids appear in this pattern's match or
+	     result, all operator substitutions are no-ops.  Emit one copy.  */
+	  bool any_id_used = false;
+	  for (unsigned i = 0; i < n_ids && !any_id_used; ++i)
+	    any_id_used = (contains_id (s->match, ids[i])
+			   || (s->result && contains_id (s->result, ids[i])));
+	  if (!any_id_used)
+	    warning_at (s->match->location,
+			"pattern does not use any operator from the enclosing"
+			" for; move it outside");
+	  for (unsigned j = 0; j < (any_id_used ? max_n_opers : 1u); ++j)
 	    {
 	      operand *match_op = s->match;
 	      operand *result_op = s->result;
