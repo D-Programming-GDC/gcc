@@ -12794,7 +12794,8 @@ vect_schedule_scc (vec_info *vinfo, slp_tree node, slp_instance instance,
 	 iterate and schedule those that are ready.  */
       unsigned todo = stack.length () - last_idx;
       auto_vec<slp_tree, 4> saved_scc (todo);
-      memcpy (saved_scc.address (), stack.address ()[last_idx + 1],
+      saved_scc.quick_grow (todo);
+      memcpy (saved_scc.address (), &stack.address ()[last_idx],
 	      sizeof (slp_tree) * todo);
       do
 	{
