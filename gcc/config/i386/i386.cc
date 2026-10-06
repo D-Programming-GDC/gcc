@@ -26560,7 +26560,8 @@ public:
 			      stmt_vec_info stmt_info, slp_tree node,
 			      tree vectype, int misalign,
 			      vect_cost_model_location where) override;
-  unsigned int add_slp_cost (slp_tree, const array_slice<stmt_info_for_cost> &);
+  unsigned int add_slp_cost (slp_tree,
+			     const array_slice<stmt_info_for_cost> &) override;
   void finish_cost (const vector_costs *) override;
   bool better_main_loop_than_p (const vector_costs *) const override;
   bool better_epilogue_loop_than_p (const vector_costs *other,
