@@ -1857,9 +1857,11 @@ dom_oracle::nearest_relations (tree name, basic_block bb)
       for (relation_chain *ptr = m_relations[bb->index].m_head;
 	   ptr; ptr = ptr->m_next)
 	{
-	  if (v == SSA_NAME_VERSION (ptr->op1 ()))
+	  if (v == SSA_NAME_VERSION (ptr->op1 ())
+	      && !SSA_NAME_IN_FREE_LIST (ptr->op2 ()))
 	    m_near.safe_push ({ ptr->kind (), ptr->op2 (), bb });
-	  else if (v == SSA_NAME_VERSION (ptr->op2 ()))
+	  else if (v == SSA_NAME_VERSION (ptr->op2 ())
+		   && !SSA_NAME_IN_FREE_LIST (ptr->op1 ()))
 	    m_near.safe_push ({ relation_swap (ptr->kind ()),
 				ptr->op1 (), bb });
 	}
