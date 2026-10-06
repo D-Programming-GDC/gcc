@@ -3450,7 +3450,7 @@ namespace __detail
       year_month_day _M_ymd{};
       weekday _M_wd{};
       __format::_ChronoParts _M_need;
-      unsigned _M_is_leap_second : 1 {};
+      unsigned _M_60th_second : 1 {};
       unsigned _M_reserved : 15 {};
 
       template<typename _CharT, typename _Traits, typename _Alloc>
@@ -3923,7 +3923,7 @@ namespace __detail
       __detail::_Parser_t<_Duration> __p(__need);
       if (__p(__is, __fmt, __abbrev, __offset))
 	{
-	  if (__p._M_is_leap_second)
+	  if (__p._M_60th_second)
 	    __is.setstate(ios_base::failbit);
 	  else
 	    {
@@ -3962,7 +3962,7 @@ namespace __detail
 	  auto __ut = utc_clock::from_sys(__p._M_sys_days) + __p._M_time
 			- *__offset;
 	  // Reject ":60" seconds unless the utc_time is a known leap second.
-	  if (__p._M_is_leap_second
+	  if (__p._M_60th_second
 		&& (chrono::floor<seconds>(__p._M_time - *__offset) != hours(24)
 		      || !chrono::get_leap_second_info(__ut).is_leap_second))
 	    __is.setstate(ios_base::failbit);
@@ -3995,7 +3995,7 @@ namespace __detail
       __detail::_Parser_t<_Duration> __p(__need);
       if (__p(__is, __fmt, __abbrev, __offset))
 	{
-	  if (__p._M_is_leap_second)
+	  if (__p._M_60th_second)
 	    __is.setstate(ios_base::failbit);
 	  else
 	    {
@@ -4030,7 +4030,7 @@ namespace __detail
       __detail::_Parser_t<_Duration> __p(__need);
       if (__p(__is, __fmt, __abbrev, __offset))
 	{
-	  if (__p._M_is_leap_second)
+	  if (__p._M_60th_second)
 	    __is.setstate(ios_base::failbit);
 	  else
 	    {
@@ -5461,7 +5461,7 @@ namespace __detail
 		      __t += __s;
 		      // Record that we had "60" or "60.ddd" for seconds.
 		      // Caller checks for valid leap second, if needed.
-		      _M_is_leap_second = __s >= seconds(60);
+		      _M_60th_second = __s >= seconds(60);
 		    }
 
 		  if (__ok)
