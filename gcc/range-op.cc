@@ -4496,16 +4496,17 @@ public:
 		        const wide_int &lh_lb,
 		        const wide_int &lh_ub,
 		        const wide_int &rh_lb,
-		        const wide_int &rh_ub) const;
+			const wide_int &rh_ub) const override;
   virtual bool op1_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &op2,
-			  relation_trio) const;
+			  relation_trio) const override;
   virtual bool op2_range (irange &r, tree type,
 			  const irange &lhs,
 			  const irange &op1,
-			  relation_trio) const;
-  void update_bitmask (irange &r, const irange &lh, const irange &rh) const
+			  relation_trio) const override;
+  void update_bitmask (irange &r, const irange &lh,
+		       const irange &rh) const override
     { update_known_bitmask (r, TRUNC_MOD_EXPR, lh, rh); }
   bool op1_op2_relation_effect (irange &lhs_range,
 				tree type,

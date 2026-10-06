@@ -178,7 +178,7 @@ public:
   relation_kind query (basic_block, tree, tree) override;
   relation_kind query (basic_block, const_bitmap, const_bitmap) override;
 
-  virtual void clear (tree name);
+  void clear (tree name) override;
   void dump (FILE *f, basic_block bb) const override;
   void dump (FILE *f) const override;
 
@@ -276,7 +276,7 @@ public:
   relation_kind query (basic_block bb, const_bitmap b1, const_bitmap b2)
     final override;
 
-  virtual void clear (tree name);
+  void clear (tree name) override;
 
   void dump (FILE *f, basic_block bb) const final override;
   void dump (FILE *f) const final override;
@@ -368,7 +368,7 @@ public:
   void reset_path (relation_oracle *oracle = NULL);
   void set_root_oracle (relation_oracle *oracle) { m_root = oracle; }
 
-  virtual void clear (tree name);
+  void clear (tree name) override;
 
   void dump (FILE *, basic_block) const final override;
   void dump (FILE *) const final override;
