@@ -207,8 +207,10 @@ class back_threader
 {
 public:
   back_threader (function *fun, unsigned flags, bool first);
-  ~back_threader ();
+  virtual ~back_threader ();
   unsigned thread_blocks ();
+  void search ();
+  unsigned apply ();
 private:
   void maybe_thread_block (basic_block bb);
   bool debug_counter ();
@@ -984,6 +986,30 @@ back_threader_registry::register_path (const vec<basic_block> &m_path,
   return register_jump_thread (jump_thread_path);
 }
 
+// Find the paths to thread in the current function.
+
+void
+back_threader::search ()
+{
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, m_fun)
+    if (EDGE_COUNT (bb->succs) > 1)
+      maybe_thread_block (bb);
+}
+
+// Thread the paths found.  Return TODO_flags.
+
+unsigned int
+back_threader::apply ()
+{
+  bool changed = m_registry.thread_through_all_blocks (true);
+
+  if (m_flags & BT_SPEED)
+    return changed ? TODO_cleanup_cfg : 0;
+
+  return false;
+}
+
 // Thread all suitable paths in the current function.
 //
 // Return TODO_flags.
@@ -991,17 +1017,8 @@ back_threader_registry::register_path (const vec<basic_block> &m_path,
 unsigned int
 back_threader::thread_blocks ()
 {
-  basic_block bb;
-  FOR_EACH_BB_FN (bb, m_fun)
-    if (EDGE_COUNT (bb->succs) > 1)
-      maybe_thread_block (bb);
-
-  bool changed = m_registry.thread_through_all_blocks (true);
-
-  if (m_flags & BT_SPEED)
-    return changed ? TODO_cleanup_cfg : 0;
-
-  return false;
+  search ();
+  return apply ();
 }
 
 namespace {
