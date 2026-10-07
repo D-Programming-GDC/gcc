@@ -5369,9 +5369,16 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
     tree cst1 = uniform_integer_cst_p (@1);
     tree cst2 = uniform_integer_cst_p (@3);
     tree cst3 = uniform_integer_cst_p (@4);
-  }
-  (if (wi::to_wide (cst1) + wi::to_wide (cst2) == wi::to_wide (cst3))
-   @2))))
+    wi::overflow_type ovf;
+   }
+   (if (wi::add (wi::to_wide (cst1), wi::to_wide (cst2),
+		 TYPE_SIGN (TREE_TYPE (cst1)), &ovf) == wi::to_wide (cst3))
+    (if (!ovf || TYPE_OVERFLOW_WRAPS (TREE_TYPE (cst1)))
+     @2
+     (with {
+       tree utype = unsigned_type_for (type);
+      }
+      (convert (plus (convert:utype @0) (convert:utype @3)))))))))
 
 /* Simplifications of shift and rotates.  */
 
