@@ -2020,15 +2020,13 @@ gimple_expand_builtin_pow (gimple_stmt_iterator *gsi, location_t loc,
   if (TREE_CODE (arg1) != REAL_CST)
     return NULL_TREE;
 
-  /* Don't perform the operation if flag_signaling_nans is on
-     and the operand is a signaling NaN.  */
-  if (HONOR_SNANS (TYPE_MODE (TREE_TYPE (arg1)))
-      && ((TREE_CODE (arg0) == REAL_CST
-	   && REAL_VALUE_ISSIGNALING_NAN (TREE_REAL_CST (arg0)))
-	  || REAL_VALUE_ISSIGNALING_NAN (TREE_REAL_CST (arg1))))
+  if (flag_errno_math)
     return NULL_TREE;
 
-  if (flag_errno_math)
+  /* Don't perform the operation if flag_signaling_nans is on
+     and either operand is a signaling NaN.  */
+  if (tree_expr_maybe_signaling_nan_p (arg0)
+      || tree_expr_maybe_signaling_nan_p (arg1))
     return NULL_TREE;
 
   /* If the exponent is equivalent to an integer, expand to an optimal
@@ -2050,12 +2048,15 @@ gimple_expand_builtin_pow (gimple_stmt_iterator *gsi, location_t loc,
   mode = TYPE_MODE (type);
   sqrtfn = mathfn_built_in (type, BUILT_IN_SQRT);
 
-  /* Optimize pow(x,0.5) = sqrt(x).  This replacement is always safe
-     unless signed zeros must be maintained.  pow(-0,0.5) = +0, while
-     sqrt(-0) = -0.  */
+  /* Optimize pow(x,0.5) = sqrt(x).  This replacement is safe
+     except for signed zeros and negative infinity.
+     pow(-0,0.5) = +0, while sqrt(-0) = -0.
+     pow(-Inf,0.5) = +Inf, while sqrt(-Inf) is NaN.  */
   if (sqrtfn
       && real_equal (&c, &dconsthalf)
-      && !HONOR_SIGNED_ZEROS (mode))
+      && !tree_expr_maybe_real_minus_zero_p (arg0)
+      && (!tree_expr_maybe_infinite_p (arg0)
+	  || tree_expr_nonnegative_p (arg0)))
     return build_and_insert_call (gsi, loc, sqrtfn, arg0);
 
   hw_sqrt_exists = optab_handler (sqrt_optab, mode) != CODE_FOR_nothing;
