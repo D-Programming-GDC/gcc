@@ -3255,7 +3255,7 @@ namespace __detail
 
       // The list above is known to be valid until (at least) this date
       // and only contains positive leap seconds.
-      constexpr sys_seconds __expires(1798416000s); // 2026-12-28 00:00:00 UTC
+      constexpr sys_seconds __expires(1814140800s); // 2027-06-28 00:00:00 UTC
 
       if (__ss > __expires)
 	{
