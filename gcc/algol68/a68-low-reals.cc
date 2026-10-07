@@ -381,51 +381,43 @@ a68_real_entier (tree val, MOID_T *to_mode, MOID_T *from_mode)
 {
   tree fn = NULL_TREE;
   tree to_type = CTYPE (to_mode);
+  int from_mode_prec = TYPE_PRECISION (CTYPE (from_mode));
+  int to_mode_prec = TYPE_PRECISION (to_type);
 
-  if (from_mode == M_REAL)
+  const int int_prec = TYPE_PRECISION (integer_type_node);
+  const int long_int_prec = TYPE_PRECISION (long_integer_type_node);
+  const int long_long_int_prec = TYPE_PRECISION (long_long_integer_type_node);
+  
+  if (from_mode_prec == TYPE_PRECISION (CTYPE (M_REAL)))
     {
-      if (to_type == integer_type_node)
+      if (to_mode_prec == int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_IFLOORF);
-      else if (to_type == long_integer_type_node)
+      else if (to_mode_prec == long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LFLOORF);
-      else if (to_type == long_long_integer_type_node)
+      else if (to_mode_prec == long_long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LLFLOORF);
       else
 	gcc_unreachable ();
     }
-  else if (from_mode == M_LONG_REAL)
+  else if (from_mode_prec == TYPE_PRECISION (CTYPE (M_LONG_REAL)))
     {
-      if (to_type == integer_type_node)
+      if (to_mode_prec == int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_IFLOOR);
-      else if (to_type == long_integer_type_node)
+      else if (to_mode_prec == long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LFLOOR);
-      else if (to_type == long_long_integer_type_node)
+      else if (to_mode_prec == long_long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LLFLOOR);
       else
 	gcc_unreachable ();
     }
-  else if (from_mode == M_LONG_LONG_REAL)
+  else if (from_mode_prec == TYPE_PRECISION (CTYPE (M_LONG_LONG_REAL)))
     {
-      if (to_type == integer_type_node)
+      if (to_mode_prec == int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_IFLOORL);
-      else if (to_type == long_integer_type_node)
+      else if (to_mode_prec == long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LFLOORL);
-      else if (to_type == long_long_integer_type_node)
+      else if (to_mode_prec == long_long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LLFLOORL);
-      else
-	gcc_unreachable ();
-    }
-  else if (from_mode == M_WORD_REAL)
-    {
-      if (to_type == integer_type_node)
-	fn = builtin_decl_explicit (BUILT_IN_IFLOOR);
-      else if (to_type == long_integer_type_node)
-	fn = builtin_decl_explicit (BUILT_IN_LFLOOR);
-      else if (to_type == long_long_integer_type_node)
-	fn = builtin_decl_explicit (BUILT_IN_LLFLOOR);
-      else if (to_type == a68_word_int_type)
-	/* XXX */
-	fn = builtin_decl_explicit (BUILT_IN_LFLOOR);
       else
 	gcc_unreachable ();
     }
@@ -443,51 +435,43 @@ a68_real_round (tree val, MOID_T *to_mode, MOID_T *from_mode)
 {
   tree fn = NULL_TREE;
   tree to_type = CTYPE (to_mode);
+  int from_mode_prec = TYPE_PRECISION (CTYPE (from_mode));
+  int to_mode_prec = TYPE_PRECISION (to_type);
 
-  if (from_mode == M_REAL)
+  const int int_prec = TYPE_PRECISION (integer_type_node);
+  const int long_int_prec = TYPE_PRECISION (long_integer_type_node);
+  const int long_long_int_prec = TYPE_PRECISION (long_long_integer_type_node);
+  
+  if (from_mode_prec == TYPE_PRECISION (CTYPE (M_REAL)))
     {
-      if (to_type == integer_type_node)
+      if (to_mode_prec == int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_IROUNDF);
-      else if (to_type == long_integer_type_node)
+      else if (to_mode_prec == long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LROUNDF);
-      else if (to_type == long_long_integer_type_node)
+      else if (to_mode_prec == long_long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LLROUNDF);
       else
 	gcc_unreachable ();
     }
-  else if (from_mode == M_LONG_REAL)
+  else if (from_mode_prec == TYPE_PRECISION (CTYPE (M_LONG_REAL)))
     {
-      if (to_type == integer_type_node)
+      if (to_mode_prec == int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_IROUND);
-      else if (to_type == long_integer_type_node)
+      else if (to_mode_prec == long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LROUND);
-      else if (to_type == long_long_integer_type_node)
+      else if (to_mode_prec == long_long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LLROUND);
       else
 	gcc_unreachable ();
     }
-  else if (from_mode == M_LONG_LONG_REAL)
+  else if (from_mode_prec == TYPE_PRECISION (CTYPE (M_LONG_LONG_REAL)))
     {
-      if (to_type == integer_type_node)
+      if (to_mode_prec == int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_IROUNDL);
-      else if (to_type == long_integer_type_node)
+      else if (to_mode_prec == long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LROUNDL);
-      else if (to_type == long_long_integer_type_node)
+      else if (to_mode_prec == long_long_int_prec)
 	fn = builtin_decl_explicit (BUILT_IN_LLROUNDL);
-      else
-	gcc_unreachable ();
-    }
-  else if (from_mode == M_WORD_REAL)
-    {
-      if (to_type == integer_type_node)
-	fn = builtin_decl_explicit (BUILT_IN_IROUND);
-      else if (to_type == long_integer_type_node)
-	fn = builtin_decl_explicit (BUILT_IN_LROUND);
-      else if (to_type == long_long_integer_type_node)
-	fn = builtin_decl_explicit (BUILT_IN_LLROUND);
-      else if (to_type == a68_word_int_type)
-	/* XXX */
-	fn = builtin_decl_explicit (BUILT_IN_LROUND);
       else
 	gcc_unreachable ();
     }
@@ -601,27 +585,32 @@ tree
 a68_real_pow (MOID_T *m, MOID_T *a_mode, MOID_T *b_mode,
 	      tree a, tree b, location_t loc)
 {
+  int m_prec = TYPE_PRECISION (CTYPE (m));
+  int a_mode_prec = TYPE_PRECISION (CTYPE (a_mode));
+  int b_mode_prec = TYPE_PRECISION (CTYPE (b_mode));
+
+  const int real_prec = TYPE_PRECISION (CTYPE (M_REAL));
+  const int long_real_prec = TYPE_PRECISION (CTYPE (M_LONG_REAL));
+  const int long_long_real_prec = TYPE_PRECISION (CTYPE (M_LONG_LONG_REAL));
+  
   enum built_in_function built_in;
-  if (m == M_REAL)
+  if (m_prec == real_prec)
     {
-      gcc_assert (a_mode == M_REAL);
-      built_in = b_mode == M_REAL ? BUILT_IN_POWF : BUILT_IN_POWIF;
+      gcc_assert (a_mode_prec == real_prec);
+      built_in
+	= (b_mode_prec == real_prec) ? BUILT_IN_POWF : BUILT_IN_POWIF;
     }
-  else if (m == M_LONG_REAL)
+  else if (m_prec == long_real_prec)
     {
-      gcc_assert (a_mode == M_LONG_REAL);
-      built_in = b_mode == M_LONG_REAL ? BUILT_IN_POW : BUILT_IN_POWI;
+      gcc_assert (a_mode_prec == long_real_prec);
+      built_in =
+	(b_mode_prec == long_real_prec) ? BUILT_IN_POW : BUILT_IN_POWI;
     }
-  else if (m == M_LONG_LONG_REAL)
+  else if (m_prec == long_long_real_prec)
     {
-      gcc_assert (a_mode == M_LONG_LONG_REAL);
-      built_in = b_mode == M_LONG_LONG_REAL ? BUILT_IN_POWL : BUILT_IN_POWIL;
-    }
-  else if (m == M_WORD_REAL)
-    {
-      /* XXX */
-      gcc_assert (a_mode == M_WORD_REAL);
-      built_in = b_mode == M_WORD_REAL ? BUILT_IN_POW : BUILT_IN_POWI;
+      gcc_assert (a_mode_prec == long_long_real_prec);
+      built_in
+	= (b_mode_prec == long_long_real_prec) ? BUILT_IN_POWL : BUILT_IN_POWIL;
     }
   else
     gcc_unreachable ();
