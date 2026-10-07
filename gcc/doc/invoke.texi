@@ -38181,14 +38181,6 @@ Entities may be defined in implementation partitions, and those
 definitions are not available outside of the module.  This is not
 implemented, and the definitions are available to extra-module use.
 
-@item Textual merging of reachable GM entities
-Entities may be multiply defined across different header-units.
-These must be de-duplicated, and this is implemented across imports,
-or when an import redefines a textually-defined entity.  However the
-reverse is not implemented---textually redefining an entity that has
-been defined in an imported header-unit.  A redefinition error is
-emitted.
-
 @end table
 
 Modular compilation is @emph{not} enabled with just the
