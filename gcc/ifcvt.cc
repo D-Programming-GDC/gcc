@@ -3166,8 +3166,9 @@ noce_try_abs (noce_if_info *if_info)
   if (!noce_simple_bbs (if_info))
     return false;
 
-  /* Reject modes with signed zeros.  */
-  if (HONOR_SIGNED_ZEROS (if_info->x))
+  /* Reject modes with signed zeros or NaNs.  */
+  if (HONOR_SIGNED_ZEROS (if_info->x)
+      || HONOR_NANS (if_info->x))
     return false;
 
   /* Recognize A and B as constituting an ABS or NABS.  The canonical
