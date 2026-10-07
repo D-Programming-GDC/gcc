@@ -6485,6 +6485,7 @@ package body Sem_Ch8 is
 
          Level := Scope_Stack.Last;
          loop
+            exit when Level < 0;
             Scop := Scope_Stack.Table (Level).Entity;
             exit when Scop = Scope (E);
             Level := Level - 1;
