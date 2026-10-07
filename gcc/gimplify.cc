@@ -14905,7 +14905,6 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
 	case OMP_CLAUSE_MESSAGE:
 	case OMP_CLAUSE_PROC_BIND:
 	case OMP_CLAUSE_SAFELEN:
-	case OMP_CLAUSE_SIMDLEN:
 	case OMP_CLAUSE_NOGROUP:
 	case OMP_CLAUSE_THREADS:
 	case OMP_CLAUSE_SIMD:
@@ -14917,6 +14916,15 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
 	case OMP_CLAUSE_USE:
 	case OMP_CLAUSE_DESTROY:
 	case OMP_CLAUSE_DEVICE_TYPE:
+	  break;
+
+	case OMP_CLAUSE_SIMDLEN:
+	  if (OMP_CLAUSE_SIMDLEN_TYPE (c))
+	    {
+	      remove = true;
+	      sorry_at (OMP_CLAUSE_LOCATION (c),
+			"%<simdlen%> clause with %<scaled%> modifier");
+	    }
 	  break;
 
 	case OMP_CLAUSE_DYN_GROUPPRIVATE:

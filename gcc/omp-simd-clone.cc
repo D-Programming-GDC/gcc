@@ -346,6 +346,10 @@ simd_clone_clauses_extract (struct cgraph_node *node, tree clauses,
 	case OMP_CLAUSE_SIMDLEN:
 	  clone_info->simdlen
 	    = TREE_INT_CST_LOW (OMP_CLAUSE_SIMDLEN_EXPR (t));
+	  if (OMP_CLAUSE_SIMDLEN_TYPE (t))
+	    sorry_at (DECL_SOURCE_LOCATION (node->decl),
+		      "%<scaled%> modifier specified in %<simdlen%> clause on "
+		      "%<declare simd%> directive for %qD", node->decl);
 	  break;
 	case OMP_CLAUSE_LINEAR:
 	  {

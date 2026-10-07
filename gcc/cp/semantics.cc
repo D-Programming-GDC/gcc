@@ -8768,6 +8768,49 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	  break;
 
 	case OMP_CLAUSE_SIMDLEN:
+	  t = OMP_CLAUSE_SIMDLEN_TYPE (c);
+	  if (t == error_mark_node)
+	    remove = true;
+	  else if (t && !dependent_type_p (t)
+		   && !ARITHMETIC_TYPE_P (t))
+	    {
+	      error_at (OMP_CLAUSE_LOCATION (c),
+			"expected arithmetic type name as argument to the "
+			"%<scaled%> modifier");
+	      remove = true;
+	    }
+	  t = OMP_CLAUSE_SIMDLEN_DIVISOR (c);
+	  if (t == error_mark_node)
+	    remove = true;
+	  else if (t && !type_dependent_expression_p (t)
+		   && !INTEGRAL_TYPE_P (TREE_TYPE (t)))
+	    {
+	      error_at (OMP_CLAUSE_LOCATION (c),
+			"%qs divisor expression of the %<scaled%> modifier "
+			"must be integral",
+			omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
+	      remove = true;
+	    }
+	  else if (t)
+	    {
+	      t = mark_rvalue_use (t);
+	      if (!processing_template_decl)
+		{
+		  t = maybe_constant_value (t);
+		  if (TREE_CODE (t) != INTEGER_CST
+		      || tree_int_cst_sgn (t) != 1)
+		    {
+		      error_at (OMP_CLAUSE_LOCATION (c),
+				"%qs divisor expression of the %<scaled%> "
+				"modifier must be a positive constant integer "
+				"expression",
+				omp_clause_code_name[OMP_CLAUSE_CODE (c)]);
+		      remove = true;
+		    }
+		}
+	      OMP_CLAUSE_SIMDLEN_DIVISOR (c) = t;
+	    }
+	  /* FALLTHRU */
 	case OMP_CLAUSE_SAFELEN:
 	  t = OMP_CLAUSE_OPERAND (c, 0);
 	  if (t == error_mark_node)
@@ -10484,6 +10527,14 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	      && tree_int_cst_lt (OMP_CLAUSE_SAFELEN_EXPR (safelen),
 				  OMP_CLAUSE_SIMDLEN_EXPR (c)))
 	    {
+	      /* Note: How a scaling factor affects this, is underspecified in
+		 OpenMP; cf. OpenMP spec issue #5160.  Presumably, it means:
+		   savelen >= simdlen * scale_factor
+		 with
+		   scale_factor = MAX (1, FLOOR_DIV_EXPR (VL(type), divisor))
+		 and OpenMP states that VL(type) might be only known at runtime.
+		 Hence scale_factor >= 1 and, conservatively, assume == 1 for
+		 this error check.  */
 	      error_at (OMP_CLAUSE_LOCATION (c),
 			"%<simdlen%> clause value is bigger than "
 			"%<safelen%> clause value");

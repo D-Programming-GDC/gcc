@@ -495,6 +495,8 @@ enum omp_clause_code {
   OMP_CLAUSE_SAFELEN,
 
   /* OpenMP clause: simdlen (constant-integer-expression).  */
+  /* OpenMP clause: simdlen ([scaled-mod:] constant-integer-expression)
+     with scaled-modifier: scaled(type [, const-integer-expression]).  */
   OMP_CLAUSE_SIMDLEN,
 
   /* OpenMP clause: device_type ({host,nohost,any}).  */

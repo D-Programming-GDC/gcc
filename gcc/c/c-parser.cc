@@ -20178,40 +20178,93 @@ c_parser_omp_clause_safelen (c_parser *parser, tree list)
 }
 
 /* OpenMP 4.0:
-   simdlen ( constant-expression ) */
+   simdlen ( constant-expression )
+
+   OpenMP 6.1:
+   simdlen ([scaled(type[, constant-expression]):] constant-expression )  */
 
 static tree
 c_parser_omp_clause_simdlen (c_parser *parser, tree list)
 {
   location_t clause_loc = c_parser_peek_token (parser)->location;
-  tree c, t;
+  tree c, t = NULL_TREE, type = NULL_TREE, divisor = NULL_TREE;
 
   matching_parens parens;
   if (!parens.require_open (parser))
     return list;
 
-  location_t expr_loc = c_parser_peek_token (parser)->location;
-  c_expr expr = c_parser_expr_no_commas (parser, NULL);
-  expr = convert_lvalue_to_rvalue (expr_loc, expr, false, true);
-  t = expr.value;
-  t = c_fully_fold (t, false, NULL);
-  if (TREE_CODE (t) != INTEGER_CST
-      || !INTEGRAL_TYPE_P (TREE_TYPE (t))
-      || tree_int_cst_sgn (t) != 1)
+  unsigned pos = 3;
+  if (c_parser_next_token_is (parser, CPP_NAME)
+      && c_parser_peek_2nd_token (parser)->type == CPP_OPEN_PAREN
+      && strcmp (IDENTIFIER_POINTER (c_parser_peek_token (parser)->value),
+		 "scaled") == 0
+      && c_parser_check_balanced_raw_token_sequence (parser, &pos)
+      && c_parser_peek_nth_token_raw (parser, ++pos)->type == CPP_COLON)
     {
-      error_at (clause_loc, "%<simdlen%> clause expression must "
-			    "be positive constant integer expression");
-      t = NULL_TREE;
+      c_parser_consume_token (parser);
+      matching_parens parens2;
+      parens2.require_open (parser);
+
+      location_t loc = c_parser_peek_token (parser)->location;
+      struct c_type_name *ctype = c_parser_type_name (parser);
+      if (ctype == NULL
+	  || (type = groktypename (ctype, NULL, NULL)) == NULL
+	  || (!INTEGRAL_TYPE_P (type)
+	      && !SCALAR_FLOAT_TYPE_P (type)
+	      && TREE_CODE (type) != COMPLEX_TYPE))
+	{
+	  error_at (loc, "expected arithmetic type name as argument to the "
+			 "%<scaled%> modifier");
+	  type = error_mark_node;
+	}
+      else if (c_parser_next_token_is (parser, CPP_COMMA))
+	{
+	  c_parser_consume_token (parser);
+	  loc = c_parser_peek_token (parser)->location;
+	  c_expr expr = c_parser_expr_no_commas (parser, NULL);
+	  expr = convert_lvalue_to_rvalue (loc, expr, false, true);
+	  divisor = expr.value;
+	  divisor = c_fully_fold (divisor, false, NULL);
+	  if (TREE_CODE (divisor) != INTEGER_CST
+	      || !INTEGRAL_TYPE_P (TREE_TYPE (divisor))
+	      || tree_int_cst_sgn (divisor) != 1)
+	    {
+	      error_at (loc, "divisor expression of the %<scaled%> modifier "
+			     "must a be positive constant integer expression");
+	      type = error_mark_node;
+	    }
+	}
+      parens2.skip_until_found_close (parser);
+      c_parser_require (parser, CPP_COLON, "expected %<:%>");
+    }
+
+  if (type != error_mark_node)
+    {
+      location_t expr_loc = c_parser_peek_token (parser)->location;
+      c_expr expr = c_parser_expr_no_commas (parser, NULL);
+      expr = convert_lvalue_to_rvalue (expr_loc, expr, false, true);
+      t = expr.value;
+      t = c_fully_fold (t, false, NULL);
+      if (TREE_CODE (t) != INTEGER_CST
+	  || !INTEGRAL_TYPE_P (TREE_TYPE (t))
+	  || tree_int_cst_sgn (t) != 1)
+	{
+	  error_at (clause_loc, "%<simdlen%> clause expression must "
+				"be positive constant integer expression");
+	  t = NULL_TREE;
+	}
     }
 
   parens.skip_until_found_close (parser);
-  if (t == NULL_TREE || t == error_mark_node)
+  if (type == error_mark_node || t == NULL_TREE || t == error_mark_node)
     return list;
 
   check_no_duplicate_clause (list, OMP_CLAUSE_SIMDLEN, "simdlen");
 
   c = build_omp_clause (clause_loc, OMP_CLAUSE_SIMDLEN);
   OMP_CLAUSE_SIMDLEN_EXPR (c) = t;
+  OMP_CLAUSE_SIMDLEN_TYPE (c) = type;
+  OMP_CLAUSE_SIMDLEN_DIVISOR (c) = divisor;
   OMP_CLAUSE_CHAIN (c) = list;
   return c;
 }

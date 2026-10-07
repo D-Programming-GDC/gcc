@@ -364,7 +364,7 @@ unsigned const char omp_clause_num_ops[] =
   1, /* OMP_CLAUSE_THREAD_LIMIT  */
   0, /* OMP_CLAUSE_PROC_BIND  */
   1, /* OMP_CLAUSE_SAFELEN  */
-  1, /* OMP_CLAUSE_SIMDLEN  */
+  3, /* OMP_CLAUSE_SIMDLEN  */
   0, /* OMP_CLAUSE_DEVICE_TYPE  */
   0, /* OMP_CLAUSE_FOR  */
   0, /* OMP_CLAUSE_PARALLEL  */

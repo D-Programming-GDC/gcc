@@ -18937,7 +18937,6 @@ tsubst_omp_clauses (tree clauses, enum c_omp_region_type ort,
 	case OMP_CLAUSE_DIST_SCHEDULE:
 	case OMP_CLAUSE_THREAD_LIMIT:
 	case OMP_CLAUSE_SAFELEN:
-	case OMP_CLAUSE_SIMDLEN:
 	case OMP_CLAUSE_NUM_TASKS:
 	case OMP_CLAUSE_GRAINSIZE:
 	case OMP_CLAUSE_PRIORITY:
@@ -18975,6 +18974,16 @@ tsubst_omp_clauses (tree clauses, enum c_omp_region_type ort,
 	  OMP_CLAUSE_NOVARIANTS_EXPR (nc)
 	    = tsubst_expr (OMP_CLAUSE_NOVARIANTS_EXPR (oc), args, complain,
 			   in_decl);
+	  break;
+	case OMP_CLAUSE_SIMDLEN:
+	  OMP_CLAUSE_SIMDLEN_EXPR (nc)
+	    = tsubst_stmt (OMP_CLAUSE_SIMDLEN_EXPR (oc),
+			   args, complain, in_decl);
+	  OMP_CLAUSE_SIMDLEN_TYPE (nc)
+	    = tsubst (OMP_CLAUSE_SIMDLEN_TYPE (oc), args, complain, in_decl);
+	  OMP_CLAUSE_SIMDLEN_DIVISOR (nc)
+	    = tsubst_stmt (OMP_CLAUSE_SIMDLEN_DIVISOR (oc),
+			   args, complain, in_decl);
 	  break;
 	case OMP_CLAUSE_REDUCTION:
 	case OMP_CLAUSE_IN_REDUCTION:

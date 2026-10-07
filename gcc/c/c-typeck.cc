@@ -18440,6 +18440,14 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
       && tree_int_cst_lt (OMP_CLAUSE_SAFELEN_EXPR (safelen),
 			  OMP_CLAUSE_SIMDLEN_EXPR (simdlen)))
     {
+      /* Note: How a scaling factor affects this, is underspecified in OpenMP;
+	 cf. OpenMP spec issue #5160.  Presumably, it means:
+	   savelen >= simdlen * scale_factor
+	 with
+	   scale_factor = MAX (1, FLOOR_DIV_EXPR (VL(type), divisor))
+	 and OpenMP states that VL(type) might be only known at runtime.
+	 Hence scale_factor >= 1 and, conservatively, assume == 1 for this
+	 error check.  */
       error_at (OMP_CLAUSE_LOCATION (simdlen),
 		"%<simdlen%> clause value is bigger than "
 		"%<safelen%> clause value");
