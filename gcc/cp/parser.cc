@@ -30925,6 +30925,11 @@ cp_parser_class_head (cp_parser* parser,
   if (type)
     popclass ();
 
+  if (type)
+    DECL_SOURCE_LOCATION (TYPE_NAME (type)) = type_start_token->location;
+  if (type && (virt_specifiers & VIRT_SPEC_FINAL))
+    CLASSTYPE_FINAL (type) = 1;
+
  done:
   /* Leave the scope given by the nested-name-specifier.  We will
      enter the class scope itself while processing the members.  */
@@ -30937,10 +30942,6 @@ cp_parser_class_head (cp_parser* parser,
       --parser->num_template_parameter_lists;
     }
 
-  if (type)
-    DECL_SOURCE_LOCATION (TYPE_NAME (type)) = type_start_token->location;
-  if (type && (virt_specifiers & VIRT_SPEC_FINAL))
-    CLASSTYPE_FINAL (type) = 1;
  out:
   parser->colon_corrects_to_scope_p = saved_colon_corrects_to_scope_p;
   return type;

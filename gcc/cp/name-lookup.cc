@@ -8816,6 +8816,11 @@ pushtag (tree name, tree type, TAG_how how)
       DECL_CONTEXT (tdef) = FROB_CONTEXT (context);
       set_originating_module (tdef);
 
+      /* Set TREE_PUBLIC now for built-in warnings and module merging.  */
+      if (TREE_CODE (context) == NAMESPACE_DECL
+	  && TREE_PUBLIC (context))
+	TREE_PUBLIC (tdef) = 1;
+
       decl = maybe_process_template_type_declaration
 	(type, how == TAG_how::HIDDEN_FRIEND, b);
       if (decl == error_mark_node)

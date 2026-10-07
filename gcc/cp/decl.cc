@@ -2344,7 +2344,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
       if (DECL_NAMESPACE_ALIAS (newdecl)
 	  && (DECL_NAMESPACE_ALIAS (newdecl)
 	      == DECL_NAMESPACE_ALIAS (olddecl)))
-	return olddecl;
+	goto return_old;
 
       /* Leave it to update_binding to merge or report error.  */
       return NULL_TREE;
@@ -2595,9 +2595,10 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
      set OLDDECL's attributes to those of NEWDECL (for template
      explicit specializations that specify their own attributes
      independent of those specified for the primary template).  */
-  const bool merge_attr = (TREE_CODE (newdecl) != FUNCTION_DECL
-			   || !DECL_TEMPLATE_SPECIALIZATION (newdecl)
-			   || DECL_TEMPLATE_SPECIALIZATION (olddecl));
+  bool merge_attr;
+  merge_attr = (TREE_CODE (newdecl) != FUNCTION_DECL
+		|| !DECL_TEMPLATE_SPECIALIZATION (newdecl)
+		|| DECL_TEMPLATE_SPECIALIZATION (olddecl));
 
   if (TREE_CODE (newdecl) == FUNCTION_DECL)
     {
@@ -2816,6 +2817,8 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	    }
 	}
 
+      /* FIXME we can't goto return_old here without removing newdecl from more
+	 hash tables.  */
       return olddecl;
     }
 
@@ -3580,6 +3583,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	}
     }
 
+ return_old:
   /* Remove the associated constraints for newdecl, if any, before
      reclaiming memory. */
   if (flag_concepts)
