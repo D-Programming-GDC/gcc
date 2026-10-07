@@ -8,7 +8,6 @@
  * * Redistributions of source code must retain the above copyright
  *   notice, this list of conditions and the following disclaimer.
  * * Redistributions in binary form must reproduce the above
- * * Redistributions in binary form must reproduce the above
  *   copyright notice, this list of conditions and the following disclaimer
  *   in the documentation and/or other materials provided with the
  *   distribution.
@@ -82,6 +81,76 @@
 
 #define NO_RDIGITS (0)
 
+/*  How to use symbol versioning.
+    (Disclaimer:  As of this writing, I have gotten this far looking at
+    documentation.  The .map files seem to work; I haven't yet tried to
+    incorporate altered versions of existing functions.)
+
+    Imagine we discover a bug in __gg__acos(), but it is a bug that somebody
+    is counting on.  That's kind of absurd, but ride with me, here.
+
+    We want to create a second version of __gg__acos() for GCC17.2 that will
+    become the default in libgcobol.so going forward.  But we need the library
+    to continue to support the one released with GCC17.1 because people are
+    still using the older compiler, or running executables created with the
+    older compiler, even in the face up updating their libgcobol.so file.
+
+    The process:
+
+    Rename the __gg__acos() routine to __gg__acos_17_1().  The contents of that
+    routine must stay functionally the same, for ever and ever.
+
+    Write the new __gg__acos_17_2() routine.
+
+    The libgcobol/libgcobol.map file needs to be modified as well:
+
+        GCOBOL_17.1
+          {
+          global:
+            // The entire list, including __gg__acos, is left alone
+
+          local:
+            *;
+          };
+
+        GCOBOL_17.2
+          {
+          global:
+            __gg__acos;
+          } GCOBOL_17.1;
+
+    There are two ways of routing the symbol versions in the source code.
+    
+    First method:
+    
+    Add the following directives at file scope in the .cc file that contains
+    __gg__acos_17_1() and __gg__acos_17_1():
+
+        __asm__(".symver __gg__acos_17_1,__gg__acos@GCOBOL_17.1");
+        __asm__(".symver __gg__acos_17_2,__gg__acos@@GCOBOL_17.2");
+
+    Second method:
+
+        extern "C" void
+        __attribute__((symver("__gg__acos@GCOBOL_17.1")))
+        __gg__acos_17_1()
+          {
+          // Preserved implementation.
+          }
+
+        extern "C" void
+        __attribute__((symver("__gg__acos@@GCOBOL_17.2")))
+        __gg__acos_17_2()
+          {
+          // New implementation.
+          }    
+
+    In either case, those specify that somebody trying to link to
+    __gg__acos@GCOBOL_17.1 will actually link to __gg__acos_17_1().  The @@
+    in __gg__acos@@GCOBOL_17.2 means that somebody linking to __gg__acos()
+    will actually be linked to __gg__acos_17_2().
+
+    And that's supposedly how symbol versioning works.   */
 
 static inline char *
 as_chars(unsigned char *p)
@@ -12003,6 +12072,7 @@ __gg__module_name_pop()
   module_name_stack.pop_back();
   }
 
+extern "C"
 const std::vector<std::string> &
 __gg__get_module_names()
   {

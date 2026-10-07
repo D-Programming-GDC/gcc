@@ -190,8 +190,10 @@ $(LP_COPYDIR_BUILD)/%.cpy: ${srcdir}/posix/cpy/%.cpy
 libgcobol_la_LINK = $(CXXLINK) $(libgcobol_la_LDFLAGS)
 version_arg = -version-info $(LIBGCOBOL_VERSION)
 libgcobol_la_LDFLAGS = $(LTLDFLAGS) $(LIBQUADLIB) $(LTLIBICONV) \
-	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg)
-libgcobol_la_DEPENDENCIES = libgcobol.spec $(LIBQUADLIB_DEP)
+	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg) \
+	-Wl,--version-script=$(srcdir)/libgcobol.map
+libgcobol_la_DEPENDENCIES = libgcobol.spec $(LIBQUADLIB_DEP) \
+	$(srcdir)/libgcobol.map
 
 # Rules for libgcobol_posix.so and libgcobol_compat_gnu.so, which have
 # COBOL sources.  They require gcobol and libgcobol to have already
@@ -206,16 +208,17 @@ libgcobol_la_DEPENDENCIES = libgcobol.spec $(LIBQUADLIB_DEP)
 
 libgcobol_posix_la_LINK = $(CXXLINK) $(libgcobol_posix_la_LDFLAGS)
 libgcobol_posix_la_LDFLAGS = $(LTLDFLAGS) $(LIBQUADLIB) $(LTLIBICONV) \
-	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg)
+	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg) \
+	-Wl,--version-script=$(srcdir)/libgcobol_posix.map
 libgcobol_posix_la_DEPENDENCIES = libgcobol.spec $(LIBQUADLIB_DEP) \
-	$(LP_COPYBOOKS)
+	$(LP_COPYBOOKS) $(srcdir)/libgcobol_posix.map
 
 libgcobol_compat_gnu_la_LINK = $(CXXLINK) $(libgcobol_compat_gnu_la_LDFLAGS)
 libgcobol_compat_gnu_la_LDFLAGS = $(LTLDFLAGS) $(LIBQUADLIB) $(LTLIBICONV) \
-	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg)
+	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg) \
+	-Wl,--version-script=$(srcdir)/libgcobol_compat_gnu.map
 libgcobol_compat_gnu_la_DEPENDENCIES = libgcobol.spec $(LIBQUADLIB_DEP) \
-	$(LC_COPYBOOKS)
-
+	$(LC_COPYBOOKS) $(srcdir)/libgcobol_compat_gnu.map
 
 LTCOBCOMPILE = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=compile $(AM_COBC) $(AM_COBFLAGS)
@@ -226,6 +229,6 @@ LTCOBCOMPILE = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 .cbl.lo:
 	$(LTCOBCOMPILE) $(COBFLAGS) $(MULTIFLAGS) -c -o $@ $<
 
-
+EXTRA_DIST = libgcobol.map libgcobol_posix.map libgcobol_compat_gnu.map
 
 endif BUILD_LIBGCOBOL

@@ -103,11 +103,12 @@ enum cbl_backtrace_flags
   CBL_BACKTRACE_DATA31      = 1 << 24
   };
 
+extern "C" const std::vector<std::string> &__gg__get_module_names();
+
 static std::vector<std::string>
 callstack()
   {
-  const std::vector<std::string> &__gg__get_module_names(),
-    &names = __gg__get_module_names();
+  const std::vector<std::string> &names = __gg__get_module_names();
   const char *s = NULL;
   std::vector<std::string> ret;
 

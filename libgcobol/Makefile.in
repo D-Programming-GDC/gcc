@@ -604,9 +604,12 @@ gcc_version := $(shell @get_gcc_base_ver@ $(top_srcdir)/../gcc/BASE-VER)
 @BUILD_LIBGCOBOL_TRUE@libgcobol_la_LINK = $(CXXLINK) $(libgcobol_la_LDFLAGS)
 @BUILD_LIBGCOBOL_TRUE@version_arg = -version-info $(LIBGCOBOL_VERSION)
 @BUILD_LIBGCOBOL_TRUE@libgcobol_la_LDFLAGS = $(LTLDFLAGS) $(LIBQUADLIB) $(LTLIBICONV) \
-@BUILD_LIBGCOBOL_TRUE@	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg)
+@BUILD_LIBGCOBOL_TRUE@	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg) \
+@BUILD_LIBGCOBOL_TRUE@	-Wl,--version-script=$(srcdir)/libgcobol.map
 
-@BUILD_LIBGCOBOL_TRUE@libgcobol_la_DEPENDENCIES = libgcobol.spec $(LIBQUADLIB_DEP)
+@BUILD_LIBGCOBOL_TRUE@libgcobol_la_DEPENDENCIES = libgcobol.spec $(LIBQUADLIB_DEP) \
+@BUILD_LIBGCOBOL_TRUE@	$(srcdir)/libgcobol.map
+
 
 # Rules for libgcobol_posix.so and libgcobol_compat_gnu.so, which have
 # COBOL sources.  They require gcobol and libgcobol to have already
@@ -619,21 +622,24 @@ gcc_version := $(shell @get_gcc_base_ver@ $(top_srcdir)/../gcc/BASE-VER)
 #     Because CFLAGS means "C flags", COBFLAGS means "COBOL flags".
 @BUILD_LIBGCOBOL_TRUE@libgcobol_posix_la_LINK = $(CXXLINK) $(libgcobol_posix_la_LDFLAGS)
 @BUILD_LIBGCOBOL_TRUE@libgcobol_posix_la_LDFLAGS = $(LTLDFLAGS) $(LIBQUADLIB) $(LTLIBICONV) \
-@BUILD_LIBGCOBOL_TRUE@	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg)
+@BUILD_LIBGCOBOL_TRUE@	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg) \
+@BUILD_LIBGCOBOL_TRUE@	-Wl,--version-script=$(srcdir)/libgcobol_posix.map
 
 @BUILD_LIBGCOBOL_TRUE@libgcobol_posix_la_DEPENDENCIES = libgcobol.spec $(LIBQUADLIB_DEP) \
-@BUILD_LIBGCOBOL_TRUE@	$(LP_COPYBOOKS)
+@BUILD_LIBGCOBOL_TRUE@	$(LP_COPYBOOKS) $(srcdir)/libgcobol_posix.map
 
 @BUILD_LIBGCOBOL_TRUE@libgcobol_compat_gnu_la_LINK = $(CXXLINK) $(libgcobol_compat_gnu_la_LDFLAGS)
 @BUILD_LIBGCOBOL_TRUE@libgcobol_compat_gnu_la_LDFLAGS = $(LTLDFLAGS) $(LIBQUADLIB) $(LTLIBICONV) \
-@BUILD_LIBGCOBOL_TRUE@	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg)
+@BUILD_LIBGCOBOL_TRUE@	$(extra_ldflags_libgcobol) $(LIBS) $(LIBXML2_LIBS) $(version_arg) \
+@BUILD_LIBGCOBOL_TRUE@	-Wl,--version-script=$(srcdir)/libgcobol_compat_gnu.map
 
 @BUILD_LIBGCOBOL_TRUE@libgcobol_compat_gnu_la_DEPENDENCIES = libgcobol.spec $(LIBQUADLIB_DEP) \
-@BUILD_LIBGCOBOL_TRUE@	$(LC_COPYBOOKS)
+@BUILD_LIBGCOBOL_TRUE@	$(LC_COPYBOOKS) $(srcdir)/libgcobol_compat_gnu.map
 
 @BUILD_LIBGCOBOL_TRUE@LTCOBCOMPILE = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 @BUILD_LIBGCOBOL_TRUE@	--mode=compile $(AM_COBC) $(AM_COBFLAGS)
 
+@BUILD_LIBGCOBOL_TRUE@EXTRA_DIST = libgcobol.map libgcobol_posix.map libgcobol_compat_gnu.map
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
