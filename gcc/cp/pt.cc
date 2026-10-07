@@ -6687,7 +6687,7 @@ redeclare_class_template (tree type, tree parms, tree cons)
 	}
     }
 
-  if (!merge_default_template_args (parms, tmpl_parms, /*class_p=*/true))
+  if (!merge_default_template_args (parms, tmpl_parms, tmpl))
     return false;
 
   tree ci = get_constraints (tmpl);

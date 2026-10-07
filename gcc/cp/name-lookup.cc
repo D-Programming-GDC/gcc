@@ -4071,7 +4071,7 @@ pushdecl (tree decl, bool hiding)
 	  for (ovl_iterator iter (oldi); iter; ++iter)
 	    if (iter.using_p ())
 	      ; /* Ignore using decls here.  */
-	    else if (iter.hidden_p ()
+	    else if (DECL_IS_UNDECLARED_BUILTIN (*iter)
 		     && TREE_CODE (*iter) == FUNCTION_DECL
 		     && DECL_LANG_SPECIFIC (*iter)
 		     && DECL_MODULE_IMPORT_P (*iter))
@@ -8643,24 +8643,8 @@ lookup_elaborated_type (tree name, TAG_how how)
 		  return bind;
 	      }
 
-	  if (!module_purview_p ())
-	    {
-	      /* We're in the global module, perhaps there's a tag
-		 there?  */
-
-	      /* FIXME: In general we should probably merge global module
-		 classes in check_module_override rather than here, but for
-		 GCC14 let's just fix lazy declarations of __class_type_info in
-		 build_dynamic_cast_1.  */
-	      if (current_namespace == abi_node)
-		{
-		  tree g = (BINDING_VECTOR_CLUSTER (*slot, 0)
-			    .slots[BINDING_SLOT_GLOBAL]);
-		  for (ovl_iterator iter (g); iter; ++iter)
-		    if (qualify_lookup (*iter, LOOK_want::TYPE))
-		      return *iter;
-		}
-	    }
+	  /* We'll find mergeable types in check_module_override when we try to
+	     push a new one, no need to handle them specially here.  */
 	}
     }
 
@@ -8825,6 +8809,9 @@ pushtag (tree name, tree type, TAG_how how)
 	(type, how == TAG_how::HIDDEN_FRIEND, b);
       if (decl == error_mark_node)
 	return decl;
+      if (TREE_TYPE (decl) != type)
+	/* Found an imported version of the same type.  */
+	return TREE_TYPE (decl);
 
       if (b->kind == sk_class)
 	{
@@ -8854,6 +8841,9 @@ pushtag (tree name, tree type, TAG_how how)
 	    (decl, b, /*hiding=*/(how == TAG_how::HIDDEN_FRIEND));
 	  if (decl == error_mark_node)
 	    return decl;
+	  if (TREE_TYPE (decl) != type)
+	    /* Found an imported version of the same type.  */
+	    return TREE_TYPE (decl);
 
 	  if (DECL_CONTEXT (decl) == std_node
 	      && init_list_identifier == DECL_NAME (TYPE_NAME (type))

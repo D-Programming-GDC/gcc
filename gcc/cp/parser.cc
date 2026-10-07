@@ -4435,6 +4435,81 @@ cp_parser_consume_semicolon_at_end_of_statement (cp_parser *parser)
     }
 }
 
+/* Consume the entire balanced token sequence at point.  Returns true
+   if that was successful.  */
+
+static bool
+cp_parser_skip_to_end_of_balanced_tokens (cp_parser *parser)
+{
+  size_t n = cp_parser_skip_balanced_tokens (parser, 1);
+  if (n == 1)
+    return false;
+  while (--n)
+    cp_lexer_consume_token (parser->lexer);
+  return true;
+}
+
+/* Consume the entire function definition at point, including
+   function-try-block and mem-initializers.  */
+
+static void
+cp_parser_skip_function_definition (cp_parser *parser)
+{
+  bool fn_try = cp_lexer_next_token_is_keyword (parser->lexer, RID_TRY);
+  if (fn_try)
+    cp_lexer_consume_token (parser->lexer);
+  if (cp_lexer_next_token_is (parser->lexer, CPP_COLON))
+    do
+      {
+	cp_lexer_consume_token (parser->lexer);
+	cp_parser_mem_initializer_id (parser);
+	cp_parser_skip_to_end_of_balanced_tokens (parser);
+      }
+    while (cp_lexer_next_token_is (parser->lexer, CPP_COMMA));
+  cp_parser_skip_to_end_of_block_or_statement (parser);
+  if (fn_try)
+    while (cp_lexer_next_token_is_keyword (parser->lexer, RID_CATCH))
+      {
+	cp_lexer_consume_token (parser->lexer);
+	cp_parser_skip_to_end_of_balanced_tokens (parser);
+	cp_parser_skip_to_end_of_block_or_statement (parser);
+      }
+  /* Parse error if what we skipped didn't end with }.  */
+  if (cp_token *prev = cp_lexer_safe_previous_token (parser->lexer))
+    if (!prev || prev->type != CPP_CLOSE_BRACE)
+      cp_parser_require (parser, CPP_CLOSE_BRACE, RT_CLOSE_BRACE);
+}
+
+/* Skip past any base clause to the open brace of the class definition.  */
+
+static void
+cp_parser_skip_base_clause (cp_parser *parser)
+{
+  while (true)
+    {
+      cp_token *t = cp_lexer_peek_token (parser->lexer);
+      switch (t->type)
+	{
+	case CPP_EOF:
+	case CPP_OPEN_BRACE:
+	  goto done;
+	case CPP_OPEN_PAREN:
+	case CPP_OPEN_SPLICE:
+	case CPP_OPEN_SQUARE:
+	  if (!cp_parser_skip_to_end_of_balanced_tokens (parser))
+	    goto done;
+	  break;
+	default:
+	  cp_lexer_consume_token (parser->lexer);
+	  break;
+	}
+    }
+ done:
+  /* Parse error if this didn't get us to the {.  */
+  if (cp_lexer_next_token_is_not (parser->lexer, CPP_OPEN_BRACE))
+    cp_parser_require (parser, CPP_OPEN_BRACE, RT_OPEN_BRACE);
+}
+
 /* Skip tokens until we have consumed an entire block, or until we
    have consumed a non-nested `;'.  */
 
@@ -24121,6 +24196,23 @@ cp_parser_enum_specifier (cp_parser* parser)
     type = start_enum (identifier, type, underlying_type,
 		       attributes, scoped_enum_p, &is_new_type);
 
+  if (type != error_mark_node && COMPLETE_TYPE_P (type)
+      && redefinable_import_p (TYPE_NAME (type)))
+    {
+      /* We already have an imported definition of this enum; skip over
+	 the redefinition and push any non-scoped enumerators.  */
+      if (cp_lexer_next_token_is (parser->lexer, CPP_OPEN_BRACE))
+	{
+	  cp_parser_skip_to_end_of_block_or_statement (parser);
+	  if (!SCOPED_ENUM_P (type))
+	    for (tree l = TYPE_VALUES (type); l; l = TREE_CHAIN (l))
+	      pushdecl (TREE_VALUE (l));
+	}
+      if (cp_parser_allow_gnu_extensions_p (parser))
+	cp_parser_gnu_attributes_opt (parser);
+      goto done;
+    }
+
   /* If the next token is not '{' it is an opaque-enum-specifier or an
      elaborated-type-specifier.  */
   if (cp_lexer_next_token_is (parser->lexer, CPP_OPEN_BRACE))
@@ -24269,6 +24361,7 @@ cp_parser_enum_specifier (cp_parser* parser)
 	finish_enum (type);
     }
 
+ done:
   if (nested_name_specifier)
     {
       if (CLASS_TYPE_P (nested_name_specifier))
@@ -29854,11 +29947,17 @@ cp_parser_class_specifier (cp_parser* parser)
 			       &nested_name_specifier_p);
   /* If the class-head was a semantic disaster, skip the entire body
      of the class.  */
-  if (!type)
+  if (!type
+      /* Or if the class is already complete from an import, skip the
+	 redefinition.  */
+      || (CLASS_TYPE_P (type) && COMPLETE_TYPE_P (type)))
     {
       cp_parser_skip_to_end_of_block_or_statement (parser);
       pop_deferring_access_checks ();
-      return error_mark_node;
+      /* Consume trailing attributes like below.  */
+      if (cp_parser_allow_gnu_extensions_p (parser))
+	cp_parser_gnu_attributes_opt (parser);
+      return type ? type : error_mark_node;
     }
 
   /* Look for the `{'.  */
@@ -30835,12 +30934,19 @@ cp_parser_class_head (cp_parser* parser,
   if (type != error_mark_node
       && (COMPLETE_TYPE_P (type) || TYPE_BEING_DEFINED (type)))
     {
-      auto_diagnostic_group d;
-      error_at (type_start_token->location, "redefinition of %q#T",
-		type);
-      inform (location_of (type), "previous definition of %q#T",
-	      type);
-      type = NULL_TREE;
+      if (redefinable_import_p (TYPE_NAME (type)))
+	/* Redefinition of an imported type is OK under P1811;
+	   cp_parser_class_specifier will skip the body.  */
+	cp_parser_skip_base_clause (parser);
+      else
+	{
+	  auto_diagnostic_group d;
+	  error_at (type_start_token->location, "redefinition of %q#T",
+		    type);
+	  inform (location_of (type), "previous definition of %q#T",
+		  type);
+	  type = NULL_TREE;
+	}
       goto done;
     }
   else if (type == error_mark_node)
@@ -36265,13 +36371,13 @@ cp_parser_function_definition_from_specifiers_and_declarator
   if (!success_p)
     {
       /* Skip the entire function.  */
-      cp_parser_skip_to_end_of_block_or_statement (parser);
+      cp_parser_skip_function_definition (parser);
       fn = error_mark_node;
     }
   else if (DECL_INITIAL (current_function_decl) != error_mark_node)
     {
-      /* Seen already, skip it.  An error message has already been output.  */
-      cp_parser_skip_to_end_of_block_or_statement (parser);
+      /* start_preparsed_function exited early, also skip parsing.  */
+      cp_parser_skip_function_definition (parser);
       fn = current_function_decl;
       current_function_decl = NULL_TREE;
       /* If this is a function from a class, pop the nested class.  */
