@@ -1,3 +1,127 @@
+2026-10-06  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR libfortran/127684
+	* gfortran.dg/coarray/sync_images_failed_1.f90: New test.
+	* gfortran.dg/coarray/sync_images_stopped_2.f90: New test.
+	* gfortran.dg/coarray/sync_images_stopped_3.f90: New test.
+
+2026-10-06  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/127707
+	* g++.dg/reflect/ns12.C: New test.
+
+2026-10-06  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* gcc.dg/tree-ssa/predcom-7.c: Drop -fno-tree-dominator-opts.
+	* gcc.dg/tree-ssa/ssa-dom-simplify-3.c: Expect the relationals to
+	stay.
+
+2026-10-06  Michiel Derhaeg  <michiel.derhaeg@globalfoundries.com>
+	    Luis Silva  <luis.silva@globalfoundries.com>
+
+	PR target/127117
+	* gcc.target/arc/arc.exp (check_effective_target_norm): New.
+	* gcc.target/arc/pr127117.c: New test.
+
+2026-10-06  Oleg Tolmatcev  <oleg.tolmatcev@gmail.com>
+
+	* gcc.target/i386/va-arg-abi-attribute-2.c: New test.
+	* gcc.target/i386/va-arg-abi-attribute-3.c: New test.
+
+2026-10-06  Oleg Tolmatcev  <oleg.tolmatcev@gmail.com>
+
+	* gcc.target/i386/va-arg-abi-attribute.c: New test.
+
+2026-10-06  Jeevitha Palanisamy  <jeevitha@linux.ibm.com>
+
+	PR target/127548
+	* gcc.target/powerpc/vec-shift-double-runnable.c: Add
+	big-endian expected values for vec_sldb and vec_srdb tests.
+
+2026-10-06  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127246
+	* gcc.dg/pr127246-1.c: New test.
+	* gcc.dg/pr127246-2.c: New test.
+	* gcc.dg/pr127246-3.c: New test.
+
+2026-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/53805
+	* gcc.dg/tree-ssa/fp-trapping-cmp-6.c: New testcase
+	* gcc.dg/tree-ssa/fp-trapping-cmp-7.c: Likewise.
+
+2026-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/53805
+	* gcc.dg/tree-ssa/fp-trapping-and-1.c: New testcase.
+
+2026-10-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/127720
+	* gcc.target/i386/pr127720-f16c.c: New test.
+	* gcc.target/i386/pr127720-avx512vl.c: New test.
+
+2026-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127452
+	* gcc.target/i386/vect-umulv2di_high.c: New testcase.
+	* gcc.target/i386/vect-umulv4di_high.c: Likewise.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* gcc.target/aarch64/simd/faminmax-no-codegen.c: Update
+	check-function-bodies checks.
+	* gcc.target/aarch64/neon/vmax.c: New test.
+	* gcc.target/aarch64/neon/vmaxnm.c: Likewise.
+	* gcc.target/aarch64/neon/vmin.c: Likewise.
+	* gcc.target/aarch64/neon/vminnm.c: Likewise.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* gcc.target/aarch64/neon/vrnd.c: New test.
+	* gcc.target/aarch64/neon/vrnda.c: Likewise.
+	* gcc.target/aarch64/neon/vrndi.c: Likewise.
+	* gcc.target/aarch64/neon/vrndm.c: Likewise.
+	* gcc.target/aarch64/neon/vrndn.c: Likewise.
+	* gcc.target/aarch64/neon/vrndp.c: Likewise.
+	* gcc.target/aarch64/neon/vrndx.c: Likewise.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* gcc.target/aarch64/neon/vsqrt.c: New test.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* gcc.target/aarch64/sme/arm_neon_1.c: Update the expected
+	dg-error message.
+	* gcc.target/aarch64/sme/arm_neon_2.c: Likewise.
+	* gcc.target/aarch64/sme/arm_neon_3.c: Likewise.
+	* gcc.target/aarch64/sme/inlining_10.c: Replace vhadd with vqtbl
+	as vhadd is no longer always_inline.
+	* gcc.target/aarch64/sme/inlining_11.c: Likewise.
+	* gcc.target/aarch64/neon/vhadd.c: New test.
+	* gcc.target/aarch64/neon/vrhadd.c: Likewise.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* gcc.target/aarch64/neon/vaddv.c: New test.
+	* gcc.target/aarch64/neon/vmaxnmv.c: New test.
+	* gcc.target/aarch64/neon/vmaxv.c: New test.
+	* gcc.target/aarch64/neon/vminnmv.c: New test.
+	* gcc.target/aarch64/neon/vminv.c: New test.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* gcc.target/aarch64/neon/vqadd.c: New test.
+	* gcc.target/aarch64/neon/vqsub.c: Likewise.
+
+2026-10-06  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/127692
+	* gcc.target/s390/pr127692-1.c: New test.
+
 2026-10-05  Dominic P  <gcc@gcc.dp11.uk>
 
 	PR c/123370

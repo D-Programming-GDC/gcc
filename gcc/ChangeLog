@@ -1,3 +1,248 @@
+2026-10-06  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* tree-ssa-dom.cc (edge_info::derive_equivalences): Remove the
+	constant-first arms of the PLUS_EXPR and EQ_EXPR cases.
+	(record_edge_info): Remove the arm for a constant first operand.
+
+2026-10-06  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* tree-ssa-dom.cc (dom_opt_dom_walker::simplify_stmt): Rename to...
+	(dom_opt_dom_walker::fold_cond): ...this.  Fold a conditional with
+	the ranger, do not simplify anything else.
+	(dom_opt_dom_walker::optimize_stmt): Adjust.
+
+2026-10-06  Michiel Derhaeg  <michiel.derhaeg@globalfoundries.com>
+	    Luis Silva  <luis.silva@globalfoundries.com>
+
+	PR target/127117
+	* config/arc/arc.md (*arc_clzsi2): Produce 31 rather than 32 for
+	a zero operand.
+	(arc_ctzsi2): Likewise.
+
+2026-10-06  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/127719
+	* tree-ssanames.cc (release_ssa_name_fn): Do not call
+	reset_range_info.
+	* value-relation.cc (dom_oracle::nearest_relations): Check the
+	free list before adding a name to the relation list.
+
+2026-10-06  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* genmatch.cc (subtree_has_match_p): New function.
+	(decision_tree::find_node): Replace unconditional DT_TRUE barrier
+	with a scan for DT_MATCH descendants in intermediate siblings.
+
+2026-10-06  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* genmatch.cc (nodes_overlap_p): Return false when the two
+	expressions have different is_generic, as they cannot match the
+	same input.
+
+2026-10-06  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* genmatch.cc (contains_id): For c_expr, check CPP_NAME tokens
+	rather than capture_ids to detect for-iterator references.
+	(lower_for): Skip result copy in replace_id when the for-iterator
+	does not appear in the result, to preserve pointer identity and
+	enable transform sharing.
+
+2026-10-06  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* genmatch.cc (capture::gen_transform): Jump to the failure label
+	rather than return when a comparison needs a sequence and there is
+	none.
+
+2026-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127705
+	* tree-vect-slp.cc (vect_schedule_scc): Fixup SCC copy.
+
+2026-10-06  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gimple.h (gimple_ior_addresses_taken): Delete.
+	* gimple.cc (gimple_ior_addresses_taken_1): Move to...
+	(gimple_ior_addresses_taken): Move to...
+	* tree-ssa.cc (gimple_ior_addresses_taken_1): ...here and rename
+	into set_addresses_taken_1.
+	(gimple_ior_addresses_taken): ...here, swap the parameters and
+	rename into set_addresses_taken.
+	(execute_update_addresses_taken): Adjust to above changes and
+	call set_addresses_taken_1 for the processing of PHI nodes.
+
+2026-10-06  Oleg Tolmatcev  <oleg.tolmatcev@gmail.com>
+
+	* config/i386/i386.cc (ix86_gimplify_va_arg): Always read unnamed
+	256 and 512-bit vectors from the stack.
+
+2026-10-06  Oleg Tolmatcev  <oleg.tolmatcev@gmail.com>
+
+	* config/i386/i386.cc (ix86_pass_by_reference_abi): New function,
+	split out of ...
+	(ix86_pass_by_reference): ... this.
+	(ix86_gimplify_va_arg): Derive argument indirection from the ABI of
+	the va_list type.  Read indirect MS ABI arguments as pointers.
+
+2026-10-06  Max Filippov  <jcmvbkbc@gmail.com>
+
+	* config/xtensa/predicates.md (move_fp_operand): Use CONSTANT_P
+	instead of CONST_DOUBLE_P.
+
+2026-10-06  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/126063
+	* config/aarch64/aarch64-acle-builtins.cc (function_instance::hash):
+	Use ptr diff for hash instead of ptr.
+	(gt_pch_nx): Add the pointers to PCH tracking.
+
+2026-10-06  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127246
+	* cfgcleanup.cc (try_crossjump_bb): Keep the predecessors of a
+	computed jump apart under the condition of the gate of
+	pass_duplicate_computed_gotos.
+
+2026-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/53805
+	* tree-ssa-ifcombine.cc (ifcombine_ifandif): Pass comparisons
+	in the correct order.
+	* gimple-fold.cc (and_comparisons_1): Add FIXME comment.
+	(maybe_fold_and_comparisons): Do not call and_comparisons_1 with
+	swapped comparisons.
+
+2026-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/53805
+	* fold-const.cc (combine_comparisons): Do not treat COMPCODE_FALSE
+	or COMPCODE_TRUE as trapping.
+
+2026-10-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/127720
+	* config/i386/i386.md (extendhfdf2): Enable also for
+	TARGET_F16C || TARGET_AVX512VL, in those cases expand as
+	extendhfsf2 followed by extendsfdf2.
+
+2026-10-06  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127452
+	* config/i386/i386-protos.h (ix86_expand_umulvndi_highpart): Declare.
+	* config/i386/i386-expand.cc (ix86_expand_umulvndi_highpart):
+	New function.
+	* config/i386/sse.md (umul<mode>3_highpart): Add for VI8_AVX2_AVX512F.
+	* config/i386/i386.cc (ix86_vector_costs::add_stmt_cost): Cost
+	IFN_MULH as we implement it.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* config/aarch64/aarch64-neon-builtins-base.cc (vmax, vmaxq, vmin,
+	vminq, vmaxnm, vmaxnmq, vminnm, vminnmq): New function bases.
+	* config/aarch64/aarch64-neon-builtins-base.def (vmax, vmaxq, vmin,
+	vminq, vmaxnm, vmaxnmq, vminnm, vminnmq): New function groups.
+	* config/aarch64/arm_neon.h (vmax_s8, vmax_s16, vmax_s32, vmax_u8,
+	vmax_u16, vmax_u32, vmaxq_s8, vmaxq_s16, vmaxq_s32, vmaxq_u8,
+	vmaxq_u16, vmaxq_u32, vmaxnm_f32, vmaxnm_f64, vmaxnmq_f32, vmaxnmq_f64,
+	vmin_s8, vmin_s16, vmin_s32, vmin_u8, vmin_u16, vmin_u32, vminq_s8,
+	vminq_s16, vminq_s32, vminq_u8, vminq_u16, vminq_u32, vminnm_f32,
+	vminnm_f64, vminnmq_f32, vminnmq_f64, vmaxnm_f16, vmaxnmq_f16,
+	vminnm_f16, vminnmq_f16): Delete functions.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* config/aarch64/aarch64-neon-builtins-base.cc (vrnd, vrndq, vrnda,
+	vrndaq, vrndi, vrndiq, vrndm, vrndmq, vrndn, vrndns, vrndnq, vrndp,
+	vrndpq, vrndx, vrndxq): New function bases.
+	* config/aarch64/aarch64-neon-builtins-base.def (vrnd, vrndq, vrnda,
+	vrndaq, vrndi, vrndiq, vrndm, vrndmq, vrndn, vrndns, vrndnq, vrndp,
+	vrndpq, vrndx, vrndxq): New function groups.
+	* config/aarch64/arm_neon.h (vrnd_f32, vrnd_f64, vrndq_f32, vrndq_f64,
+	vrnda_f32, vrnda_f64, vrndaq_f32, vrndaq_f64, vrndi_f32, vrndi_f64,
+	vrndiq_f32, vrndiq_f64, vrndm_f32, vrndm_f64, vrndmq_f32, vrndmq_f64,
+	vrndns_f32, vrndn_f32, vrndn_f64, vrndnq_f32, vrndnq_f64, vrndp_f32,
+	vrndp_f64, vrndpq_f32, vrndpq_f64, vrndx_f32,  vrndx_f64, vrndxq_f32,
+	vrndxq_f64, vrnd_f16, vrndq_f16, vrnda_f16, vrndaq_f16, vrndi_f16,
+	vrndiq_f16, vrndm_f16, vrndmq_f16, vrndn_f16, vrndnq_f16, vrndp_f16,
+	vrndpq_f16, vrndx_f16, vrndxq_f16): Delete functions.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* config/aarch64/aarch64-neon-builtins-base.cc (vsqrt, vsqrtq):
+	New function bases.
+	* config/aarch64/aarch64-neon-builtins-base.def (vsqrt, vsqrtq):
+	New function groups.
+	* config/aarch64/arm_neon.h (vsqrt_f32, vsqrt_f64, vsqrtq_f32,
+	vsqrtq_f64, vsqrt_f16, vsqrtq_f16): Delete functions.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* config/aarch64/aarch64-neon-builtins-base.cc (vhadd, vhaddq, vrhadd,
+	vrhaddq): New function bases.
+	* config/aarch64/aarch64-neon-builtins-base.def (vhadd, vhaddq, vrhadd,
+	vrhaddq): New function groups.
+	* config/aarch64/arm_neon.h (vhadd_s8, vhadd_s16, vhadd_s32, vhadd_u8,
+	vhadd_u16, vhadd_u32, vhaddq_s8, vhaddq_s16, vhaddq_s32, vhaddq_u8,
+	vhaddq_u16, vhaddq_u32, vrhadd_s8, vrhadd_s16, vrhadd_s32, vrhadd_u8,
+	vrhadd_u16, vrhadd_u32, vrhaddq_s8, vrhaddq_s16, vrhaddq_s32,
+	vrhaddq_u8, vrhaddq_u16, vrhaddq_u32): Delete functions.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* config/aarch64/aarch64-acle-builtins.h (TYPES_s_float_bhs_integer,
+	TYPES_sd_float_all_integer, s_float_bhs_integer,
+	sd_float_all_integer): New type lists.
+	* config/aarch64/aarch64-neon-builtins-base.cc (vaddv, vaddvq, vmaxv,
+	vmaxvq, vminv, vminvq, vmaxnmv, vmaxnmvq, vminnmv, vminnmvq):
+	New function bases.
+	* config/aarch64/aarch64-neon-builtins-base.def (vaddv, vaddvq, vmaxv,
+	vmaxvq, vminv, vminvq, vmaxnmv, vmaxnmvq, vminnmv, vminnmvq):
+	New function groups.
+	* config/aarch64/arm_neon.h (vaddv_s8, vaddv_s16, vaddv_s32, vaddv_u8,
+	vaddv_u16, vaddv_u32, vaddvq_s8, vaddvq_s16, vaddvq_s32, vaddvq_s64,
+	vaddvq_u8, vaddvq_u16, vaddvq_u32, vaddvq_u64, vaddv_f32, vaddvq_f32,
+	vaddvq_f64, vmaxv_s8, vmaxv_s16, vmaxv_s32, vmaxv_u8, vmaxv_u16,
+	vmaxv_u32, vmaxvq_s8, vmaxvq_s16, vmaxvq_s32, vmaxvq_u8, vmaxvq_u16,
+	vmaxvq_u32, vmaxnmv_f32, vmaxnmvq_f32, vmaxnmvq_f64, vminv_s8,
+	vminv_s16, vminv_s32, vminv_u8, vminv_u16, vminv_u32, vminvq_s8,
+	vminvq_s16, vminvq_s32, vminvq_u8, vminvq_u16, vminvq_u32, vminnmv_f32,
+	vminnmvq_f32, vminnmvq_f64, vmaxnmv_f16, vmaxnmvq_f16, vminnmv_f16,
+	vminnmvq_f16): Delete functions.
+
+2026-10-06  Dhruv Chawla  <dhruvc@nvidia.com>
+
+	* config/aarch64/aarch64-neon-builtins-base.cc (vqaddb, vqaddh,
+	vqadds, vqaddd, vqadd, vqaddq, vqsubb, vqsubh, vqsubs, vqsubd, vqsub,
+	vqsubq): New function bases.
+	(one_element_vector_type_p): New function.
+	(gimple_ifn::fold): Automatically convert arguments with
+	single-element vector modes to the corresponding XX modes and back.
+	* config/aarch64/aarch64-neon-builtins-base.def (vqaddb, vqaddh,
+	vqadds, vqaddd, vqadd, vqaddq, vqsubb, vqsubh, vqsubs, vqsubd, vqsub,
+	vqsubq): New function groups.
+	* config/aarch64/arm_neon.h (vqadd_s8, vqadd_s16, vqadd_s32,
+	vqadd_s64, vqadd_u8, vqadd_u16, vqadd_u32, vqadd_u64, vqaddq_s8,
+	vqaddq_s16, vqaddq_s32, vqaddq_s64, vqaddq_u8, vqaddq_u16, vqaddq_u32,
+	vqaddq_u64, vqsub_s8, vqsub_s16, vqsub_s32, vqsub_s64, vqsub_u8,
+	vqsub_u16, vqsub_u32, vqsub_u64, vqsubq_s8, vqsubq_s16, vqsubq_s32,
+	vqsubq_s64, vqsubq_u8, vqsubq_u16, vqsubq_u32, vqsubq_u64, vqaddb_s8,
+	vqaddh_s16, vqadds_s32, vqaddd_s64, vqaddb_u8, vqaddh_u16, vqadds_u32,
+	vqaddd_u64, vqsubb_s8, vqsubh_s16, vqsubs_s32, vqsubd_s64, vqsubb_u8,
+	vqsubh_u16, vqsubs_u32, vqsubd_u64): Delete functions.
+
+2026-10-06  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/127692
+	* config/s390/s390.md: Fix bswap:HI reg-reg splitter.
+
+2026-10-06  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* tree-ssa-scopedtables.h (expr_hash_elt::expr_hash_elt): Remove
+	the undefined tree overload.
+	(initialize_expr_from_cond): Remove declaration.
+	* tree-ssa-scopedtables.cc (initialize_expr_from_cond): Make
+	static.
+
 2026-10-05  Andrew MacLeod  <amacleod@redhat.com>
 
 	PR tree-optimization/127719

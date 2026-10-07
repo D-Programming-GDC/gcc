@@ -1,3 +1,20 @@
+2026-10-06  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR libfortran/127684
+	* caf/shmem.c (_gfortran_caf_sync_images): Do not return early for
+	a stopped or failed image.  Check the images only when one of them
+	terminated.
+	(mark_stopped): Use notify_image_terminated.
+	(_gfortran_caf_fail_image): Likewise.
+	* caf/shmem/supervisor.c (supervisor_main_loop): Likewise.  Do not
+	signal the images waiting in sync_table.
+	* caf/shmem/sync.c (stopped_image_in): New function.
+	(sync_table): Return whether an image of the set terminated.  Stop
+	waiting when an image of the set stopped.
+	(notify_image_terminated): New function.
+	* caf/shmem/sync.h (sync_table): Return bool.
+	(notify_image_terminated): Declare.
+
 2026-10-02  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
 
 	PR libfortran/127702

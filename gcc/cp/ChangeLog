@@ -1,3 +1,15 @@
+2026-10-06  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/127707
+	* name-lookup.cc (finish_nonmember_using_decl): New bool
+	parameter.  Set USING_DECL_TYPENAME_P if it's true.
+	* name-lookup.h (finish_nonmember_using_decl): Adjust
+	declaration.
+	* parser.cc (finish_using_decl): Pass typename_p to
+	finish_nonmember_using_decl.
+	* pt.cc (tsubst_stmt) <case DECL_EXPR>: Pass
+	USING_DECL_TYPENAME_P to finish_nonmember_using_decl.
+
 2026-10-03  Marek Polacek  <polacek@redhat.com>
 
 	PR c++/127344
