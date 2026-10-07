@@ -5681,7 +5681,11 @@ simplify_ashift:
 		  && known_eq (offset, GET_MODE_SIZE (op0_mode))
 		  && !side_effects_p (trueop0)
 		  && !side_effects_p (trueop1))
-		return gen_lowpart (mode, base0);
+		{
+		  tem = rtl_hooks.gen_lowpart_no_emit (mode, base0);
+		  if (tem)
+		    return tem;
+		}
 	    }
 	}
       }
