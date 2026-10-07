@@ -240,6 +240,7 @@ in the following sections.
 -fno-implicit-templates
 -fmodule-header@r{[}=@var{kind}@r{]}
 -fmodule-implicit-inline
+-fno-module-include-translate
 -fno-module-lazy
 -fmodule-mapper=@var{specification}
 -fmodule-only
@@ -3632,6 +3633,12 @@ during code porting.  This option makes such function definitions
 implicitly inline.  It does however generate an ABI incompatibility,
 so you must use it everywhere or nowhere.  (Such definitions outside
 of a named module remain implicitly inline, regardless.)
+
+@opindex fmodule-include-translate
+@opindex fno-module-include-translate
+@item -fno-module-include-translate
+Do not treat #include of a header with a corresponding compiled header
+unit as import.
 
 @opindex fno-module-lazy
 @opindex fmodule-lazy
