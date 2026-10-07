@@ -10865,8 +10865,17 @@ expand_expr_real_2 (const_sepops ops, rtx target, machine_mode tmode,
 	 but that is probably not worth while.  */
 
     case BIT_AND_EXPR:
+      goto binop;
+
     case BIT_IOR_EXPR:
     case BIT_XOR_EXPR:
+      if ((get_nonzero_bits (treeop0) & get_nonzero_bits (treeop1)) == 0)
+	{
+	  expand_operands (treeop0, treeop1,
+			   subtarget, &op0, &op1, EXPAND_NORMAL);
+	  this_optab = aop_optab;
+	  goto binop3;
+	}
       goto binop;
 
     case LROTATE_EXPR:
