@@ -1418,7 +1418,17 @@ add_method (tree type, tree method, bool via_using)
 	  if (losem || losef)
 	    win = losem - losef;
 	  else
-	    win = more_constrained (fn, method);
+	    {
+	      win = more_constrained (fn, method);
+	      if (win)
+		{
+		  /* The winner can't be more explicit.  */
+		  int ex = (DECL_NONCONVERTING_P (method)
+			    - DECL_NONCONVERTING_P (fn));
+		  if (ex && ex != win)
+		    win = 0;
+		}
+	    }
 	  if (win > 0)
 	    /* Leave FN in the method vec, discard METHOD.  */
 	    return false;
