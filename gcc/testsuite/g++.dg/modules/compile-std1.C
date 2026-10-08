@@ -8,6 +8,7 @@
 // { dg-module-cmi std }
 // { dg-module-cmi std.compat }
 // { dg-module-cmi <bits/stdc++.h> }
+// { dg-skip-if "Target libm lacks full long double C99 support required by std module" { hppa*-*-hpux* } }
 
 import std;
 import std.compat;
