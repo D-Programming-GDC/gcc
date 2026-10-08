@@ -1,3 +1,111 @@
+2026-10-07  Hans-Peter Nilsson  <hp@axis.com>
+
+	PR middle-end/84877
+	* gcc.dg/pr84877.c: Remove xfail for cris-*-*.
+
+2026-10-07  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/renaming20.adb: New test.
+
+2026-10-07  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	PR analyzer/125265
+	* gcc.dg/analyzer/named-constants-via-macros-alias.c: New test.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/122774
+	* g++.dg/modules/gmf-7_a.C: New test.
+	* g++.dg/modules/gmf-7_b.C: New test.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	P1811
+	PR c++/99000
+	* g++.dg/modules/compile-std1.C: Also test #include after import.
+	* g++.dg/modules/hello-1_b.C: Likewise.
+	* g++.dg/modules/default-arg-4_b.C: Remove xfails.
+	* g++.dg/modules/pr122053_b.C: Likewise.
+	* g++.dg/modules/gmf-3.h: New test.
+	* g++.dg/modules/gmf-3_a.C: New test.
+	* g++.dg/modules/gmf-3_b.C: New test.
+	* g++.dg/modules/gmf-4_a.C: New test.
+	* g++.dg/modules/gmf-4_b.C: New test.
+	* g++.dg/modules/p1811-1.h: New file.
+	* g++.dg/modules/p1811-1_a.C: New file.
+	* g++.dg/modules/p1811-1_b.C: New file.
+	* g++.dg/modules/p1811-2.h: New file.
+	* g++.dg/modules/p1811-2_a.C: New file.
+	* g++.dg/modules/p1811-2_b.C: New file.
+	* g++.dg/modules/p1811-3.h: New file.
+	* g++.dg/modules/p1811-3_a.C: New file.
+	* g++.dg/modules/p1811-3_b.C: New file.
+	* g++.dg/modules/p1811-4_a.C: New file.
+	* g++.dg/modules/p1811-4_b.C: New file.
+	* g++.dg/modules/p1811-5.h: New file.
+	* g++.dg/modules/p1811-5_a.C: New file.
+	* g++.dg/modules/p1811-5_b.C: New file.
+	* g++.dg/modules/p1811-6.h: New file.
+	* g++.dg/modules/p1811-6_a.C: New file.
+	* g++.dg/modules/p1811-6_b.C: New file.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	* g++.dg/lookup/builtin4.C: Expect warning.
+	* g++.dg/lookup/hidden-class10.C: Likewise.
+
+2026-10-07  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/protected_subtype2.adb: New test.
+
+2026-10-07  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR tree-optimization/108477
+	* gcc.target/i386/pr108477.c: New test case.
+
+2026-10-07  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR rtl-optimization/126521
+	* gcc.target/i386/pr126521.c: New test case.
+
+2026-10-07  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR tree-optimization/127544
+	PR tree-optimization/126562
+	* gcc.dg/pr127544-1.c: New test case.
+
+2026-10-07  Jakub Jelinek  <jakub@redhat.com>
+
+	* g++.dg/warn/Walloc-size-2.C: New test.
+
+2026-10-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/126459
+	* gcc.dg/torture/pr126459.c: New test.
+
+2026-10-07  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR middle-end/127723
+	* c-c++-common/gomp/simdlen-scaled-1.c: New test.
+	* c-c++-common/gomp/simdlen-scaled-2.c: New test.
+	* c-c++-common/gomp/simdlen-scaled-3.c: New test.
+	* c-c++-common/gomp/simdlen-scaled-4.c: New test.
+	* g++.dg/gomp/simdlen-scaled-1.C: New test.
+	* g++.dg/gomp/simdlen-scaled-2.C: New test.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/115806
+	* g++.dg/lookup/using29.C: Adjust diagnostics.
+	* g++.dg/lookup/using68.C: Likewise.
+	* g++.dg/modules/using-19_b.C: Likewise.
+	* g++.dg/lookup/using53.C: Remove xfails.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/127627
+	* g++.dg/cpp2a/explicit21.C: New test.
+
 2026-10-06  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
 
 	PR libfortran/127684

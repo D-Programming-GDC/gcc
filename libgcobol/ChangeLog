@@ -1,3 +1,18 @@
+2026-10-07  Robert Dubner  <rdubner@symas.com>
+
+	* Makefile.am: Include libgcobol.map, libgcobol_compat_gnu.map, and
+	libgcobol_posix.map as -Wl,--version-script inputs.
+	* Makefile.in: Regenerated.
+	* compat/gnu/lib/cbl_gpi.cc (__gg__get_module_names): Minor change
+	to how the external is declared and referenced.
+	(callstack): Likewise.
+	* libgcobol.cc (NO_RDIGITS): Lengthy comment about "How to use
+	symbol versioning".
+	(__gg__module_name_pop): Likewise.
+	* libgcobol.map: New file.
+	* libgcobol_compat_gnu.map: New file.
+	* libgcobol_posix.map: New file.
+
 2026-10-01  Nick Rozinsky  <nick.rozinsky@gmail.com>
 
 	* Makefile.am: Add gettime.cc and posix-clock-gettime.{cbl,cpy}

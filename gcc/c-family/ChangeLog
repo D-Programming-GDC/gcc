@@ -1,3 +1,13 @@
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	* c.opt.urls: Regenerate.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	P1811
+	PR c++/99000
+	* c.opt (fmodule-include-translate): New option.
+
 2026-10-03  Jakub Jelinek  <jakub@redhat.com>
 
 	P3950R1

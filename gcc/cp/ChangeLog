@@ -1,3 +1,60 @@
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	P1811
+	PR c++/99000
+	* module.cc (maybe_translate_include): Check
+	-fmodule-include-translate.
+	* name-lookup.cc (redefinable_import_p): New.
+	(pushdecl): Check DECL_IS_UNDECLARED_BUILTIN instead of hidden_p.
+	(lookup_elaborated_type): Don't special-case cxxabi classes.
+	(pushtag): Handle pushdecl finding a previous definition.
+	* decl.cc (merge_default_template_args): Check redefinable_import_p.
+	(duplicate_decls, grokfndecl, start_enum): Likewise.
+	(redeclaration_error_message): Likewise.
+	* parser.cc (cp_parser_skip_to_end_of_balanced_tokens): New.
+	(cp_parser_skip_function_definition): New.
+	(cp_parser_skip_base_clause): New.
+	(cp_parser_enum_specifier): Skip redundant definition.
+	(cp_parser_class_specifier): Likewise.
+	(cp_parser_class_head): Likewise.
+	(cp_parser_function_definition_from_specifiers_and_declarator):
+	Likewise.
+	* pt.cc (redeclare_class_template): Adjust.
+	* cp-tree.h: Adjust.
+	* name-lookup.h: Adjust.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	* name-lookup.cc (pushtag): Set TREE_PUBLIC sooner.
+	* parser.cc (cp_parser_class_head): Set location and final
+	before 'done' label.
+	* decl.cc (duplicate_decls): Free duplicate namespace alias.
+
+2026-10-07  Jakub Jelinek  <jakub@redhat.com>
+
+	* cp-gimplify.cc (cp_genericize_r): Don't call warn_for_alloc_size
+	for CALL_FROM_NEW_OR_DELETE_P calls.
+
+2026-10-07  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR middle-end/127723
+	* parser.cc (cp_parser_omp_clause_simdlen): Handle
+	simdlen's type and divisor of the scaled modifier.
+	* pt.cc (tsubst_omp_clauses): Likewise
+	* semantics.cc (finish_omp_clauses): Likewise;
+	add comment about safelen vs. simdlen with scaled.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/115806
+	* decl.cc (lookup_and_check_tag): Strip using here...
+	* name-lookup.cc (lookup_elaborated_type): ...not here.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	PR c++/127627
+	* class.cc (add_method): Don't remove a less-explicit function.
+
 2026-10-06  Marek Polacek  <polacek@redhat.com>
 
 	PR c++/127707

@@ -1,3 +1,94 @@
+2026-10-07  Jeff Law  <jeffreyalaw@gmail.com>
+
+	* config/sh/sh.md (aopsi3): Define and route towards IOR.
+
+2026-10-07  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	PR analyzer/125265
+	* doc/params.texi (analyzer-max-macro-alias-depth): Document.
+	* params.opt (-param=analyzer-max-macro-alias-depth=): New.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	* doc/invoke.texi (-fno-module-include-translate): Document.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	* doc/invoke.texi (C++ Modules): Remove "Textual merging" from
+	missing pieces.
+
+2026-10-07  Filip Kastl  <fkastl@suse.cz>
+
+	* gimple-range-cache.h: Add some missing override keywords for
+	member functions.
+	* gimple-range-path.h: Ditto.
+	* gimple-range.h: Ditto.
+	* range-op.cc: Ditto.
+	* value-relation.h: Exchange the virtual keyword for the
+	override keyword where appropriate.
+
+2026-10-07  Filip Kastl  <fkastl@suse.cz>
+
+	* config/i386/i386.cc: Add a missing override keyword for a
+	member functions.
+
+2026-10-07  Jeevitha Palanisamy  <jeevitha@linux.ibm.com>
+
+	PR target/125060
+	* config/rs6000/vector.md (vcond_mask_<mode><mode>): Change the mode
+	iterator from VEC_I to VEC_IC to support V1TI.
+
+2026-10-07  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR tree-optimization/108477
+	* expr.cc (expand_expr_real_2) <case BIT_IOR_EXPR>: Split from
+	BIT_AND_EXPR path.  Use get_nonzero_bits to determine if both
+	operands a bit-wise disjoint, and if so, expand using the
+	backend's preferred aop_optab.
+	<case BIT_XOR_EXPR>: Likewise.
+
+2026-10-07  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR rtl-optimization/126521
+	* ifcvt.cc (noce_try_abs): These conversions are unsafe in the
+	presence of NaNs.
+
+2026-10-07  Roger Sayle  <roger@nextmovesoftware.com>
+
+	PR tree-optimization/127544
+	PR tree-optimization/126562
+	* tree-ssa-math-opts.cc (gimple_expand_builtin_pow): Use
+	tree_expr_maybe_signaling_nan_p insted of REAL_VALUE_ISSIGNALING_NAN
+	to check whether an operand may be a signaling NaN.  pow(x,0.5)
+	also can't be transformed to sqrt(x) if x may be -Inf.
+
+2026-10-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/126459
+	* match.pd (x != CST1 ? x + CST2 : CST3 -> x + CST2): If
+	CST1 + CST2 overflows and type overflow doesn't wrap,
+	simplify into corresponding unsigned addition.
+
+2026-10-07  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR middle-end/127723
+	* attribs.cc (omp_declare_simd_clauses_equal): Handle
+	simdlen's type and divisor of the scaled modifier.
+	* omp-general.cc (resolve_omp_target_device_matches,
+	omp_construct_simd_compare): Likewise.
+	* gimplify.cc (gimplify_scan_omp_clauses): Remove
+	simdlen clause with a sorry when it has a scaled modifier.
+	* omp-simd-clone.cc (simd_clone_clauses_extract): Likewise.
+	* tree-core.h (enum omp_clause_code): Update comment for
+	OMP_CLAUSE_SIMDLEN.
+	* tree-pretty-print.cc (dump_omp_clause): Handle scaled
+	modifier to simdlen.
+	(dump_omp_context_selector): Fix dumping of simd trait.
+	* tree.cc (omp_clause_num_ops): OMP_CLAUSE_SIMDLEN takes
+	now three operands.
+	* tree.h (OMP_CLAUSE_SIMDLEN_TYPE,
+	OMP_CLAUSE_SIMDLEN_DIVISOR): New defines.
+
 2026-10-06  Aldy Hernandez  <aldy@quesejoda.com>
 
 	* tree-ssa-dom.cc (edge_info::derive_equivalences): Remove the

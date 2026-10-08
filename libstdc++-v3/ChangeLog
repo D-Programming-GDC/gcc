@@ -1,3 +1,34 @@
+2026-10-07  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	* include/std/chrono (chrono::__detail::__get_leap_second_info):
+	Update expiry date for leap seconds list.
+	* src/c++20/tzdb.cc (chrono::<unnamed>::fixed_expiry): Likewise.
+	* src/c++20/tzdata.zi: Import new file from 2026e release.
+
+2026-10-07  François Dumont  <frs.dumont@gmail.com>
+
+	* include/debug/safe_base.h:
+	Add #pragma GCC diagnostic to suppress C++11 extensions warnings.
+	(_Safe_iterator_base::_M_sequence): Add default member-initializer.
+	(_Safe_iterator_base::_M_version): Likewise.
+	(_Safe_iterator_base::_M_prior): Likewise.
+	(_Safe_iterator_base::_M_next): Likewise.
+	(_Safe_iterator_base()): Default implementation.
+	(_Safe_iterator_base(const _Safe_sequence_base*, bool)): Forward to default
+	constructor.
+	(_Safe_iterator_base(const _Safe_iterator_base&, bool)): Likewise.
+	(_Safe_sequence_base::_M_iterators): Add default member-initializer.
+	(_Safe_sequence_base::_M_const_iterators): Likewise.
+	(_Safe_sequence_base::_M_version): Likewise.
+	(_Safe_sequence_base()): Default implementation.
+	(_Safe_sequence_base(const _Safe_sequence_base&)): Forward to default
+	constructor.
+
+2026-10-07  Jason Merrill  <jason@redhat.com>
+
+	* include/bits/indirect.h (pmr::indirect): Add std:: qualification.
+	(pmr::polymorphic): Likewise.
+
 2026-10-06  Jonathan Wakely  <jwakely@redhat.com>
 
 	* include/bits/chrono_io.h (_Parser::_M_is_leap_second): Rename

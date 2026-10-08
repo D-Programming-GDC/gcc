@@ -1,3 +1,15 @@
+2026-10-07  Robert Dubner  <rdubner@symas.com>
+
+	* genapi.h (parser_add): Formatting.
+	(parser_divide): Remove unused declaration.
+	(parser_intrinsic_convert): Remove whitespace.
+	(parser_trim): Likewise.
+	* genmath.cc (fast_add): Support faster COMPUTE.
+	(fast_subtract): Support faster COMPUTE.
+	(add_case_1): Whitespace.
+	(parser_as_two): New function detects when faster is possible.
+	(parser_compute): Use parser_as_two().
+
 2026-10-01  Xavier Del Campo Romero  <xdelcampo@symas.com>
 
 	* lexio.cc (cdftext::lex_open): Split objects for included files and

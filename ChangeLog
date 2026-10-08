@@ -1,3 +1,7 @@
+2026-10-07  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config.rpath: Update from gnulib.
+
 2026-09-30  Eric Botcazou  <ebotcazou@adacore.com>
 
 	PR ada/120106
