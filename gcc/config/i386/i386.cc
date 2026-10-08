@@ -26708,9 +26708,6 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 				       : ix86_cost->sse_op);
 	  break;
 
-	case MULT_EXPR:
-	  /* For MULT_HIGHPART_EXPR, x86 only supports pmulhw,
-	     take it as MULT_EXPR.  */
 	case MULT_HIGHPART_EXPR:
 	  if (kind == vector_stmt && GET_MODE_INNER (mode) == DImode)
 	    {
@@ -26721,10 +26718,15 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 	      stmt_cost += ix86_vec_cost (mode, ix86_cost->sse_op) * 10;
 	    }
 	  else
+	    /* For MULT_HIGHPART_EXPR, x86 only supports pmulhw,
+	       take it as MULT_EXPR.  */
 	    stmt_cost = ix86_multiplication_cost (ix86_cost, mode);
 	  break;
-	  /* There's no direct instruction for WIDEN_MULT_EXPR,
-	     take emulation into account.  */
+	case MULT_EXPR:
+	  stmt_cost = ix86_multiplication_cost (ix86_cost, mode);
+	  break;
+	/* There's no direct instruction for WIDEN_MULT_EXPR,
+	   take emulation into account.  */
 	case WIDEN_MULT_EXPR:
 	  stmt_cost = ix86_widen_mult_cost (ix86_cost, mode,
 					    TYPE_UNSIGNED (vectype));
