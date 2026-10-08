@@ -9563,7 +9563,9 @@ namespace __detail
 		__c.reserve(static_cast<range_size_t<_Cont>>(ranges::size(__r)));
 	      // _GLIBCXX_RESOLVE_LIB_DEFECTS
 	      // 4016. container-insertable checks do not match what
-	      // container-inserter does
+	      //       container-inserter does
+	      // 4121. ranges::to constructs associative containers
+	      //       via c.emplace(c.end(), *it)
 	      auto __it = ranges::begin(__r);
 	      const auto __sent = ranges::end(__r);
 	      while (__it != __sent)
@@ -9572,8 +9574,8 @@ namespace __detail
 		    __c.emplace_back(*__it);
 		  else if constexpr (requires { __c.push_back(*__it); })
 		    __c.push_back(*__it);
-		  else if constexpr (requires { __c.emplace(__c.end(), *__it); })
-		    __c.emplace(__c.end(), *__it);
+		  else if constexpr (requires { __c.emplace_hint(__c.end(), *__it); })
+		    __c.emplace_hint(__c.end(), *__it);
 		  else
 		    __c.insert(__c.end(), *__it);
 		  ++__it;
