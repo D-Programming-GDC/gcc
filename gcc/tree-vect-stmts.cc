@@ -58,6 +58,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "optabs-libfuncs.h"
 #include "tree-dfa.h"
+#include "hierarchical_discriminator.h"
 
 /* For lang_hooks.types.type_for_mode.  */
 #include "langhooks.h"
@@ -9707,6 +9708,8 @@ hoist_defs_of_uses (gimple *stmt, class loop *loop, bool hoist_p)
     {
       gimple *def_stmt = SSA_NAME_DEF_STMT (USE_FROM_PTR (use_p));
       gimple *copy = gimple_copy (def_stmt);
+      assign_discriminators_to_stmt
+	(copy, 0, allocate_copyid_base (gimple_location (copy), 1));
       gimple_set_uid (copy, 0);
       def_operand_p def_p = single_ssa_def_operand (def_stmt, SSA_OP_DEF);
       tree new_def = duplicate_ssa_name (DEF_FROM_PTR (def_p), copy);
