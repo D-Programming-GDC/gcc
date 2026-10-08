@@ -518,11 +518,7 @@ get_live_virtual_operand_on_edge (edge e)
 static bool
 vect_use_loop_latch_condition_p (loop_vec_info loop_vinfo)
 {
-  return (loop_vinfo
-	  && LOOP_VINFO_EARLY_BREAKS_VECT_PEELED (loop_vinfo)
-	  && LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo)
-	  && (LOOP_VINFO_PARTIAL_VECTORS_STYLE (loop_vinfo)
-	      != vect_partial_vectors_avx512));
+  return (loop_vinfo && LOOP_VINFO_EARLY_BREAKS_VECT_PEELED (loop_vinfo));
 }
 
 /* Helper for vect_set_loop_condition_partial_vectors.  Generate definitions
@@ -908,6 +904,65 @@ vect_set_loop_controls_directly (class loop *loop, loop_vec_info loop_vinfo,
   return next_ctrl;
 }
 
+  /* Convert the loop into a do-while form similar to what ch_vect would have
+     done.  We know that after the checks and peeling that we have at least one
+     iteration to perform of the loop because the loop is PEELED.  A PEELED loop
+     has the increment exit before the early ones, i.e. it's a do-while loop but
+     if we materialize the IV edge in that place we are essentially checking one
+     iteration ahead so we exit early.  Instead when using masks and the loop
+     is PEELED we remove the existing loop latch and make it a fall through
+     edge and place the latch back to the end of the loop.  So effectively
+     transform:
+
+     header
+       |
+     latch
+       |
+     body
+       |
+     branch to header
+
+     into
+
+     header
+       |
+     body
+       |
+     newlatch
+       |
+     branch to header
+
+     because the conditions in the pre-header makes it safe to do so for some
+     cases.  */
+static void
+vect_reuse_loop_latch (loop_vec_info loop_vinfo, basic_block latch,
+		       edge exit_edge, gcond *old_cond, gcond *cond_stmt)
+{
+  edge latch_e = single_succ_edge (latch);
+  int exit_flags = exit_edge->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE);
+  edge latch_exit_edge = NULL;
+
+  latch_e->flags &= ~(EDGE_FALLTHRU | EDGE_TRUE_VALUE | EDGE_FALSE_VALUE);
+  latch_e->flags |= (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE) ^ exit_flags;
+  latch_exit_edge = make_edge (latch, exit_edge->dest, exit_flags);
+  latch_exit_edge->probability = exit_edge->probability;
+  latch_exit_edge->count () = exit_edge->count ();
+  copy_phi_arg_into_existing_phi (exit_edge, latch_exit_edge);
+  if (gphi *vphi = get_virtual_phi (latch_exit_edge->dest))
+    SET_PHI_ARG_DEF_ON_EDGE (vphi, latch_exit_edge,
+			     get_live_virtual_operand_on_edge (
+			       latch_exit_edge));
+  gimple_stmt_iterator latch_gsi = gsi_last_bb (latch);
+  gsi_insert_after (&latch_gsi, cond_stmt, GSI_NEW_STMT);
+  LOOP_VINFO_MAIN_EXIT (loop_vinfo) = latch_exit_edge;
+
+  if (exit_edge->flags & EDGE_TRUE_VALUE)
+    gimple_cond_make_false (old_cond);
+  else
+    gimple_cond_make_true (old_cond);
+  update_stmt (old_cond);
+}
+
 /* Set up the iteration condition and rgroup controls for LOOP, given
    that LOOP_VINFO_USING_PARTIAL_VECTORS_P is true for the vectorized
    loop.  LOOP_VINFO describes the vectorization of LOOP.  NITERS is
@@ -1036,64 +1091,9 @@ vect_set_loop_condition_partial_vectors (class loop *loop, edge exit_edge,
       cond_stmt
 	= gimple_build_cond (code, test_ctrl, zero_ctrl, NULL_TREE, NULL_TREE);
     }
-  edge latch_exit_edge = NULL;
-  /* Convert the loop into a do-while form similar to what ch_vect would have
-     done.  We know that after the checks and peeling that we have at least one
-     iteration to perform of the loop because the loop is PEELED.  A PEELED loop
-     has the increment exit before the early ones, i.e. it's a do-while loop but
-     if we materialize the IV edge in that place we are essentially checking one
-     iteration ahead so we exit early.  Instead when using masks and the loop
-     is PEELED we remove the existing loop latch and make it a fall through
-     edge and place the latch back to the end of the loop.  So effectively
-     transform:
-
-     header
-       |
-     latch
-       |
-     body
-       |
-     branch to header
-
-     into
-
-     header
-       |
-     body
-       |
-     newlatch
-       |
-     branch to header
-
-     because the conditions in the pre-header makes it safe to do so for some
-     cases.  */
   if (vect_use_loop_latch_condition_p (loop_vinfo))
-    {
-      basic_block latch = loop->latch;
-      edge latch_e = single_succ_edge (latch);
-      int exit_flags = exit_edge->flags & (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE);
-
-      latch_e->flags &= ~(EDGE_FALLTHRU | EDGE_TRUE_VALUE | EDGE_FALSE_VALUE);
-      latch_e->flags |= (EDGE_TRUE_VALUE | EDGE_FALSE_VALUE) ^ exit_flags;
-      latch_exit_edge = make_edge (latch, exit_edge->dest, exit_flags);
-      latch_exit_edge->probability = exit_edge->probability;
-      latch_exit_edge->count () = exit_edge->count ();
-      copy_phi_arg_into_existing_phi (exit_edge, latch_exit_edge);
-      if (gphi *vphi = get_virtual_phi (latch_exit_edge->dest))
-	SET_PHI_ARG_DEF_ON_EDGE (vphi, latch_exit_edge,
-				 get_live_virtual_operand_on_edge
-				   (latch_exit_edge));
-      gimple_stmt_iterator latch_gsi = gsi_last_bb (latch);
-      gsi_insert_after (&latch_gsi, cond_stmt, GSI_NEW_STMT);
-      LOOP_VINFO_MAIN_EXIT (loop_vinfo) = latch_exit_edge;
-
-      gcond *old_cond = as_a <gcond *> (gsi_stmt (loop_cond_gsi));
-      if (exit_edge->flags & EDGE_TRUE_VALUE)
-	gimple_cond_make_false (old_cond);
-      else
-	gimple_cond_make_true (old_cond);
-      update_stmt (old_cond);
-    }
+    vect_reuse_loop_latch (loop_vinfo, loop->latch, exit_edge,
+			   as_a<gcond *> (gsi_stmt (loop_cond_gsi)), cond_stmt);
   else
     gsi_insert_before (&loop_cond_gsi, cond_stmt, GSI_SAME_STMT);
 
@@ -1346,7 +1346,11 @@ vect_set_loop_condition_partial_vectors_avx512 (class loop *loop,
      iv_type.  */
   gcond *cond_stmt = gimple_build_cond (code, index_before_incr, iv_step,
 					NULL_TREE, NULL_TREE);
-  gsi_insert_before (&loop_cond_gsi, cond_stmt, GSI_SAME_STMT);
+  if (vect_use_loop_latch_condition_p (loop_vinfo))
+    vect_reuse_loop_latch (loop_vinfo, loop->latch, exit_edge,
+			   as_a<gcond *> (gsi_stmt (loop_cond_gsi)), cond_stmt);
+  else
+    gsi_insert_before (&loop_cond_gsi, cond_stmt, GSI_SAME_STMT);
 
   /* The loop iterates (NITERS - 1 + NITERS_SKIP) / VF + 1 times.
      Subtract one from this to get the latch count.  */
@@ -1484,16 +1488,14 @@ vect_set_loop_condition_normal (loop_vec_info loop_vinfo, edge exit_edge,
 	     &indx_before_incr, &indx_after_incr,
 	     !loop_vinfo || LOOP_VINFO_IV_INCREMENT_INVARIANT_P (loop_vinfo));
 
-  indx_after_incr = force_gimple_operand_gsi (&loop_cond_gsi, indx_after_incr,
-					      true, NULL_TREE, true,
-					      GSI_SAME_STMT);
-  limit = force_gimple_operand_gsi (&loop_cond_gsi, limit, true, NULL_TREE,
-				     true, GSI_SAME_STMT);
-
   cond_stmt = gimple_build_cond (code, indx_after_incr, limit, NULL_TREE,
 				 NULL_TREE);
 
-  gsi_insert_before (&loop_cond_gsi, cond_stmt, GSI_SAME_STMT);
+  if (vect_use_loop_latch_condition_p (loop_vinfo))
+    vect_reuse_loop_latch (loop_vinfo, loop->latch, exit_edge,
+			   as_a<gcond *> (gsi_stmt (loop_cond_gsi)), cond_stmt);
+  else
+    gsi_insert_before (&loop_cond_gsi, cond_stmt, GSI_SAME_STMT);
 
   /* Record the number of latch iterations.  */
   if (limit == niters)
@@ -1510,7 +1512,6 @@ vect_set_loop_condition_normal (loop_vec_info loop_vinfo, edge exit_edge,
   if (final_iv)
     {
       gassign *assign;
-      gcc_assert (single_pred_p (exit_edge->dest));
       tree phi_dest
 	= integer_zerop (init) ? final_iv : copy_ssa_name (indx_after_incr);
       /* Make sure to maintain LC SSA form here and elide the subtraction
@@ -1519,8 +1520,18 @@ vect_set_loop_condition_normal (loop_vec_info loop_vinfo, edge exit_edge,
       add_phi_arg (phi, indx_after_incr, exit_edge, UNKNOWN_LOCATION);
       if (!integer_zerop (init))
 	{
-	  assign = gimple_build_assign (final_iv, MINUS_EXPR,
-					phi_dest, init);
+	  /* If vectorizing an inverted early break loop we have to restart the
+	     scalar loop at niters - vf.  This matches what we do in
+	     vect_gen_vector_loop_niters_mult_vf for non-masked loops.  */
+	  if (LOOP_VINFO_EARLY_BREAKS_VECT_PEELED (loop_vinfo))
+	    {
+	      tree ftype = TREE_TYPE (final_iv);
+	      tree vf
+		= build_int_cst (ftype, LOOP_VINFO_VECT_FACTOR (loop_vinfo));
+	      assign = gimple_build_assign (final_iv, MINUS_EXPR, init, vf);
+	    }
+	  else
+	    assign = gimple_build_assign (final_iv, MINUS_EXPR, phi_dest, init);
 	  gimple_stmt_iterator gsi = gsi_after_labels (exit_edge->dest);
 	  gsi_insert_before (&gsi, assign, GSI_SAME_STMT);
 	}
