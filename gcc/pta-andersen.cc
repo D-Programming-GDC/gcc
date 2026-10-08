@@ -959,8 +959,8 @@ scc_visit (constraint_graph_t graph, class scc_info *si, unsigned int n)
 		}
 	      else
 		{
-		  unite (lowest_node, i);
-		  graph->indirect_cycles[i - FIRST_REF_NODE] = lowest_node;
+		  if (unite (lowest_node, i))
+		    graph->indirect_cycles[i - FIRST_REF_NODE] = lowest_node;
 		}
 	    }
 	  bitmap_set_bit (si->deleted, lowest_node);
@@ -1977,8 +1977,10 @@ find_equivalent_node (constraint_graph_t graph,
 	{
 	  /* Unify the two variables since we know they are equivalent.  */
 	  if (unite (graph->eq_rep[label], node))
-	    unify_nodes (graph, graph->eq_rep[label], node, false);
-	  return graph->eq_rep[label];
+	    {
+	      unify_nodes (graph, graph->eq_rep[label], node, false);
+	      return graph->eq_rep[label];
+	    }
 	}
       else
 	{
