@@ -1954,6 +1954,20 @@ execute_update_addresses_taken (void)
 	      else if (is_asan_mark_p (stmt)
 		       || gimple_call_internal_p (stmt, IFN_GOMP_SIMT_ENTER))
 		;
+	      else if (gimple_call_internal_p (stmt, IFN_ASSUME))
+		{
+		  /* An address-taken arguments are not relevant for aliasing
+		     and we never expand the call (and need the address).
+		     But we can't use a register.  */
+		  for (unsigned i = 1; i < gimple_call_num_args (stmt); ++i)
+		    {
+		      tree arg = gimple_call_arg (stmt, i);
+		      if (TREE_CODE (arg) == ADDR_EXPR)
+			bitmap_set_bit (not_reg_needs,
+					DECL_UID (get_base_address
+						    (TREE_OPERAND (arg, 0))));
+		    }
+		}
 	      else
 		set_addresses_taken (stmt, addresses_taken);
 	    }
