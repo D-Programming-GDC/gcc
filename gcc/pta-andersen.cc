@@ -149,7 +149,11 @@ static bool
 unite (unsigned int to, unsigned int from)
 {
   gcc_checking_assert (to < graph->size && from < graph->size);
-  if (to != from && graph->rep[from] != to)
+  if (to != from
+      && graph->rep[from] != to
+      /* Do not merge an artificial variable into another, this will
+	 explode solution sets unnecessarily.  */
+      && (from >= FIRST_REF_NODE || !get_varinfo (from)->is_artificial_var))
     {
       graph->rep[from] = to;
       return true;
