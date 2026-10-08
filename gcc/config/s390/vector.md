@@ -67,6 +67,11 @@
 ; All integer vector modes supported in a vector register + TImode
 (define_mode_iterator VIT [V1QI V2QI V4QI V8QI V16QI V1HI V2HI V4HI V8HI V1SI V2SI V4SI V1DI V2DI V1TI TI])
 (define_mode_iterator VIT_VXE3 [V1QI V2QI V4QI V8QI V16QI V1HI V2HI V4HI V8HI V1SI V2SI V4SI V1DI V2DI (V1TI "TARGET_VXE3") (TI "TARGET_VXE3")])
+(define_mode_iterator VIT_VXE3_DT [V1QI V2QI V4QI V8QI V16QI
+				   V1HI V2HI V4HI V8HI
+				   V1SI V2SI V4SI
+				   (V1DI "TARGET_VXE3") (V2DI "TARGET_VXE3")
+				   (V1TI "TARGET_VXE3") (TI   "TARGET_VXE3")])
 (define_mode_iterator VI  [V1QI V2QI V4QI V8QI V16QI V1HI V2HI V4HI V8HI V1SI V2SI V4SI V1DI V2DI])
 (define_mode_iterator VI_VXE3 [V1QI V2QI V4QI V8QI V16QI V1HI V2HI V4HI V8HI V1SI V2SI V4SI V1DI (V2DI "TARGET_VXE3")])
 (define_mode_iterator VI_QHS [V1QI V2QI V4QI V8QI V16QI V1HI V2HI V4HI V8HI V1SI V2SI V4SI])
@@ -2019,6 +2024,17 @@
    operands[4] = gen_reg_rtx (<vec_double>mode);
    operands[5] = s390_expand_merge_perm_const (<vec_double>mode, true);
  })
+
+; vmalb, vmalhw, vmalf, vmalg, vmalq
+(define_insn "*vmal<mode>"
+  [(set (match_operand:VIT_VXE3_DT                    0 "register_operand" "=v")
+	(plus:VIT_VXE3_DT (mult:VIT_VXE3_DT
+			   (match_operand:VIT_VXE3_DT 1 "register_operand"  "v")
+			   (match_operand:VIT_VXE3_DT 2 "general_operand"   "v"))
+			  (match_operand:VIT_VXE3_DT  3 "general_operand"   "v")))]
+  "TARGET_VX"
+  "vmal<bhfgq><w>\t%v0,%v1,%v2,%v3"
+  [(set_attr "op_type" "VRR")])
 
 ; vec_widen_ushiftl_hi
 ; vec_widen_ushiftl_lo

@@ -3966,6 +3966,21 @@ s390_insn_cost (rtx_insn *insn, bool speed)
   return pattern_cost (PATTERN (insn), speed);
 }
 
+/* Returns true if the constant value OP is a legitimate vector operand
+   during and after reload.
+   This function accepts all constants which can be loaded directly
+   into an VR.  */
+
+static bool
+legitimate_reload_vector_constant_p (rtx op)
+{
+  return TARGET_VX && (satisfies_constraint_j00 (op)
+		       || satisfies_constraint_jm1 (op)
+		       || satisfies_constraint_jzz (op)
+		       || satisfies_constraint_jxx (op)
+		       || satisfies_constraint_jyy (op));
+}
+
 /* Compute a (partial) cost for rtx X.  Return true if the complete
    cost has been computed, and false if subexpressions should be
    scanned.  In either case, *TOTAL contains the cost result.  The
@@ -3978,6 +3993,7 @@ s390_rtx_costs (rtx x, machine_mode mode, int outer_code,
 		int opno ATTRIBUTE_UNUSED,
 		int *total, bool speed ATTRIBUTE_UNUSED)
 {
+  constexpr int vml_vmal_costs = COSTS_N_INSNS (5);
   int code = GET_CODE (x);
   switch (code)
     {
@@ -3990,6 +4006,16 @@ s390_rtx_costs (rtx x, machine_mode mode, int outer_code,
     case MEM:
       *total = 0;
       return true;
+
+    case CONST_VECTOR:
+      /* Constant vectors never end up as immediates.  Penalize vectors which
+	 cannot be loaded by a single instruction (vzero, vone, vgm, vgbm,
+	 vrepi) and therefore go through the constant pool.  */
+      *total = COSTS_N_INSNS (1);
+      if (!legitimate_reload_vector_constant_p (x))
+	*total += COSTS_N_INSNS (1);
+      return true;
+
     case SET:
       {
 	rtx dst = SET_DEST (x);
@@ -4161,12 +4187,43 @@ s390_rtx_costs (rtx x, machine_mode mode, int outer_code,
     case XOR:
     case NEG:
     case NOT:
-    case PLUS:
     case MINUS:
       *total = COSTS_N_INSNS (1);
       return false;
 
+    case PLUS:
+      /* Check for VECTOR MULTIPLY AND ADD.  */
+      if (TARGET_VX
+	  && (GET_MODE_CLASS (mode) == MODE_VECTOR_INT || mode == TImode)
+	  /* VMALG/Q become available with z17.  */
+	  && (GET_MODE_UNIT_SIZE (mode) < 8 || TARGET_VXE3)
+	  && GET_CODE (XEXP (x, 0)) == MULT)
+	{
+	  *total = vml_vmal_costs;
+	  *total += rtx_cost (XEXP (x, 1), mode, PLUS, 1, speed);
+	  *total += rtx_cost (XEXP (XEXP (x, 0), 0), mode, MULT, 0, speed);
+	  *total += rtx_cost (XEXP (XEXP (x, 0), 1), mode, MULT, 1, speed);
+	  return true;
+	}
+      *total = COSTS_N_INSNS (1);
+      return false;
+
     case MULT:
+      if (TARGET_VX
+	  && (GET_MODE_CLASS (mode) == MODE_VECTOR_INT || mode == TImode)
+	  /* VMLG/Q become available with z17.  */
+	  && (GET_MODE_UNIT_SIZE (mode) < 8 || TARGET_VXE3))
+	{
+	  /* During expand_mult we may emit a synthetic multiplication
+	     depending on the costs.  For example, for mode V16QI and
+	     multiplicand 123 the sequence VREPI+VML competes with
+	     VESL+VS+VESL+VS.  The downside of the synthetic multiplication is
+	     that on RTL level it is hard to reconstruct the fact that the
+	     sequence was a multiplication which may prohibit the combination
+	     with a PLUS into a VMAL.  */
+	  *total = vml_vmal_costs;
+	  return false;
+	}
       switch (mode)
 	{
 	case E_SImode:
@@ -4509,15 +4566,10 @@ legitimate_pic_operand_p (rtx op)
 static bool
 s390_legitimate_constant_p (machine_mode mode, rtx op)
 {
-  if (TARGET_VX && GET_CODE (op) == CONST_VECTOR)
-    {
-      if (!satisfies_constraint_j00 (op)
-	  && !satisfies_constraint_jm1 (op)
-	  && !satisfies_constraint_jzz (op)
-	  && !satisfies_constraint_jxx (op)
-	  && !satisfies_constraint_jyy (op))
-	return 0;
-    }
+  if (TARGET_VX
+      && GET_CODE (op) == CONST_VECTOR
+      && !legitimate_reload_vector_constant_p (op))
+    return 0;
 
   if (mode == HFmode)
     return satisfies_constraint_j00 (op);
@@ -4698,21 +4750,6 @@ legitimate_reload_fp_constant_p (rtx op)
     return true;
 
   return false;
-}
-
-/* Returns true if the constant value OP is a legitimate vector operand
-   during and after reload.
-   This function accepts all constants which can be loaded directly
-   into an VR.  */
-
-static bool
-legitimate_reload_vector_constant_p (rtx op)
-{
-  return TARGET_VX && (satisfies_constraint_j00 (op)
-		       || satisfies_constraint_jm1 (op)
-		       || satisfies_constraint_jzz (op)
-		       || satisfies_constraint_jxx (op)
-		       || satisfies_constraint_jyy (op));
 }
 
 /* Given an rtx OP being reloaded into a reg required to be in class RCLASS,
