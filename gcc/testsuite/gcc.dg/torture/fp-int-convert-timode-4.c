@@ -4,7 +4,7 @@
 /* { dg-require-effective-target int128 } */
 /* { dg-require-effective-target fenv } */
 /* { dg-require-effective-target hard_float } */
-/* { dg-options "-frounding-math" } */
+/* { dg-options "-frounding-math -lm" } */
 
 #include <fenv.h>
 #include <stdlib.h>

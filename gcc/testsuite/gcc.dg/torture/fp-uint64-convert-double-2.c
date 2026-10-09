@@ -2,7 +2,7 @@
 /* { dg-do run { xfail { arm-*-* } } } */
 /* { dg-require-effective-target fenv } */
 /* { dg-require-effective-target hard_float } */
-/* { dg-additional-options "-frounding-math" } */
+/* { dg-additional-options "-frounding-math -lm" } */
 
 #include <fenv.h>
 #include <stdlib.h>
