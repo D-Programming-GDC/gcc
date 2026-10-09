@@ -760,7 +760,7 @@ bpf_output_destructor (rtx symbol, int priority ATTRIBUTE_UNUSED)
 
    The main purposes of this function are:
    - To reject indirect CALL instructions, which are not supported by
-     eBPF.
+     eBPF, unless targeting xBPF.
    - To recognize calls to kernel helper functions and emit the
      corresponding CALL N instruction.
 
