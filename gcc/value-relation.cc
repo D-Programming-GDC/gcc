@@ -1911,9 +1911,12 @@ dom_oracle::start_search (frontier_data &side, tree root, const_bitmap equiv,
   bitmap_iterator bi;
   EXECUTE_IF_SET_IN_BITMAP (equiv, 0, i, bi)
     {
-      if (i == root_v)
+      // Equivalences are maintained lazily, so ensure they are still
+      // valid before adding them to the frontier.
+      tree name = ssa_name (i);
+      if (i == root_v || !name || SSA_NAME_IN_FREE_LIST (name))
 	continue;
-      m_worklist.safe_push ({ VREL_EQ, ssa_name (i), bb, side.m_rhs });
+      m_worklist.safe_push ({ VREL_EQ, name, bb, side.m_rhs });
       bitmap_set_bit (side.m_visited, i);
       side.set_known (i, VREL_EQ);
     }
