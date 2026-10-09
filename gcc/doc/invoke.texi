@@ -1089,7 +1089,7 @@ Objective-C and Objective-C++ Dialects}.
 @emph{eBPF Options} (@ref{eBPF Options})
 @gccoptlist{-mbig-endian  -mlittle-endian
 -mframe-limit=@var{bytes}  -mxbpf  -mco-re  -mjmpext  -mjmp32
--malu32  -mv3-atomics  -mbswap  -msdiv  -msmov  -mcpu=@var{version}
+-malu32  -mv3-atomics  -mbswap  -msdiv  -msmov  -mcallx  -mcpu=@var{version}
 -masm=@var{dialect}  -minline-memops-threshold=@var{bytes}
 -Wco-re}
 
@@ -26723,6 +26723,16 @@ CPU v4 and above.
 Enable or disable sign-extending move and memory load instructions.
 Enabled for CPU v4 and above.
 
+@opindex mcallx
+@opindex mno-callx
+@item -mcallx
+@itemx -mno-callx
+Enable or disable indirect call instructions, i.e.@: calls through a
+function pointer, which are emitted as @code{call %r@var{N}} in the
+@samp{normal} assembly dialect and as @code{callx r@var{N}} in the
+@samp{pseudoc} one.  With @option{-mno-callx} an indirect call is
+diagnosed as an error.  Enabled for CPU v1 and above.
+
 @opindex mcpu
 @item -mcpu=@var{version}
 This specifies which version of the eBPF ISA to target. Newer versions
@@ -26732,7 +26742,8 @@ Supported values for @var{version} are:
 
 @table @samp
 @item v1
-The first stable eBPF ISA with no special features or extensions.
+The first stable eBPF ISA.  Supports indirect calls, as in
+@option{-mcallx}.
 
 @item v2
 Supports the jump extensions, as in @option{-mjmpext}.
@@ -26765,12 +26776,12 @@ information for the BPF target (@option{-gbtf}).
 @opindex mxbpf
 @opindex mno-xbpf
 @item -mxbpf
-Generate code for an expanded version of BPF, which relaxes some of
-the restrictions imposed by the BPF architecture:
-@itemize @minus
-@item Save and restore callee-saved registers at function entry and
-exit, respectively.
-@end itemize
+Target xBPF, an expanded version of BPF which relaxes some of the
+restrictions imposed by the BPF architecture.  This option does not
+currently affect code generation: it is passed on to the assembler,
+where it selects the @samp{xbpf} ISA spec and thus enables the assembly
+of xBPF-only instructions.  Note that code using such instructions is
+not accepted by the kernel BPF verifier.
 
 @opindex masm=@var{dialect}
 @item -masm=@var{dialect}

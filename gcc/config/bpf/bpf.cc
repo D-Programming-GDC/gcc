@@ -248,6 +248,9 @@ bpf_option_override (void)
   if (bpf_has_smov == -1)
     bpf_has_smov = (bpf_isa >= ISA_V4);
 
+  if (bpf_has_callx == -1)
+    bpf_has_callx = (bpf_isa >= ISA_V1);
+
   /* Disable -fstack-protector as it is not supported in BPF.  */
   if (flag_stack_protect)
     {
@@ -759,8 +762,7 @@ bpf_output_destructor (rtx symbol, int priority ATTRIBUTE_UNUSED)
    is an RTX denoting the address of the called function.
 
    The main purposes of this function are:
-   - To reject indirect CALL instructions, which are not supported by
-     eBPF, unless targeting xBPF.
+   - To reject indirect CALL instructions when disabled by -mno-callx.
    - To recognize calls to kernel helper functions and emit the
      corresponding CALL N instruction.
 
@@ -792,7 +794,7 @@ bpf_output_call (const char *templ, rtx *operands, int target_index)
 	break;
       }
     default:
-      if (!TARGET_XBPF)
+      if (!bpf_has_callx)
 	{
 	  error ("indirect call in function, which are not supported by eBPF");
 	  operands[target_index] = GEN_INT (0);
@@ -1317,11 +1319,11 @@ bpf_asm_named_section (const char *name, unsigned int flags,
 static bool
 bpf_small_register_classes_for_mode_p (machine_mode mode)
 {
-  if (TARGET_XBPF)
+  if (bpf_has_callx)
     return 1;
   else
     /* Avoid putting function addresses in registers, as calling these
-       is not supported in eBPF.  */
+       is not supported with -mno-callx.  */
     return (mode != FUNCTION_MODE);
 }
 

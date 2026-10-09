@@ -540,7 +540,7 @@
 })
 
 ;; Emit a direct call for a constant address (S), or an indirect call
-;; for a register (r), the latter only generated when targeting xBPF.
+;; for a register (r), the latter unless disabled by -mno-callx.
 ;; Indirect calls are spelled `callx rN' in the pseudo-C dialect but
 ;; `call %rN' in the normal one.
 (define_insn "call_internal"
