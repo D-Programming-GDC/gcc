@@ -2745,12 +2745,6 @@
 #endif
 
 
-/* Define to `__inline__' or `__inline' if that's what the C compiler
-   calls it, or to nothing if 'inline' is not supported under any name.  */
-#ifndef __cplusplus
-#undef inline
-#endif
-
 /* Define to the type of a signed integer type of width exactly 16 bits if
    such a type exists and the standard includes do not define it. */
 #ifndef USED_FOR_TARGET

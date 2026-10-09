@@ -6195,48 +6195,6 @@ ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for inline" >&5
-$as_echo_n "checking for inline... " >&6; }
-if ${ac_cv_c_inline+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_cv_c_inline=no
-for ac_kw in inline __inline__ __inline; do
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#ifndef __cplusplus
-typedef int foo_t;
-static $ac_kw foo_t static_foo () {return 0; }
-$ac_kw foo_t foo () {return 0; }
-#endif
-
-_ACEOF
-if ac_fn_cxx_try_compile "$LINENO"; then :
-  ac_cv_c_inline=$ac_kw
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  test "$ac_cv_c_inline" != no && break
-done
-
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_c_inline" >&5
-$as_echo "$ac_cv_c_inline" >&6; }
-
-case $ac_cv_c_inline in
-  inline | yes) ;;
-  *)
-    case $ac_cv_c_inline in
-      no) ac_val=;;
-      *) ac_val=$ac_cv_c_inline;;
-    esac
-    cat >>confdefs.h <<_ACEOF
-#ifndef __cplusplus
-#define inline $ac_val
-#endif
-_ACEOF
-    ;;
-esac
-
 
 # Check whether --enable-largefile was given.
 if test "${enable_largefile+set}" = set; then :
@@ -21872,7 +21830,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21875 "configure"
+#line 21833 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21978,7 +21936,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 21981 "configure"
+#line 21939 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
