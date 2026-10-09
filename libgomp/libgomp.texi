@@ -693,6 +693,7 @@ Technical Report (TR) 15 is the second preview for OpenMP 6.1.
 @item @code{grid} and @code{tile} modifier to the @code{size} clause @tab N @tab
 @item New @code{flatten} loop-transforming directive @tab N @tab
 @item @code{scaled} modifier to @code{simdlen} clause @tab N @tab
+      (@uref{https://gcc.gnu.org/PR127723,PR127723})
 @item Lifted restriction on the first chunk size for the @code{schedule} clause
       with @code{simd} modifier @tab N @tab
 @item Change to the used chunk-size with the @code{schedule} clause and no

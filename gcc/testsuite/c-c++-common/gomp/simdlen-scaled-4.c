@@ -31,8 +31,10 @@ void f() {
 }
 
 // Once implemented remove ...
-// { dg-message "sorry, unimplemented: 'simdlen' clause with 'scaled' modifier" "" { target *-*-* } 19 }
-// { dg-message "sorry, unimplemented: 'simdlen' clause with 'scaled' modifier" "" { target *-*-* } 23 }
+// { dg-message "sorry, unimplemented: 'simdlen' clause with 'scaled' modifier" "" { target *-*-* } 10 }
+// { dg-message "sorry, unimplemented: 'simdlen' clause with 'scaled' modifier" "" { target *-*-* } 11 }
+// { dg-message "sorry, unimplemented: 'simdlen' clause with 'scaled' modifier" "" { target *-*-* } 16 }
+// { dg-message "sorry, unimplemented: 'simdlen' clause with 'scaled' modifier" "" { target *-*-* } 20 }
 
 // ... and the following XFAIL should work ... (it fails because the clause is removed)
 // { dg-final { scan-tree-dump-times "fvarInt2 \\(1\\);" 1 "gimple" { xfail *-*-* } } }

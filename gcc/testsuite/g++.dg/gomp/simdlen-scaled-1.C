@@ -6,17 +6,17 @@
 template<typename T, int d, long l>
 [[omp::decl(declare simd,simdlen(scaled(T, d): l))]]
 void g1(int a) { }
-// { dg-message "sorry, unimplemented: 'scaled' modifier specified in 'simdlen' clause on 'declare simd' directive for 'void g1\\(int\\) \\\[with T = int; int d = 1; long int l = 1\\\]'" "" { target *-*-* } .-1 }
+// { dg-message "sorry, unimplemented: 'simdlen' clause with 'scaled' modifier" "" { target *-*-* } .-2 }
 
 template<typename T, int d, long l>
 [[omp::decl(declare simd,simdlen(scaled(T, d + l): sizeof (T)))]]
 void g2(int a) { }
-// { dg-message "sorry, unimplemented: 'scaled' modifier specified in 'simdlen' clause on 'declare simd' directive for 'void g2\\(int\\) \\\[with T = float; int d = 2; long int l = 0\\\]'" "" { target *-*-* } .-1 }
+// { dg-message "sorry, unimplemented: 'simdlen' clause with 'scaled' modifier" "" { target *-*-* } .-2 }
 
 template<typename T, int d, long l>
 [[omp::decl(declare simd,simdlen(scaled(T): l/d))]]
 void g3(int a) { }
-// { dg-message "sorry, unimplemented: 'scaled' modifier specified in 'simdlen' clause on 'declare simd' directive for 'void g3\\(int\\) \\\[with T = __complex__ double; int d = 2; long int l = 8\\\]'" "" { target *-*-* } .-1 }
+// { dg-message "sorry, unimplemented: 'simdlen' clause with 'scaled' modifier" "" { target *-*-* } .-2 }
 
 void f() {
   g1<int, 1, 1>(1);
