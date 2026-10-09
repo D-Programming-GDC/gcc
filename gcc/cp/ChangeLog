@@ -1,3 +1,9 @@
+2026-10-08  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/127710
+	* cvt.cc (force_lvalue): For a TARGET_EXPR, build
+	(TARGET_EXPR<...>, slot).
+
 2026-10-07  Jason Merrill  <jason@redhat.com>
 
 	P1811

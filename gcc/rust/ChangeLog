@@ -1,3 +1,15 @@
+2026-10-08  Guillaume Gomez  <contact@guillaume-gomez.fr>
+
+	* Make-lang.in: Add compilation of `attr-handlers.c` in
+	Rust front-end.
+	* rust-attribs.cc (handle_leaf_attribute)
+	(handle_const_attribute) (handle_pure_attribute)
+	(handle_novops_attribute) (handle_nothrow_attribute)
+	(handle_returns_twice_attribute) (handle_type_generic_attribute)
+	(handle_fnspec_attribute) (handle_hot_attribute): Rename to `rust_`
+	equivalent to avoid conflict with `attr-handlers.h` functions and remove
+	the functions provided by `attr-handlers.c`.
+
 2026-09-16  Yap Zhi Heng  <yapzhhg@gmail.com>
 
 	* Make-lang.in: Compile the new rust-compile-platform-intrinsic files.

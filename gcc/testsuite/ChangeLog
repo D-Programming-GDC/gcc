@@ -1,3 +1,107 @@
+2026-10-09  Kugan Vivekanandarajah  <kvivekananda@nvidia.com>
+
+	* gcc.dg/hierarchical-discriminator-ch.c: New test.
+	* gcc.dg/hierarchical-discriminator-rtl-unroll.c: Likewise.
+	* gcc.dg/hierarchical-discriminator-tracer.c: Likewise.
+	* gcc.dg/hierarchical-discriminator-unroll-jam.c: Likewise.
+	* gcc.dg/hierarchical-discriminator-unswitch.c: Likewise.
+	* gcc.dg/hierarchical-discriminator-loop-version.c: Require a
+	non-zero discriminator in the assembler scan.
+
+2026-10-08  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/127710
+	* g++.dg/cpp2a/class-copy1.C: New test.
+	* g++.dg/cpp2a/lambda-assign1.C: New test.
+
+2026-10-08  John David Anglin  <danglin@gcc.gnu.org>
+
+	* g++.dg/modules/compile-std1.C: Skip on hppa*-*-hpux*.
+	* g++.dg/plugin/std-module-exports-c++20.C: Likewise.
+	* g++.dg/plugin/std-module-exports-c++23.C: Likewise.
+	* g++.dg/plugin/std-module-exports-c++26.C: Likewise.
+	* g++.dg/plugin/std-module-exports-c++29.C: Likewise.
+	* g++.dg/tm/pr46270.C: Likewise.
+	* g++.dg/torture/pr111019.C: Likewise.
+	* gcc.dg/fold-round-1.c: Likewise.
+	* gcc.dg/lto/pr122515_0.c: Likewise.
+	* gcc.dg/plugin/crash-test-nested-ice.c: Likewise.
+	* gcc.dg/plugin/crash-test-nested-write-through-null.c: Likewise.
+
+2026-10-08  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR rtl-optimization/127743
+	* g++.target/i386/pr127743.C: New test.
+
+2026-10-08  Dominic P  <gcc@gcc.dp11.uk>
+
+	* gcc.target/aarch64/sve/strided_load_9.c: New test.
+	* gcc.target/aarch64/sve/strided_store_8.c: New test.
+
+2026-10-08  Jørgen Kvalsvik  <j@lambda.is>
+
+	* gcc.misc-tests/gcov-44.c: New test.
+
+2026-10-08  Richard Biener  <rguenther@suse.de>
+
+	PR target/127769
+	* gcc.target/i386/vect-mulq-1.c: New testcase.
+
+2026-10-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/127482
+	* gcc.target/avr/torture/pr127482.c: New test.
+
+2026-10-08  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127661
+	* gcc.dg/tree-ssa/pr127661.c: New test.
+
+2026-10-08  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127483
+	* gcc.dg/pr127483.c: New test.
+	* gcc.target/aarch64/pr127483.c: Likewise.
+	* gcc.target/aarch64/pr127483-be.c: Likewise.
+
+2026-10-08  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127661
+	* gcc.dg/pr127661-2.c: New test.
+
+2026-10-08  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127661
+	* gcc.dg/pr127661.c: New test.
+	* gcc.target/aarch64/pr127661.c: New test.
+	* gcc.target/aarch64/pr127661-2.c: New test.
+	* gcc.target/i386/pr127661.c: New test.
+
+2026-10-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127764
+	* gcc.dg/torture/pr127764.c: New testcase.
+
+2026-10-08  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/127606
+	* gcc.dg/pr127606.c: New testcase.
+
+2026-10-08  Jose E. Marchesi  <jemarch@gnu.org>
+
+	* algol68/execute/not-word-bits-1.a68: Fix for 32-bit targets.
+	* algol68/execute/word-bits-shift-1.a68: Likewise.
+
+2026-10-08  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* gcc.target/s390/vector/vmal-1.c: New test.
+	* gcc.target/s390/vector/vmal-2.c: New test.
+
+2026-10-08  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+
+	* lib/lto.exp (lto-link-and-maybe-run): Disable board provided
+	ldflags during incremental link.
+
 2026-10-07  Hans-Peter Nilsson  <hp@axis.com>
 
 	PR middle-end/84877

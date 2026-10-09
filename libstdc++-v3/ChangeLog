@@ -1,3 +1,22 @@
+2026-10-08  John David Anglin  <danglin@gcc.gnu.org>
+
+	* testsuite/26_numerics/headers/cmath/equivalent_functions.cc:
+	Skip on hppa*-*-hpux*.
+	* testsuite/26_numerics/headers/cmath/functions_std_c++17.cc:
+	Likewise.
+
+2026-10-08  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	* include/bits/stl_iterator.h (move_iterator::move_iterator())
+	[__glibcxx_concepts]: Constrain with default_initializable.
+	* testsuite/24_iterators/move_iterator/default_init.cc: New test.
+
+2026-10-08  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	* include/std/ranges (ranges::to): Replace emplace(__c.end(), *__it)
+	with emplace_hint(__c.end(), *__it)
+	* testsuite/std/ranges/conv/1.cc: Update tests accordingly.
+
 2026-10-07  Tomasz Kamiński  <tkaminsk@redhat.com>
 
 	* include/std/chrono (chrono::__detail::__get_leap_second_info):

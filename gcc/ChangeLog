@@ -1,3 +1,212 @@
+2026-10-09  Kugan Vivekanandarajah  <kvivekananda@nvidia.com>
+
+	* ipa-cp.cc (update_profiling_info): Under
+	-fprofile-partial-training lower the original node's profile to
+	local instead of also forcing it to global0.
+
+2026-10-09  Kugan Vivekanandarajah  <kvivekananda@nvidia.com>
+
+	* hierarchical_discriminator.cc (assign_discriminators_to_bb):
+	Handle RTL.
+	* cfghooks.h (struct copy_bb_data): Add skip_copyid.
+	* cfghooks.cc (copyid_location_from_bb): New.
+	(duplicate_block): Assign a fresh copyid unless suppressed.
+	(copy_bbs): Assign one shared copyid for the duplicated region.
+	* cfgloopmanip.h (DLTHE_RECORD_HIERARCHICAL_DISCRIMINATOR): Remove.
+	* cfgloopmanip.cc (duplicate_loop_body_to_header_edge): Remove
+	manual hierarchical discriminator assignment.
+	* gimple-loop-versioning.cc (loop_versioning::version_loop): Rely
+	on copy_bbs for copyids.
+	* tree-vect-loop-manip.cc (vect_do_peeling, vect_loop_versioning):
+	Likewise.
+	* tree-ssa-loop-ivcanon.cc (try_unroll_loop_completely): Drop
+	DLTHE_RECORD_HIERARCHICAL_DISCRIMINATOR.
+	* tree-vect-stmts.cc (hoist_defs_of_uses): Assign copyid to
+	gimple_copy clones.
+	* value-prof.cc (gimple_ic, gimple_stringop_fixed_value): Likewise.
+
+2026-10-08  Dominic P  <gcc@gcc.dp11.uk>
+
+	* tree-vect-stmts.cc (vect_truncate_gather_scatter_offset): Do not
+	lower the element count to the latch iteration count when peeling
+	for alignment.
+
+2026-10-08  Zhongteng Gui  <dragon-archer@outlook.com>
+
+	PR target/127137
+	* config.gcc (i[34567]86-*-mingw* | x86_64-*-mingw*): Remove
+	handling of i386/crtdll.h.
+	* config/i386/crtdll.h: Remove file. No longer used.
+	* doc/install.texi: Remove mingw32crt from the list of targets.
+
+2026-10-08  Alfie Richards  <alfie.richards@arm.com>
+	    Alex Coplan  <alex.coplan@arm.com>
+
+	* config/aarch64/aarch64-acle-builtins.cc
+	(gimple_folder::fold_contiguous_load): New function.
+	* config/aarch64/aarch64-acle-builtins.h
+	(gimple_folder::fold_contiguous_load): New function.
+	* config/aarch64/aarch64-sve-builtins-base.cc:
+	(svld1_impl::fold): Change to use fold_contiguous_load.
+	(svldxf1_extend_impl::fold): Change to use fold_contiguous_load.
+	* config/aarch64/aarch64-sve.md
+	(aarch64_ld<fn>f1_<ANY_EXTEND:optab><SVE_HSDI:mode><SVE_PARTIAL_I:mode>):
+	Add else operand.
+
+2026-10-08  Alfie Richards  <alfie.richards@arm.com>
+
+	* tree-vect-loop-manip.cc (vect_maybe_permute_loop_masks):
+	Make the function optional and retargetable.
+	(vect_maybe_permute_loop_masks):
+	New overload.
+
+2026-10-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127693
+	* tree-ssa-operands.cc (operands_scanner::parse_ssa_operands):
+	For IFN_ASSUME do not cause address-takens.
+	* tree-ssa.cc (execute_update_addresses_taken): Likewise, but
+	still make sure to not rewrite to a register.
+	* gimple-ssa-pta-constraints.cc (find_func_aliases_for_call): No
+	side-effects from IFN_ASSUME, so produce no constraints.
+
+2026-10-08  Jørgen Kvalsvik  <j@lambda.is>
+
+	* prime-paths.cc (scc_exit_prime_paths): Call
+	insert_with_suffix.
+
+2026-10-08  Jeff Law  <jeffreyalaw@gmail.com>
+
+	* config/stormy16/stormy16.md (aopqi3, aophi3): New expanders.
+
+2026-10-08  Richard Biener  <rguenther@suse.de>
+
+	PR target/127769
+	* config/i386/i386.cc (ix86_vector_costs::add_stmt_cost):
+	Separate MULT_EXPR and MULT_HIGHPART_EXPR handling.
+
+2026-10-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127758
+	* pta-andersen.cc (unite): Refuse to merge an artificial
+	variable into another.
+
+2026-10-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127758
+	* pta-andersen.cc (scc_visit): Do not merge when unite fails.
+	(find_equivalent_node): Likewise.
+
+2026-10-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	* config/avr/avr.cc (avr_prologue_setup_frame): Tighten
+	condition for when prologue_saves is used.
+
+2026-10-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/127482
+	* config/avr/avr.cc (sequent_regs_live): Return 0 for
+	noreturn functions, OS_task and OS_main.
+	(avr_prologue_setup_frame, avr_expand_epilogue) <minimize>: Move
+	OS_task and OS_main tests to sequent_regs_live.
+
+2026-10-08  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127661
+	* tree-ssa-dom.cc (names_without_foldable_uses): New variable.
+	(pass_dominator::execute): Allocate and free it.
+	(back_propagate_equivalences): Return early for the names in
+	names_without_foldable_uses unless checking is enabled.  Skip PHI
+	nodes.  Record LHS in names_without_foldable_uses if no use can
+	give an equivalence.
+	(dom_opt_dom_walker::before_dom_children): After optimize_stmt,
+	remove the uses of a statement that defines an SSA name from
+	names_without_foldable_uses.
+
+2026-10-08  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127483
+	* simplify-rtx.cc (simplify_context::simplify_binary_operation_1)
+	<case VEC_CONCAT>: Use rtl_hooks.gen_lowpart_no_emit rather than
+	gen_lowpart, and do not fold if it fails.
+
+2026-10-08  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127661
+	* cprop.cc (bypass_block): Substitute SETCC into the source of
+	JUMP once, before the loop over the incoming edges.
+
+2026-10-08  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127661
+	* cprop.cc (struct bypass_set_cache_entry): New.
+	(bypass_set_cache): New variable.
+	(find_bypass_set): Use and update it.
+	(bypass_conditional_jumps): Allocate and free it.
+
+2026-10-08  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127661
+	* cprop.cc (bypass_setcc_needed_p): New function.
+	(bypass_block): Use it to decide whether to copy SETCC onto a
+	redirected edge.
+	(bypass_conditional_jumps): Update comment.
+
+2026-10-08  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* genmatch.cc (lower_for): Emit a diagnostic and skip replicated
+	substitutions when no for-level iterator appears in the pattern.
+	* match.pd: Move the (for lop ...) vec_cond pattern outside the
+	enclosing (for op ...).
+
+2026-10-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127764
+	* ipa-fnsummary.cc (set_switch_stmt_execution_predicate):
+	Use wi::to_widest to preserve sign when extending min to type.
+
+2026-10-08  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* tree-ssa-threadbackward.cc (class back_threader): Add search
+	and apply; make the destructor virtual.
+	(back_threader::search): New, split out of thread_blocks.
+	(back_threader::apply): Same.
+	(back_threader::thread_blocks): Call them.
+
+2026-10-08  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* gimple-range-path.cc (DEBUG_SOLVER): Move...
+	(path_range_query::range_defined_in_block): Adjust.
+	(path_range_query::compute_ranges_in_block): Likewise.
+	(path_range_query::compute_ranges): Likewise.
+	* gimple-range-path.h (DEBUG_PATH_RANGER): ...here, renamed.
+
+2026-10-08  Aldy Hernandez  <aldy@quesejoda.com>
+
+	* tree-ssa-sccvn.cc (record_unwind_state): New, split out of...
+	(do_rpo_vn_1): ...here.
+
+2026-10-08  Richard Biener  <rguenther@suse.de>
+
+	* simplify-rtx.cc (simplify_context::simplify_binary_operation_1):
+	Also simplify (xor (ior A B) B) to (and (not B) A).
+
+2026-10-08  Richard Biener  <rguenther@suse.de>
+
+	PR rtl-optimization/127606
+	* combine.cc (distribute_and_simplify_rtx): Gate the
+	(and (xor B C) (not A)) to (xor (ior A B) (ior A C))
+	distribution on A not containing a paradoxical subreg.
+
+2026-10-08  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* config/s390/s390.cc (legitimate_reload_vector_constant_p):
+	Move.
+	(s390_rtx_costs): Add costs for VML and VMAL.
+	(s390_legitimate_constant_p): Utilize
+	legitimate_reload_vector_constant_p.
+	* config/s390/vector.md (*vmal<mode>): New insn pattern.
+
 2026-10-07  Jeff Law  <jeffreyalaw@gmail.com>
 
 	* config/sh/sh.md (aopsi3): Define and route towards IOR.

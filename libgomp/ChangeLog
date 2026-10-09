@@ -1,3 +1,7 @@
+2026-10-08  John David Anglin  <danglin@gcc.gnu.org>
+
+	* testsuite/libgomp.c++/target-std__cmath.C: Skip on hppa*-*-hpux*.
+
 2026-09-30  Tobias Burnus  <tburnus@baylibre.com>
 
 	* libgomp.texi (OpenMP 6.0 Impl. Status): Set 'local' clause to 'Y'.
