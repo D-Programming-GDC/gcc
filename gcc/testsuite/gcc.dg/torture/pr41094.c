@@ -1,5 +1,5 @@
 /* { dg-do run } */
-/* { dg-options "-ffast-math -lm" } */
+/* { dg-options "-ffast-math" } */
 
 #include <math.h>
 

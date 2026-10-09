@@ -3,7 +3,7 @@
 /* { dg-do run } */
 /* { dg-require-effective-target int128 } */
 /* { dg-require-effective-target fenv } */
-/* { dg-options "-frounding-math -lm" } */
+/* { dg-options "-frounding-math" } */
 
 #include <fenv.h>
 #include <stdlib.h>
