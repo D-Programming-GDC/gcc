@@ -3694,6 +3694,9 @@
 			    (pre_inc "preinc")
 			    (pre_dec "predec")])
 
+;; Prefer IOR form when expanding any_or_plus
+(define_code_attr aop_pref_ior [(ior "") (xor "*") (plus "*")])
+
 ;; -------------------------------------------------------------------
 ;; Int Iterators.
 ;; -------------------------------------------------------------------

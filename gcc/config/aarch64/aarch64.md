@@ -6889,12 +6889,13 @@
 
 (define_insn "*aarch64_bfxil<mode>_extr"
   [(set (match_operand:GPI 0 "register_operand" "=r")
-        (ior:GPI (and:GPI (match_operand:GPI 1 "register_operand" "0")
-			  (match_operand:GPI 2 "const_int_operand" "n"))
-		 (zero_extract:GPI
-		   (match_operand:GPI 3 "register_operand" "r")
-		   (match_operand:GPI 4 "aarch64_simd_shift_imm_<mode>" "n")
-		   (match_operand:GPI 5 "aarch64_simd_shift_imm_<mode>" "n"))))]
+        (any_or_plus:GPI
+	  (and:GPI (match_operand:GPI 1 "register_operand" "0")
+		   (match_operand:GPI 2 "const_int_operand" "n"))
+	  (zero_extract:GPI
+	    (match_operand:GPI 3 "register_operand" "r")
+	    (match_operand:GPI 4 "aarch64_simd_shift_imm_<mode>" "n")
+	    (match_operand:GPI 5 "aarch64_simd_shift_imm_<mode>" "n"))))]
   "UINTVAL (operands[2]) == HOST_WIDE_INT_M1U << INTVAL (operands[4])
    && INTVAL (operands[4])
    && (UINTVAL (operands[4]) + UINTVAL (operands[5])
@@ -6905,13 +6906,14 @@
 
 (define_insn "*aarch64_bfxilsi_extrdi"
   [(set (match_operand:SI 0 "register_operand" "=r")
-        (ior:SI (and:SI (match_operand:SI 1 "register_operand" "0")
-			(match_operand:SI 2 "const_int_operand" "n"))
-		(match_operator:SI 6 "subreg_lowpart_operator"
-		  [(zero_extract:DI
-		     (match_operand:DI 3 "register_operand" "r")
-		     (match_operand:SI 4 "aarch64_simd_shift_imm_si" "n")
-		     (match_operand:SI 5 "aarch64_simd_shift_imm_si" "n"))])))]
+        (any_or_plus:SI
+	  (and:SI (match_operand:SI 1 "register_operand" "0")
+		  (match_operand:SI 2 "const_int_operand" "n"))
+	  (match_operator:SI 6 "subreg_lowpart_operator"
+	    [(zero_extract:DI
+	       (match_operand:DI 3 "register_operand" "r")
+	       (match_operand:SI 4 "aarch64_simd_shift_imm_si" "n")
+	       (match_operand:SI 5 "aarch64_simd_shift_imm_si" "n"))])))]
   "UINTVAL (operands[2]) == HOST_WIDE_INT_M1U << INTVAL (operands[4])
    && INTVAL (operands[4])
    && UINTVAL (operands[4]) + UINTVAL (operands[5]) <= 32"
@@ -7025,10 +7027,11 @@
 
 (define_insn "*aarch64_bfxil<mode>"
   [(set (match_operand:GPI 0 "register_operand" "=r,r")
-    (ior:GPI (and:GPI (match_operand:GPI 1 "register_operand" "r,0")
-		    (match_operand:GPI 3 "const_int_operand" "n, Ulc"))
-	    (and:GPI (match_operand:GPI 2 "register_operand" "0,r")
-		    (match_operand:GPI 4 "const_int_operand" "Ulc, n"))))]
+    (any_or_plus:GPI
+      (and:GPI (match_operand:GPI 1 "register_operand" "r,0")
+	       (match_operand:GPI 3 "const_int_operand" "n, Ulc"))
+      (and:GPI (match_operand:GPI 2 "register_operand" "0,r")
+	       (match_operand:GPI 4 "const_int_operand" "Ulc, n"))))]
   "(INTVAL (operands[3]) == ~INTVAL (operands[4]))
   && (aarch64_high_bits_all_ones_p (INTVAL (operands[3]))
     || aarch64_high_bits_all_ones_p (INTVAL (operands[4])))"
@@ -7051,8 +7054,8 @@
 ; Zero-extended version of above (aarch64_bfxil)
 (define_insn "*aarch64_bfxilsi_uxtw"
   [(set (match_operand:DI 0 "register_operand" "=r,r")
-	(zero_extend:DI (ior:SI (and:SI (match_operand:SI 1 "register_operand"
-					"r,0")
+	(zero_extend:DI (any_or_plus:SI
+	    (and:SI (match_operand:SI 1 "register_operand" "r,0")
 		    (match_operand:SI 3 "const_int_operand" "n, Ulc"))
 	    (and:SI (match_operand:SI 2 "register_operand" "0,r")
 		    (match_operand:SI 4 "const_int_operand" "Ulc, n")))))]
@@ -7079,14 +7082,15 @@
 ;; operations within an IOR/AND RTX, therefore we have two patterns matching
 ;; each valid permutation.
 
-(define_insn "aarch64_rev16<mode>2_alt1"
+(define_insn "<aop_pref_ior>aarch64_rev16<mode>2_alt1"
   [(set (match_operand:GPI 0 "register_operand" "=r")
-        (ior:GPI (and:GPI (ashift:GPI (match_operand:GPI 1 "register_operand" "r")
-                                      (const_int 8))
-                          (match_operand:GPI 3 "const_int_operand" "n"))
-                 (and:GPI (lshiftrt:GPI (match_dup 1)
-                                        (const_int 8))
-                          (match_operand:GPI 2 "const_int_operand" "n"))))]
+	(any_or_plus:GPI
+	  (and:GPI (ashift:GPI (match_operand:GPI 1 "register_operand" "r")
+			       (const_int 8))
+		   (match_operand:GPI 3 "const_int_operand" "n"))
+	  (and:GPI (lshiftrt:GPI (match_dup 1)
+				 (const_int 8))
+		   (match_operand:GPI 2 "const_int_operand" "n"))))]
   "aarch_rev16_shleft_mask_imm_p (operands[3], <MODE>mode)
    && aarch_rev16_shright_mask_imm_p (operands[2], <MODE>mode)"
   "rev16\\t%<w>0, %<w>1"
@@ -7095,12 +7099,13 @@
 
 (define_insn "*aarch64_rev16<mode>2_alt2"
   [(set (match_operand:GPI 0 "register_operand" "=r")
-        (ior:GPI (and:GPI (lshiftrt:GPI (match_operand:GPI 1 "register_operand" "r")
-                                        (const_int 8))
-                          (match_operand:GPI 2 "const_int_operand" "n"))
-                 (and:GPI (ashift:GPI (match_dup 1)
-                                      (const_int 8))
-                          (match_operand:GPI 3 "const_int_operand" "n"))))]
+	(any_or_plus:GPI
+	  (and:GPI (lshiftrt:GPI (match_operand:GPI 1 "register_operand" "r")
+				 (const_int 8))
+		   (match_operand:GPI 2 "const_int_operand" "n"))
+	  (and:GPI (ashift:GPI (match_dup 1)
+			       (const_int 8))
+		   (match_operand:GPI 3 "const_int_operand" "n"))))]
   "aarch_rev16_shleft_mask_imm_p (operands[3], <MODE>mode)
    && aarch_rev16_shright_mask_imm_p (operands[2], <MODE>mode)"
   "rev16\\t%<w>0, %<w>1"
@@ -7108,7 +7113,7 @@
 )
 
 ;; Similar pattern to match (rotate (bswap) 16)
-(define_insn "aarch64_rev16si2_alt3"
+(define_insn "*aarch64_rev16si2_alt3"
   [(set (match_operand:SI 0 "register_operand" "=r")
         (rotate:SI (bswap:SI (match_operand:SI 1 "register_operand" "r"))
                    (const_int 16)))]
