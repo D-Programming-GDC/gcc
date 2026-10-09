@@ -52,12 +52,6 @@ ACX_PROG_CC_WARNINGS_ARE_ERRORS([manual])
 # Checks for header files.
 GCC_HEADER_STDINT(gstdint.h)
 
-# Checks for typedefs, structures, and compiler characteristics.
-AC_C_CONST
-AC_TYPE_OFF_T
-AC_CHECK_SIZEOF(int)
-AC_CHECK_SIZEOF(long)
-
 AC_ARG_ENABLE(maintainer-mode,
 [  --enable-maintainer-mode enable rules only needed by maintainers],,
 enable_maintainer_mode=no)
