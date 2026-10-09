@@ -60,8 +60,6 @@ AC_CHECK_HEADERS(locale.h fcntl.h limits.h strings.h string.h sys/file.h unistd.
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_BIGENDIAN
-AC_C_CONST
-AC_C_INLINE
 AC_FUNC_OBSTACK
 AC_TYPE_OFF_T
 AC_TYPE_SIZE_T
