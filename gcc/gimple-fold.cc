@@ -8005,6 +8005,8 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
 	{
 	  exp = res_ops[1];
 	  gcc_checking_assert (!pxor_cmp_op && !pxor_and_mask);
+	  if (outer_type && TREE_CODE (exp) == INTEGER_CST)
+	    exp = fold_convert (outer_type, exp);
 	}
       else if (!pxor_cmp_op)
 	/* Not much we can do when xor appears in the right-hand compare
