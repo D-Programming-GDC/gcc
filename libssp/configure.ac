@@ -124,7 +124,7 @@ AM_CONDITIONAL(LIBSSP_USE_SYMVER, [test "x$ssp_use_symver" != xno])
 AM_CONDITIONAL(LIBSSP_USE_SYMVER_GNU, [test "x$ssp_use_symver" = xgnu])
 AM_CONDITIONAL(LIBSSP_USE_SYMVER_SUN, [test "x$ssp_use_symver" = xsun])
 
-AC_CHECK_HEADERS(alloca.h malloc.h paths.h syslog.h string.h unistd.h fcntl.h stdio.h limits.h)
+AC_CHECK_HEADERS(alloca.h malloc.h paths.h syslog.h unistd.h fcntl.h)
 
 if test x$gcc_no_link = xyes; then
   # Presume the ISO C functions are available; add target-specific
