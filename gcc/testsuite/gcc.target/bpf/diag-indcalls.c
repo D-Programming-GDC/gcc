@@ -7,5 +7,5 @@ void (*fnp) (void);
 void
 foo ()
 {
-  (*fnp) ();
-} /* { dg-error "indirect call in function" } */
+  (*fnp) (); /* { dg-error "indirect call in function" } */
+}

@@ -534,7 +534,7 @@
 	      (use (match_operand 3 ""))])]	;; struct_value_size_rtx
   ""
 {
-  rtx target = XEXP (operands[0], 0);
+  rtx target = bpf_check_call_target (XEXP (operands[0], 0));
   emit_call_insn (gen_call_internal (target, operands[1]));
   DONE;
 })
@@ -561,7 +561,7 @@
 	      (use (match_operand 3 ""))])]		;; next_arg_reg
   ""
 {
-  rtx target = XEXP (operands[1], 0);
+  rtx target = bpf_check_call_target (XEXP (operands[1], 0));
   emit_call_insn (gen_call_value_internal (operands[0], target,
                                            operands[2]));
   DONE;
