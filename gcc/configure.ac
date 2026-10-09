@@ -1352,16 +1352,15 @@ AC_HEADER_TIME
 ACX_HEADER_STRING
 AC_HEADER_SYS_WAIT
 AC_HEADER_TIOCGWINSZ
-AC_CHECK_HEADERS(limits.h stddef.h string.h strings.h stdlib.h time.h iconv.h \
+AC_CHECK_HEADERS(stddef.h string.h strings.h time.h iconv.h \
 		 fcntl.h ftw.h unistd.h sys/auxv.h sys/file.h sys/time.h sys/mman.h \
 		 sys/resource.h sys/param.h sys/times.h sys/stat.h sys/locking.h \
-		 direct.h malloc.h langinfo.h ldfcn.h locale.h wchar.h libgen.h)
+		 direct.h malloc.h langinfo.h ldfcn.h wchar.h libgen.h)
 
 # Check for thread headers.
 AC_CHECK_HEADER(thread.h, [have_thread_h=yes], [have_thread_h=])
 AC_CHECK_HEADER(pthread.h, [have_pthread_h=yes], [have_pthread_h=])
 
-# These tests can't be done till we know if we have limits.h.
 gcc_AC_C_CHAR_BIT
 AC_C_BIGENDIAN
 

@@ -277,9 +277,7 @@ extern int errno;
 # endif
 #endif
 
-#ifdef HAVE_STDLIB_H
-# include <stdlib.h>
-#endif
+#include <stdlib.h>
 
 /* When compiling C++ we need to include <cstdlib> as well as <stdlib.h> so
    that it is processed before we poison "malloc"; otherwise, if a source
@@ -324,9 +322,7 @@ extern int errno;
 # undef m_slot
 #endif
 
-#if HAVE_LIMITS_H
-# include <limits.h>
-#endif
+#include <limits.h>
 
 /* A macro to determine whether a VALUE lies inclusively within a
    certain range without evaluating the VALUE more than once.  This
