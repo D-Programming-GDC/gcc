@@ -2884,10 +2884,10 @@ delete_prior_computation (rtx note, rtx_insn *insn)
   rtx_insn *our_prev;
   rtx reg = XEXP (note, 0);
 
-  for (our_prev = prev_nonnote_insn (insn);
+  for (our_prev = prev_nonnote_nondebug_insn (insn);
        our_prev && (NONJUMP_INSN_P (our_prev)
 		    || CALL_P (our_prev));
-       our_prev = prev_nonnote_insn (our_prev))
+       our_prev = prev_nonnote_nondebug_insn (our_prev))
     {
       rtx pat = PATTERN (our_prev);
 
