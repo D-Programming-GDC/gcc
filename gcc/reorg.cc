@@ -670,7 +670,7 @@ note_delay_statistics (int slots_filled, int index)
 static void
 optimize_skip (rtx_jump_insn *insn, vec<rtx_insn *> *delay_list)
 {
-  rtx_insn *trial = next_nonnote_insn (insn);
+  rtx_insn *trial = next_nonnote_nondebug_insn (insn);
   rtx_insn *next_trial = next_active_insn (trial);
   int flags;
 
@@ -1765,7 +1765,7 @@ get_label_before (rtx_insn *insn, rtx sibling)
 
   /* Find an existing label at this point
      or make a new one if there is none.  */
-  label = prev_nonnote_insn (insn);
+  label = prev_nonnote_nondebug_insn (insn);
 
   if (label == 0 || !LABEL_P (label))
     {
@@ -2580,7 +2580,7 @@ fill_slots_from_thread (rtx_jump_insn *insn, rtx condition,
 	  && REG_P (SET_DEST (pat))
 	  && !reg_overlap_mentioned_p (SET_DEST (pat), SET_SRC (pat)))
 	{
-	  rtx_insn *next = next_nonnote_insn (trial);
+	  rtx_insn *next = next_nonnote_nondebug_insn (trial);
 
 	  if (next && NONJUMP_INSN_P (next)
 	      && GET_CODE (PATTERN (next)) != USE
