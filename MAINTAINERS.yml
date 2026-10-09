@@ -1398,6 +1398,16 @@ users:
   roles:
   - WriteAfter
   account: lhtin
+- sn: Dos Reis
+  cn: Gabriel Dos Reis
+  email:
+  - gdr@integrable-solutions.net
+  - gdr@gcc.gnu.org
+  roles:
+  - WriteAfter
+  account: gdr
+  DCO:
+  - gdr@integrable-solutions.net
 - sn: Drepper
   cn: Ulrich Drepper
   email:
