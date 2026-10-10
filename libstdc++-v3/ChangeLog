@@ -1,3 +1,10 @@
+2026-10-09  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	* include/std/simd: Include <bits/ranges_access.h>.
+	Use angled instead of quoted includes.
+	* testsuite/std/simd/traits_common.cc: Add test for
+	calling non-member begin, end, size, ....
+
 2026-10-08  John David Anglin  <danglin@gcc.gnu.org>
 
 	* testsuite/26_numerics/headers/cmath/equivalent_functions.cc:

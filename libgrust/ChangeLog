@@ -1,3 +1,16 @@
+2026-10-09  Sam James  <sam@gentoo.org>
+
+	PR bootstrap/112422
+	* configure: Regenerate.
+	* configure.ac (AC_HEADER_SYS_WAIT): Delete.
+	(AC_CHECK_HEADERS): Delete
+
+2026-10-09  Sam James  <sam@gentoo.org>
+
+	PR bootstrap/112422
+	* configure: Regenerate.
+	* configure.ac: Drop AC_HEADER_STDC.
+
 2026-09-16  Enes Cevik  <enes@nsvke.com>
 
 	* rustc-lib/version-info:

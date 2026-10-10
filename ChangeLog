@@ -1,3 +1,8 @@
+2026-10-09  Gabriel Dos Reis  <gdr@integrable-solutions.net>
+
+	* MAINTAINERS: Regenerate.
+	* MAINTAINERS.yml: Add record for myself.
+
 2026-10-07  Uros Bizjak  <ubizjak@gmail.com>
 
 	* config.rpath: Update from gnulib.

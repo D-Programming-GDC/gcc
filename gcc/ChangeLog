@@ -1,3 +1,214 @@
+2026-10-09  Roger Sayle  <roger@nextmovesoftware.com>
+
+	* config/aarch64/aarch64.cc (aarch64_extr_rtx_p): Allow extr
+	pattern to be represented as either IOR, XOR or PLUS.
+	* config/aarch64/aarch64.md (*aarch64_bfxil<mode>_extr):
+	Use any_or_plus iterator.
+	(*aarch64_bfxilsi_extrdi): Likewise.
+	(*aarch64_bfxil<mode>): Likewise.
+	(*aarch64_bfxilsi_uxtw): Likewise.
+	(aarch64_rev16<mode>2_alt1): Use any_or_plus iterator and
+	new aop_pref_ior attribute so that the gen function uses IOR.
+	(*aarch64_rev16<mode>2_alt2): Use any_or_plus iterator.
+	(*aarch64_rev16si2_alt3): Add "*" prefix to skip gen function.
+	* config/aarch64/iterators.md (aop_pref_ior): New code attribute to
+	produce "*" for XOR/PLUS.
+
+2026-10-09  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/127781
+	* value-relation.cc (dom_oracle::start_search): Check if any equiv
+	set elements are now in the free list.
+
+2026-10-09  Sam James  <sam@gentoo.org>
+
+	PR bootstrap/112422
+	* configure: Regenerate.
+	* configure.ac: AC_HEADER_STDC.
+
+2026-10-09  Igor Shevlyakov  <igor@tachyum.com>
+
+	PR tree-optimization/127784
+	* tree-vect-stmts.cc (vectorizable_simd_clone_call): Pass a vector
+	of 1s as an all-true mask for a VOIDmode mask_mode.
+
+2026-10-09  Christopher Bazley  <chris.bazley@arm.com>
+
+	* tree-vect-loop.cc (vectorizable_live_operation): Simplify the
+	calculation of the index of the final result to avoid
+	generating invalid polynomial offsets relative to the end of
+	variable-length vector types, which is what happens if the code
+	for loop vectorization is reused for basic block SLP.
+
+2026-10-09  Jeff Law  <jeffreyalaw@gmail.com>
+
+	* config/h8300/logical.md (aop<mode>3): New expander.
+
+2026-10-09  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR middle-end/127723
+	* omp-simd-clone.cc (simd_clone_clauses_extract): Remove sorry
+	diagnostic for simdlen with scaled modifier, moved to
+	c-family/c-omp.cc to ensure it is always active not only when
+	a target hook exists.
+
+2026-10-09  Yongqiang Tian  <yqtian668@gmail.com>
+
+	PR rtl-optimization/127725
+	* reorg.cc (optimize_skip): Use next_nonnote_nondebug_insn.
+	(get_label_before): Use prev_nonnote_nondebug_insn.
+	(fill_slots_from_thread): Use next_nonnote_nondebug_insn.
+
+2026-10-09  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	PR rtl-optimization/127661
+	* cfganal.h (compute_idf): Add a bitmap argument, NULL by default.
+	* cfganal.cc (compute_idf): Add the LIVE argument.  If it is not
+	NULL, only add and follow the blocks in it.
+	* tree-into-ssa.cc (prune_unused_phi_nodes): Update the comment
+	about computing liveness.
+	(compute_livein_region): New function.
+	(insert_updated_phi_nodes_for): Use it to restrict the IDF of old
+	virtual names.
+
+2026-10-09  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* genmatch.cc (MATCHER_FN_FILE_FRACTION)
+	(MATCHER_FN_MIN_RUN_FRACTION): New constants.
+	(ssa_name_group_p, phi_cond_group_p): New functions.
+	(class fn_splitter): New class.
+	(fn_splitter::split_out_p, fn_splitter::same_chunk_p)
+	(fn_splitter::full, fn_splitter::print_params)
+	(fn_splitter::print_args, fn_splitter::choose_chunk_file)
+	(fn_splitter::open_chunk, fn_splitter::close_chunk)
+	(fn_splitter::emit_dispatch, collect_alt_units)
+	(fn_splitter::emit_alternatives): New functions.
+	(dt_node::gen_kids): Add an optional fn_splitter argument and use it
+	at valid function-level boundaries.
+	(dt_node::gen_kids_1): Add an optional fn_splitter argument and call
+	the function holding a group in place of its body.  Check that the
+	GENERIC SSA_NAME group and groups with a PHI form stay in the entry
+	function.  Use ssa_name_group_p.
+	(decision_tree::gen): Set the matcher function budget and use
+	fn_splitter for large per-operation matchers.
+
+2026-10-09  Yongqiang Tian  <yqtian668@gmail.com>
+
+	PR rtl-optimization/127795
+	* reorg.cc (delete_prior_computation): Ignore debug insns in the
+	backward scan.
+
+2026-10-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127521
+	* gimple-fold.cc (fold_truth_andor_for_ifcombine): Reject
+	non-constant compares that test the same bit in different ways.
+
+2026-10-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/126563
+	* tree-ssa-ifcombine.cc (recognize_bits_test): Do not call
+	get_name_for_bit_test on rhs1.
+	(ifcombine_ifandif): Check all operands for abnormal PHIs.
+	Look through conversions via get_name_for_bit_test on the names
+	only when direct matching fails.
+
+2026-10-09  Aldy Hernandez  <aldy@quesejoda.com>
+
+	PR tree-optimization/126904
+	* tree-ssa-sccvn.h (class vn_driver): New.
+	(run_rpo_vn, eliminate_with_rpo_vn, free_rpo_vn): Remove.
+	* tree-ssa-sccvn.cc (class eliminate_dom_walker): Make the
+	destructor virtual.
+	(eliminate_with_rpo_vn): Make static.
+	(run_rpo_vn): Rename to ...
+	(assign_value_ids): ... this, static and without the walk.
+	(free_rpo_vn): Make static.
+	(do_rpo_vn_1): Take the walker and the RPO map from the caller.
+	(vn_driver::vn_driver, vn_driver::~vn_driver)
+	(vn_driver::finalize): New.
+	(do_rpo_vn, pass_fre::execute): Use a vn_driver.
+	* tree-ssa-pre.cc (pass_pre::execute): Same.
+
+2026-10-09  Jeff Law  <jeffrey.law@oss.qualcomm.com>
+
+	* config/h8300/h8300.cc (compute_a_shift_length): Do not do any special
+	length adjustment for H8/SX for SHIFT_SPECIAL.
+
+2026-10-09  Alfie Richards  <alfie.richards@arm.com>
+
+	* tree-vect-loop-manip.cc (vect_set_loop_controls_directly):
+	Use standard_iv_increment_position instead of
+	vect_iv_increment_position.
+	(vect_set_loop_condition_partial_vectors_avx512): Likewise
+	(vect_set_loop_condition_normal): Likewise.
+	* tree-vect-loop.cc
+	(vect_update_ivs_after_vectorizer_for_early_breaks):
+	Likewise.
+
+2026-10-09  Alfie Richards  <alfie.richards@arm.com>
+	    Tamar Christina  <tamar.christina@arm.com>
+
+	PR tree-optimization/126301
+	* tree-vect-loop-manip.cc (vect_use_loop_latch_condition_p):
+	Remove restriction for avx512 and non-partial vectors.
+	(vect_reuse_loop_latch): New function.
+	(vect_set_loop_condition_partial_vectors_avx512):
+	Add logic for do loop transformation.
+	(vect_set_loop_condition_normal): Likewise.
+
+2026-10-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127762
+	* gimple-fold.cc (decode_field_reference): Change psignbit to
+	int * and set it to 1 for sign extensions, -1 if all extension
+	bits are clear, or 0 otherwise.
+	(fold_truth_andor_for_ifcombine): Change ll_signbit, lr_signbit,
+	rl_signbit, and rr_signbit to int.  Check for signbit > 0 when
+	including sign bit in test, and signbit < 0 when checking for
+	zero-extension.  Only reject positive lr_signbit and
+	rr_signbit.
+
+2026-10-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127447
+	PR tree-optimization/125444
+	PR tree-optimization/124937
+	* gimple-fold.cc (decode_field_reference): Convert exp to
+	outer_type when decoding an INTEGER_CST right-hand XOR operand.
+
+2026-10-09  Vineet Gupta  <vineet.gupta@linux.dev>
+
+	* config/bpf/bpf-protos.h (bpf_check_call_target): New prototype.
+	* config/bpf/bpf.cc (bpf_check_call_target): New function.
+	(bpf_output_call): Update comment and error message.
+	* config/bpf/bpf.md (call): Check the call target with
+	bpf_check_call_target.
+	(call_value): Likewise.
+
+2026-10-09  Vineet Gupta  <vineet.gupta@linux.dev>
+
+	* config/bpf/bpf.opt (mcallx): New option.
+	* config/bpf/bpf.cc (bpf_option_override): Enable bpf_has_callx
+	for CPU v1 and above.
+	(bpf_output_call): Check bpf_has_callx instead of TARGET_XBPF.
+	(bpf_small_register_classes_for_mode_p): Likewise.
+	* config/bpf/bpf-c.cc (bpf_target_macros): Define
+	__BPF_FEATURE_CALLX.
+	* config/bpf/bpf.md (call_internal): Update comment.
+	* doc/invoke.texi (eBPF Options): Document -mcallx.  Document
+	that -mxbpf is only passed on to the assembler, and remove the
+	stale note about callee-saved registers.
+
+2026-10-09  Vineet Gupta  <vineet.gupta@linux.dev>
+
+	* config/bpf/bpf.md (call_internal): Split the call target
+	constraint into separate alternatives for a constant address and
+	for a register, and use the pseudo-C spelling `callx' for the
+	latter.
+	(call_value_internal): Likewise.
+	* config/bpf/bpf.cc (bpf_output_call): Update comment.
+
 2026-10-09  Kugan Vivekanandarajah  <kvivekananda@nvidia.com>
 
 	* ipa-cp.cc (update_profiling_info): Under

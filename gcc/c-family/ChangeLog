@@ -1,3 +1,10 @@
+2026-10-09  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR middle-end/127723
+	* c-omp.cc (c_omp_declare_simd_clauses_to_numbers): Add sorry
+	diagnostic for simdlen with scaled modifer, moved from
+	omp-simd-clone.cc to ensure it is always active.
+
 2026-10-07  Jason Merrill  <jason@redhat.com>
 
 	* c.opt.urls: Regenerate.

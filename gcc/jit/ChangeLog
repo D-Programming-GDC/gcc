@@ -1,3 +1,11 @@
+2026-10-09  Zhongteng Gui  <dragon-archer@outlook.com>
+
+	PR jit/125229
+	* Make-lang.in: Seperate conditions for JIT_LDFLAGS and
+	LIBGCCJIT_EXTRA_OPTS, fixed special condition where host
+	is Darwin and target is MinGW, existing special handling
+	for JIT_LDFLAGS on Darwin hosts will also be effective.
+
 2026-10-01  Guillaume Gomez  <contact@guillaume-gomez.fr>
 
 	* Make-lang.in: Compile new attr-handlers.cc file

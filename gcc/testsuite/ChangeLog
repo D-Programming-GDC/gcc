@@ -1,3 +1,125 @@
+2026-10-09  John David Anglin  <danglin@gcc.gnu.org>
+
+	Revert:
+	2026-10-09  John David Anglin  <danglin@gcc.gnu.org>
+
+	* gcc.dg/torture/fp-double-convert-float-1.c: Add -lm to
+	dg-additional-options.
+	* gcc.dg/torture/fp-uint64-convert-double-1.c: Likewise.
+	* gcc.dg/torture/fp-uint64-convert-double-2.c: Likewise.
+	* gcc.dg/torture/fp-int-convert-timode-2.c: Add -lm to
+	dg-options.
+	* gcc.dg/torture/fp-int-convert-timode-3.c: Likewise.
+	* gcc.dg/torture/fp-int-convert-timode-4.c: Likewise.
+	* gcc.dg/torture/pr41094.c: Likewise.
+
+2026-10-09  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/127781
+	* gcc.dg/pr127781.c: New.
+
+2026-10-09  John David Anglin  <danglin@gcc.gnu.org>
+
+	* gcc.dg/torture/fp-double-convert-float-1.c: Add -lm to
+	dg-additional-options.
+	* gcc.dg/torture/fp-uint64-convert-double-1.c: Likewise.
+	* gcc.dg/torture/fp-uint64-convert-double-2.c: Likewise.
+	* gcc.dg/torture/fp-int-convert-timode-2.c: Add -lm to
+	dg-options.
+	* gcc.dg/torture/fp-int-convert-timode-3.c: Likewise.
+	* gcc.dg/torture/fp-int-convert-timode-4.c: Likewise.
+	* gcc.dg/torture/pr41094.c: Likewise.
+
+2026-10-09  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/127794
+	* gm2.dg/pim/pass/largestore.mod: New test.
+	* gm2.dg/pim/pass/largestore2.mod: New test.
+
+2026-10-09  Igor Shevlyakov  <igor@tachyum.com>
+
+	PR tree-optimization/127784
+	* gcc.dg/vect/vect-simd-clone-allones-mask.c: New test.
+
+2026-10-09  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR middle-end/127723
+	* c-c++-common/gomp/simdlen-scaled-1.c: Update dg-message sorry
+	handling.
+	* c-c++-common/gomp/simdlen-scaled-4.c: Ditto.
+	* g++.dg/gomp/simdlen-scaled-1.C: Ditto.
+	* g++.dg/gomp/simdlen-scaled-2.C: Ditto.
+
+2026-10-09  Yongqiang Tian  <yqtian668@gmail.com>
+
+	PR rtl-optimization/127725
+	* gcc.target/sparc/reorg-fill-slots-regcopy-debug.c: New test.
+	* gcc.target/sparc/reorg-get-label-before-debug.c: New test.
+	* gcc.target/sparc/reorg-optimize-skip-debug.c: New test.
+
+2026-10-09  Yongqiang Tian  <yqtian668@gmail.com>
+
+	PR rtl-optimization/127795
+	* gcc.target/sparc/reorg-delete-prior-debug.c: New test.
+
+2026-10-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127521
+	* gcc.dg/field-merge-30.c: New test.
+	* gcc.dg/field-merge-31.c: New test.
+
+2026-10-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/126563
+	* gcc.dg/tree-ssa/ssa-ifcombine-14.c: New test.
+	* gcc.dg/tree-ssa/ssa-ifcombine-15.c: New test.
+
+2026-10-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127762
+	* gcc.dg/field-merge-27.c: New test.
+	* gcc.dg/field-merge-29.c: New test.
+
+2026-10-09  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/127447
+	PR tree-optimization/125444
+	PR tree-optimization/124937
+	* gcc.dg/field-merge-28.c: New test.
+
+2026-10-09  Vineet Gupta  <vineet.gupta@linux.dev>
+
+	* gcc.target/bpf/diag-indcalls.c: Expect the error at the call
+	instead of at the end of the function.
+	* gcc.target/bpf/diag-indcalls-2.c: New test.
+
+2026-10-09  Vineet Gupta  <vineet.gupta@linux.dev>
+
+	* gcc.target/bpf/diag-indcalls.c: Pass -mno-callx.
+	* gcc.target/bpf/feature-macro-1.c: Pass -mcallx and check
+	__BPF_FEATURE_CALLX.
+	* gcc.target/bpf/feature-macro-3.c: New test.
+	* gcc.target/bpf/feature-macro-4.c: New test.
+	* gcc.target/bpf/indirect-call-1.c: New test.
+	* gcc.target/bpf/indirect-call-2.c: New test.
+
+2026-10-09  Vineet Gupta  <vineet.gupta@linux.dev>
+
+	* gcc.target/bpf/xbpf-indirect-call-2.c: New test.
+
+2026-10-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/121508
+	PR preprocessor/123339
+	* c-c++-common/cpp/pr121508-1.c: New test.
+	* c-c++-common/cpp/pr121508-2.c: New test.
+	* c-c++-common/cpp/pr121508-3.c: New test.
+	* c-c++-common/cpp/pr121508-4.c: New test.
+	* c-c++-common/cpp/pr121508-5.c: New test.
+	* c-c++-common/cpp/pr123339.c: New test.
+	* c-c++-common/gomp/has-include-1.c: Remove spurious extra
+	dg-error.
+
 2026-10-09  Kugan Vivekanandarajah  <kvivekananda@nvidia.com>
 
 	* gcc.dg/hierarchical-discriminator-ch.c: New test.
