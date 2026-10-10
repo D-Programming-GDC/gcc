@@ -1,7 +1,7 @@
 /* { dg-do compile } */
 /* { dg-options "-O2" } */
 /* { dg-final { check-function-bodies "**" "" "" } } */
-/* { dg-final { scan-assembler-times {\n\tvzero\t} 9 } } */
+/* { dg-final { scan-assembler-times {\n\tvzero\t} 3 } } */
 
 typedef unsigned char __attribute__ ((vector_size (16))) v16qi;
 typedef unsigned short __attribute__ ((vector_size (16))) v8hi;
@@ -172,14 +172,9 @@ v16qi clzv16qi_z13 (v16qi x)
   return x;
 }
 
-/* TODO: fold zero test.
-
+/*
 ** clzgv16qi_z13:
-**	vzero	(%v[0-9]+)
-**	vceqb	(%v[0-9]+),%v24,\1
-**	vgm	(%v[0-9]+),4,4,0
 **	vclzb	%v24,%v24
-**	vsel	%v24,\3,%v24,\2
 **	br	%r14
 */
 
@@ -210,14 +205,9 @@ v8hi clzv8hi_z13 (v8hi x)
   return x;
 }
 
-/* TODO: fold zero test.
-
+/*
 ** clzgv8hi_z13:
-**	vzero	(%v[0-9]+)
-**	vceqh	(%v[0-9]+),%v24,\1
-**	vgm	(%v[0-9]+),11,11,1
 **	vclzh	%v24,%v24
-**	vsel	%v24,\3,%v24,\2
 **	br	%r14
 */
 
@@ -354,6 +344,12 @@ void ctzsi_z13_autovec (unsigned int *x)
 }
 
 /* TODO: fold zero test.
+   In contrast to ctzsi_z13_autovec, vect-pattern recognition fails because
+   type precision differs for lhs and promoted rhs.  Consequently no ctz ifn is
+   constructed which is required by match.pd in order to fold a zero test.
+   Furthermore, in contrast to ctzdi_z17_autovec where phiopt2 already folds
+   the zero test since starting with z17 ctzdi2 becomes available and
+   vect-patterns recog never sees a zero test.
 
 ** ctzdi_z13_autovec:
 **	...
@@ -409,14 +405,9 @@ void ctzti_z17_autovec (int *x, unsigned __int128 *y)
 }
 
 
-/* TODO: fold zero test.
-
+/*
 ** ctzv16qi_z13:
-**	vzero	(%v[0-9]+)
-**	vceqb	(%v[0-9]+),%v24,\1
-**	vgm	(%v[0-9]+),4,4,0
 **	vctzb	%v24,%v24
-**	vsel	%v24,\3,%v24,\2
 **	br	%r14
 */
 
@@ -428,14 +419,9 @@ v16qi ctzv16qi_z13 (v16qi x)
   return x;
 }
 
-/* TODO: fold zero test.
-
+/*
 ** ctzv8hi_z13:
-**	vzero	(%v[0-9]+)
-**	vceqh	(%v[0-9]+),%v24,\1
-**	vgm	(%v[0-9]+),11,11,1
 **	vctzh	%v24,%v24
-**	vsel	%v24,\3,%v24,\2
 **	br	%r14
 */
 
@@ -447,14 +433,9 @@ v8hi ctzv8hi_z13 (v8hi x)
   return x;
 }
 
-/* TODO: fold zero test.
-
+/*
 ** ctzv4si_z13:
-**	vzero	(%v[0-9]+)
-**	vceqf	(%v[0-9]+),%v24,\1
-**	vgm	(%v[0-9]+),26,26,2
 **	vctzf	%v24,%v24
-**	vsel	%v24,\3,%v24,\2
 **	br	%r14
 */
 
