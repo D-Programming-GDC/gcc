@@ -1942,7 +1942,7 @@ vect_recog_ctz_ffs_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
     {
       ifnnew = IFN_CTZ;
       defined_at_zero_new
-	= CTZ_DEFINED_VALUE_AT_ZERO (SCALAR_INT_TYPE_MODE (rhs_type),
+	= CTZ_DEFINED_VALUE_AT_ZERO (TYPE_MODE (vec_rhs_type),
 				     val_new) == 2;
     }
   else if (direct_internal_fn_supported_p (IFN_CLZ, vec_rhs_type,
@@ -1950,7 +1950,7 @@ vect_recog_ctz_ffs_pattern (vec_info *vinfo, stmt_vec_info stmt_vinfo,
     {
       ifnnew = IFN_CLZ;
       defined_at_zero_new
-	= CLZ_DEFINED_VALUE_AT_ZERO (SCALAR_INT_TYPE_MODE (rhs_type),
+	= CLZ_DEFINED_VALUE_AT_ZERO (TYPE_MODE (vec_rhs_type),
 				     val_new) == 2;
     }
   if ((ifnnew == IFN_LAST
@@ -2243,6 +2243,10 @@ vect_recog_popcount_clz_ctz_ffs_pattern (vec_info *vinfo,
   if (TYPE_PRECISION (unprom_diff.type) != TYPE_PRECISION (lhs_type))
     return NULL;
 
+  vec_type = get_vectype_for_scalar_type (vinfo, lhs_type);
+  if (!vec_type || !VECTOR_MODE_P (TYPE_MODE (vec_type)))
+    return NULL;
+
   /* Also A should be unsigned or same precision as temp_in, otherwise
      different builtins/internal functions have different behaviors.  */
   if (TYPE_PRECISION (unprom_diff.type)
@@ -2272,8 +2276,7 @@ vect_recog_popcount_clz_ctz_ffs_pattern (vec_info *vinfo,
 	    int val1, val2;
 	    val1 = tree_to_shwi (gimple_call_arg (call_stmt, 1));
 	    int d2
-	      = CLZ_DEFINED_VALUE_AT_ZERO (SCALAR_INT_TYPE_MODE (lhs_type),
-					   val2);
+	      = CLZ_DEFINED_VALUE_AT_ZERO (TYPE_MODE (vec_type), val2);
 	    if (d2 != 2 || val1 != val2 + addend)
 	      return NULL;
 	  }
@@ -2288,8 +2291,7 @@ vect_recog_popcount_clz_ctz_ffs_pattern (vec_info *vinfo,
 	    int val1, val2;
 	    val1 = tree_to_shwi (gimple_call_arg (call_stmt, 1));
 	    int d2
-	      = CTZ_DEFINED_VALUE_AT_ZERO (SCALAR_INT_TYPE_MODE (lhs_type),
-					   val2);
+	      = CTZ_DEFINED_VALUE_AT_ZERO (TYPE_MODE (vec_type), val2);
 	    if (d2 != 2 || val1 != val2)
 	      return NULL;
 	  }
@@ -2301,11 +2303,7 @@ vect_recog_popcount_clz_ctz_ffs_pattern (vec_info *vinfo,
 	gcc_unreachable ();
       }
 
-  vec_type = get_vectype_for_scalar_type (vinfo, lhs_type);
   /* Do it only if the backend has popcount<vector_mode>2 etc. pattern.  */
-  if (!vec_type)
-    return NULL;
-
   bool supported
     = direct_internal_fn_supported_p (ifn, vec_type, OPTIMIZE_FOR_SPEED);
   /* We cannot rely on the reduction check in vect_recog_ctz_ffs_pattern
@@ -2358,11 +2356,11 @@ vect_recog_popcount_clz_ctz_ffs_pattern (vec_info *vinfo,
   tree arg2 = NULL_TREE;
   int val;
   if (ifn == IFN_CLZ
-      && CLZ_DEFINED_VALUE_AT_ZERO (SCALAR_INT_TYPE_MODE (lhs_type),
+      && CLZ_DEFINED_VALUE_AT_ZERO (TYPE_MODE (vec_type),
 				    val) == 2)
     arg2 = build_int_cst (integer_type_node, val);
   else if (ifn == IFN_CTZ
-	   && CTZ_DEFINED_VALUE_AT_ZERO (SCALAR_INT_TYPE_MODE (lhs_type),
+	   && CTZ_DEFINED_VALUE_AT_ZERO (TYPE_MODE (vec_type),
 					 val) == 2)
     arg2 = build_int_cst (integer_type_node, val);
   if (arg2)

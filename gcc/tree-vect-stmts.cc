@@ -3555,6 +3555,19 @@ vectorizable_call (vec_info *vinfo,
       return false;
     }
 
+  /* During vect-patterns we remembered the defined-at-zero value in the
+     optional second argument for the natural vector mode.  Now, once we have
+     the final vector mode, verify that they coincide. If not, bail out.  */
+  if (clz_ctz_arg1)
+    {
+      int val;
+      int d = (cfn == CFN_CLZ
+	       ? CLZ_DEFINED_VALUE_AT_ZERO (TYPE_MODE (vectype_in), val)
+	       : CTZ_DEFINED_VALUE_AT_ZERO (TYPE_MODE (vectype_in), val));
+      if (d != 2 || val != tree_to_shwi (clz_ctz_arg1))
+	return false;
+    }
+
   if (VECTOR_BOOLEAN_TYPE_P (vectype_out)
       != VECTOR_BOOLEAN_TYPE_P (vectype_in))
     {
