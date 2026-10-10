@@ -72,6 +72,7 @@
 				   V1SI V2SI V4SI
 				   (V1DI "TARGET_VXE3") (V2DI "TARGET_VXE3")
 				   (V1TI "TARGET_VXE3") (TI   "TARGET_VXE3")])
+(define_mode_iterator VIT_VXE3_NO_TI [V1QI V2QI V4QI V8QI V16QI V1HI V2HI V4HI V8HI V1SI V2SI V4SI V1DI V2DI (V1TI "TARGET_VXE3")])
 (define_mode_iterator VI  [V1QI V2QI V4QI V8QI V16QI V1HI V2HI V4HI V8HI V1SI V2SI V4SI V1DI V2DI])
 (define_mode_iterator VI_VXE3 [V1QI V2QI V4QI V8QI V16QI V1HI V2HI V4HI V8HI V1SI V2SI V4SI V1DI (V2DI "TARGET_VXE3")])
 (define_mode_iterator VI_QHS [V1QI V2QI V4QI V8QI V16QI V1HI V2HI V4HI V8HI V1SI V2SI V4SI])
@@ -1620,20 +1621,38 @@
 ; Count leading zeros
 ; vclzb, vclzh, vclzf, vclzg, vclzq
 (define_insn "clz<mode>2"
-  [(set (match_operand:VT_VXE3              0 "register_operand" "=v")
-	(clz:VT_VXE3 (match_operand:VT_VXE3 1 "register_operand"  "v")))]
+  [(set (match_operand:VIT_VXE3_NO_TI                     0 "register_operand" "=v")
+	(clz:VIT_VXE3_NO_TI (match_operand:VIT_VXE3_NO_TI 1 "register_operand"  "v")))]
   "TARGET_VX"
   "vclz<bhfgq>\t%v0,%v1"
   [(set_attr "op_type" "VRR")])
 
+(define_expand "clzti2"
+  [(set (match_dup 2)
+	(clz:V1TI (subreg:V1TI (match_operand:TI 1 "register_operand") 0)))
+   (set (match_operand:SI 0 "register_operand")
+	(vec_select:SI (subreg:V4SI (match_dup 2) 0)
+		       (parallel [(const_int 3)])))]
+  "TARGET_VXE3"
+  "operands[2] = gen_reg_rtx (V1TImode);")
+
 ; Count trailing zeros
 ; vctzb, vctzh, vctzf, vctzg, vctzq
 (define_insn "ctz<mode>2"
-  [(set (match_operand:VT_VXE3              0 "register_operand" "=v")
-	(ctz:VT_VXE3 (match_operand:VT_VXE3 1 "register_operand"  "v")))]
+  [(set (match_operand:VIT_VXE3_NO_TI                     0 "register_operand" "=v")
+	(ctz:VIT_VXE3_NO_TI (match_operand:VIT_VXE3_NO_TI 1 "register_operand"  "v")))]
   "TARGET_VX"
   "vctz<bhfgq>\t%v0,%v1"
   [(set_attr "op_type" "VRR")])
+
+(define_expand "ctzti2"
+  [(set (match_dup 2)
+	(ctz:V1TI (subreg:V1TI (match_operand:TI 1 "register_operand") 0)))
+   (set (match_operand:SI 0 "register_operand")
+	(vec_select:SI (subreg:V4SI (match_dup 2) 0)
+		       (parallel [(const_int 3)])))]
+  "TARGET_VXE3"
+  "operands[2] = gen_reg_rtx (V1TImode);")
 
 
 
