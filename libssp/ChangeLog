@@ -1,3 +1,25 @@
+2026-10-10  Sam James  <sam@gentoo.org>
+
+	PR bootstrap/112422
+	* config.h.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Don't search for string.h, stdio.h, or limits.h.
+	* gets-chk.c: Drop now-redundant ifdef guards.
+	* memcpy-chk.c: Ditto.
+	* memmove-chk.c: Ditto.
+	* mempcpy-chk.c: Ditto.
+	* memset-chk.c: Ditto.
+	* snprintf-chk.c: Ditto.
+	* sprintf-chk.c: Ditto.
+	* ssp.c: Ditto.
+	* stpcpy-chk.c: Ditto.
+	* strcat-chk.c: Ditto.
+	* strcpy-chk.c: Ditto.
+	* strncat-chk.c: Ditto.
+	* strncpy-chk.c: Ditto.
+	* vsnprintf-chk.c: Ditto.
+	* vsprintf-chk.c: Ditto.
+
 2026-07-03  WHR  <whr@rivoreo.one>
 	    Thomas Schwinge  <tschwinge@baylibre.com>
 

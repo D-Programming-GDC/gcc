@@ -1,3 +1,14 @@
+2026-10-10  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* gcc.target/s390/clz-ctz-1.c: Adapt after zero tests are
+	folded, now.
+
+2026-10-10  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* gcc.dg/tree-ssa/pr123311-2.c: Pattern ctzsi2 becomes available
+	with z17.
+	* gcc.target/s390/clz-ctz-1.c: New test.
+
 2026-10-09  John David Anglin  <danglin@gcc.gnu.org>
 
 	Revert:

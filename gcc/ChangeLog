@@ -1,3 +1,79 @@
+2026-10-10  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/pa/pa.cc (pa_emit_move_sequence): Handle SFmode and DFmode
+	symbolic, constant pool, or CONST memory references on both 32-bit
+	and 64-bit targets by emitting proper PIC, 14-bit HIGH/LO_SUM, or
+	1.x fallback move sequences using a scratch register.
+	(pa_secondary_reload): Strip SUBREG early. Update hard-float memory
+	displacement checks to account for 5-bit vs 14-bit constraints on
+	PA 1.x vs PA 2.0. Look through MEM wrappers when evaluating symbolic
+	address expressions. For symbolic address expressions under flag_pic
+	or non-readonly conditions, return R1_REGS for SImode and DImode, but
+	explicitly break out for SFmode and DFmode to let them safely fall
+	back to GENERAL_REGS. Return GENERAL_REGS instead of NO_REGS for shifted
+	and coprocessor/SAR reload fallbacks.
+	(pa_can_change_mode_class): Remove equal-size mode change shortcut.
+	Prevent cross-class type punning between integer and floating-point
+	modes within GENERAL_REGS or R1_REGS before reload is completed.
+	(pa_legitimate_constant_p): Reject out-of-range multi-word constants
+	in DImode on 32-bit targets. Reject naked symbolic or constant pool
+	SFmode and DFmode addresses unconditionally on 32-bit targets, while
+	intentionally allowing fully-formed LO_SUM expressions to preserve
+	PA 2.0 optimizations.
+	(pa_legitimate_address_p): Reject naked symbolic, constant pool, or
+	CONST expressions for SFmode and DFmode unconditionally on 32-bit
+	targets to force a proper HIGH/LO_SUM split or reload.
+
+2026-10-10  Sam James  <sam@gentoo.org>
+
+	PR bootstrap/112422
+	* config.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Drop AC_C_CONST.
+
+2026-10-10  Sam James  <sam@gentoo.org>
+
+	PR bootstrap/112422
+	* acinclude.m4 (gcc_AC_C_CHAR_BIT): Don't check HAVE_LIMITS_H.
+	* config.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Don't search for limits.h, locale.h, stdlib.h.
+	* intl.h (GCC_INTL_H): Always include locale.h.
+	* system.h: Always include limits.h.
+	Always include stdlib.h.
+
+2026-10-10  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* doc/ifn.texi (IFN_CLZ): Document optional second argument.
+	(IFN_CTZ): Ditto.
+	* match.pd: Fold zero test for .CLZ/.CTZ over vector modes, too.
+
+2026-10-10  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* config/i386/i386.h (CLZ_DEFINED_VALUE_AT_ZERO): Utilize
+	GET_MODE_UNIT_BITSIZE instead of GET_MODE_BITSIZE in order to
+	deal with vector modes.
+	(CTZ_DEFINED_VALUE_AT_ZERO): Ditto.
+	* config/rs6000/rs6000.h (CLZ_DEFINED_VALUE_AT_ZERO): Ditto.
+	(CTZ_DEFINED_VALUE_AT_ZERO): Ditto.
+	* tree-vect-patterns.cc (vect_recog_ctz_ffs_pattern): Use
+	defined zero value for vector modes.
+	(vect_recog_popcount_clz_ctz_ffs_pattern): Test for a defined
+	zero value for vector modes.
+	* tree-vect-stmts.cc (vectorizable_call): Bail out if natural
+	and final vector mode do not coincide w.r.t. defined-at-zero
+	value.
+
+2026-10-10  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* config/s390/s390.h (CLZ_DEFINED_VALUE_AT_ZERO): Deal with
+	vector modes.
+	(CTZ_DEFINED_VALUE_AT_ZERO): Ditto.
+	* config/s390/s390.md (ctzsi2): Compute 32 for zero value.
+	* config/s390/vector.md (VIT_VXE3_NO_TI): New mode iterator.
+	(clzti2): New expander.
+	(ctzti2): Ditto.
+
 2026-10-09  Roger Sayle  <roger@nextmovesoftware.com>
 
 	* config/aarch64/aarch64.cc (aarch64_extr_rtx_p): Allow extr
